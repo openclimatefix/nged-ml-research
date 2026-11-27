@@ -34,12 +34,13 @@ fail when the interval lies wholly below zero. `verdict` applies rules 1 to 6 of
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
 import sys
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Final
@@ -68,6 +69,14 @@ MONTHS: Final = (
 HELD_IN_MONTHS: Final = 8
 SEEDS: Final = (0, 1, 2)
 GATE_MONTH: Final = "2026-10"
+GATE_EXIT_CODE: Final = 22
+"""The exit code of `--gate` when the replay gate fails; all exit codes are listed at the top of `e00735_run.sh`."""
+MAX_UNPAIRED: Final = 0.02
+"""The largest share of either arm's rows that may sit in cells the other arm does not hold with the same row keys."""
+CELLS_VERSION: Final = "1"
+"""Bump when the cell table's columns or sums change, so older cell files are recomputed."""
+BASELINES: Final = ("heuristic", "climatology")
+"""Experiment 677's manual heuristic and climatology, scored on the stored rows (experiment 704's construction)."""
 GATE_TOLERANCE: Final = 5e-4
 """The replay tolerance of experiment 704, as a fraction of capacity."""
 N_BOOT: Final = 20_000
@@ -78,15 +87,20 @@ MIN_GAIN: Final = 0.02
 MIN_MONTHS_NEGATIVE: Final = 6
 MIN_FITS_NEGATIVE: Final = 18
 WHOLE_YEAR_BOUND: Final = 0.02
+"""The upper bound of the no-harm reading on all held-in rows (the constant keeps its early name)."""
 NOT_SUPPORTED_BAND: Final = 0.05
 LEAD_FIRST_DAY, LEAD_LAST_DAY = 1, 10
 """Days 1 to 10 are leads in (0, 240] hours: lead-day buckets 1 to 10."""
 HOLDOUT_CODE: Final = cols.code_of(day=date(2026, 7, 1))
 LEAD_DAY_MAX: Final = 14
+P6_FIRST: Final = date(2026, 10, 24)
+P6_LAST: Final = date(2026, 11, 1)
+P6_LABELS: Final = ("D19", "D4", "D9")
 SUM_COLUMNS: Final = (
     "crps", "mae", "signed", "pin01", "pin05", "pin95", "pin99", "cov01", "cov05", "cov95",
     "cov99", "gap", "s1236",
 )  # fmt: skip
+CELL_EXTRA: Final = ("n", "n1236", "chk")
 KEY_COLUMNS: Final = ("m", "seed", "primary", "vday", "lead_day")
 BLOCK_DAYS: Final = 7
 CHUNK: Final = 2_000
@@ -117,6 +131,7 @@ class Context:
 def make_context() -> Context:
     """Load the cleaned power and the capacities once (about 1 GB)."""
     import e00668_score_lib as lib  # ty: ignore[unresolved-import]
+    import e00735_diagnostic as diag  # ty: ignore[unresolved-import]
 
     table = win.sites()
     ids = sorted(table["time_series_id"].to_list())
@@ -131,12 +146,20 @@ def make_context() -> Context:
     row_of = np.full(256, -1, dtype=np.int64)
     for i, t in enumerate(ids):
         row_of[t] = i
+    grid = lib.cleaned_grid(ids=ids)
+    cut = int(lib.grid_index(times=pl.Series([diag.CUT_START]))[0])
+    labels = dict(zip(table["time_series_id"].to_list(), table["d_label"].to_list(), strict=True))
+    for i, t in enumerate(ids):
+        if (
+            labels[t] in win.REPORTED_ONLY
+        ):  # D15 and D18: the cleaned power is not trusted before 2025-03-01
+            grid[i, :cut] = np.nan
     return Context(
         ids=ids,
         cap=cap,
         primary_of_row=np.asarray([primary[t] for t in ids], dtype=np.int64),
         row_of_tsid=row_of,
-        grid=lib.cleaned_grid(ids=ids),
+        grid=grid,
     )
 
 
@@ -149,8 +172,33 @@ def mean_weights() -> np.ndarray:
     return np.diff(edges)
 
 
+def baseline_quantiles(
+    *,
+    name: str,
+    rows: pl.DataFrame,
+    ctx: Context,
+    row: np.ndarray,
+    vidx: np.ndarray,
+    oidx: np.ndarray,
+) -> np.ndarray:
+    """Return the quantiles in MW of experiment 677's manual heuristic or climatology on the rows' keys.
+
+    The climatology trains on the power before the first day of each row's origin month, which is the
+    refit cut-off of a monthly refit (experiment 704's `baseline_q`).
+    """
+    import e00668_score_lib as lib  # ty: ignore[unresolved-import]
+
+    grid = ctx.padded_grid(last=int(vidx.max()))
+    lead_h = (vidx - oidx) / 2.0
+    if name == "heuristic":
+        return lib.manual_heuristic(grid=grid, row=row, vidx=vidx, lead_h=lead_h)
+    assert name == "climatology", name
+    starts = rows["power_fcst_init_time"].dt.truncate("1mo")
+    return lib.climatology(grid=grid, row=row, vidx=vidx, cutoff_idx=lib.grid_index(times=starts))
+
+
 def cells_from_contract(
-    *, rows: pl.DataFrame, ctx: Context, month_index: int
+    *, rows: pl.DataFrame, ctx: Context, month_index: int, baseline: str | None = None
 ) -> tuple[pl.DataFrame, dict]:
     """Return the sums per Primary, valid local date, and lead day of one fit's contract rows, and its row counts.
 
@@ -158,6 +206,8 @@ def cells_from_contract(
         rows: Contract rows (12:00 origins, 14 days each, quantiles in MW).
         ctx: The scoring context.
         month_index: Index of the refit month in `MONTHS`.
+        baseline: `heuristic` or `climatology` to score that baseline on the rows' keys instead of
+            the rows' own quantiles.
 
     Returns:
         The cell table and a dictionary of row counts (all, scored, without truth).
@@ -172,7 +222,13 @@ def cells_from_contract(
     grid = ctx.padded_grid(last=int(vidx.max()))
     lead_h = (vidx - oidx) / 2.0
     scale = 100.0 / ctx.cap[row]
-    q = rows.select(lib.QCOLS).to_numpy().astype(np.float64) * scale[:, None]
+    if baseline is None:
+        q = rows.select(lib.QCOLS).to_numpy().astype(np.float64) * scale[:, None]
+    else:
+        q = (
+            baseline_quantiles(name=baseline, rows=rows, ctx=ctx, row=row, vidx=vidx, oidx=oidx)
+            * scale[:, None]
+        )
     y = grid[row, vidx] * scale
     ok = np.isfinite(y) & np.isfinite(q).all(axis=1)
     counts = {
@@ -182,6 +238,7 @@ def cells_from_contract(
     }
     sel = np.flatnonzero(ok)
     q, y, lead_h, row = q[sel], y[sel], lead_h[sel], row[sel]
+    key_sum = (oidx[sel] + 7 * vidx[sel]).astype(np.int64)
     stamp = rows["valid_time"].dt.epoch("us").to_numpy()[sel]
     d = y[:, None] - q
     pin = np.maximum(taus * d, (taus - 1.0) * d)
@@ -207,6 +264,7 @@ def cells_from_contract(
             "gap": q[:, 5] - q @ mean_weights(),
             "s1236": np.where(in_window, signed, 0.0),
             "n1236": in_window.astype(np.int32),
+            "chk": key_sum,
         }
     )
     cells = (
@@ -214,6 +272,7 @@ def cells_from_contract(
         .agg(
             pl.len().cast(pl.Int32).alias("n"),
             pl.col("n1236").sum(),
+            pl.col("chk").sum(),
             *[pl.col(c).sum() for c in SUM_COLUMNS],
         )
         .sort("primary", "vday", "lead_day")
@@ -261,30 +320,109 @@ def contract_from_stored(*, month: str, seed: int) -> pl.DataFrame:
     return frame.sort("time_series_id", "power_fcst_init_time", "valid_time")
 
 
+def sha256_file(*, path: Path) -> str:
+    """Return the sha256 of a file's bytes."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while block := handle.read(1 << 24):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def fit_code_hash(*, path: Path, month: str) -> str:
+    """Return the code hash that the fit of `path` recorded in its arm folder (the marker `e00735_k1.py` writes)."""
+    marker = path.parents[2] / f"code_hash_{month}.txt"
+    assert marker.exists(), ("no code-hash marker beside the fit", str(marker))
+    return marker.read_text().strip()
+
+
+def stamp_of(*, arm: str, month: str, seed: int) -> dict[str, str] | None:
+    """Return what a cell file must record to be current: the fit's code hash, the sha256 of its input file, and the cell version.
+
+    A stored or baseline arm has no fit: its input is experiment 677's stored backtest file, named by
+    its size and modification time (the file is far too large to hash on every run).
+    """
+    if arm in {"stored", *BASELINES}:
+        stored = ROOT_677 / "backtests" / f"{STORED_FILE}.parquet"
+        info = stored.stat()
+        return {
+            "code_hash": "experiment 677 stored rows",
+            "input": f"{stored.name}:{info.st_size}:{info.st_mtime_ns}",
+            "version": CELLS_VERSION,
+        }
+    path = fit_path(root=ROOT, arm=arm, month=month, seed=seed)
+    if not path.exists():
+        return None
+    return {
+        "code_hash": fit_code_hash(path=path, month=month),
+        "input": sha256_file(path=path),
+        "version": CELLS_VERSION,
+    }
+
+
+def stamp_path(*, out: Path) -> Path:
+    """Return the file beside a cell file that records its stamp."""
+    return out.with_suffix(".stamp.json")
+
+
+def cell_is_current(*, out: Path, stamp: dict[str, str]) -> bool:
+    """Return True when the cell file and its stamp exist and the stamp equals the current one."""
+    sp = stamp_path(out=out)
+    return out.exists() and sp.exists() and json.loads(sp.read_text()) == stamp
+
+
+def write_cells(*, cells: pl.DataFrame, out: Path, stamp: dict[str, str]) -> None:
+    """Write a cell file and then its stamp, each through a temporary file and a rename.
+
+    The stamp is the last file renamed, so a crash between the two leaves a cell file with an old or
+    missing stamp, which `cell_is_current` refuses.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)
+    sp = stamp_path(out=out)
+    sp.unlink(missing_ok=True)
+    tmp = out.with_suffix(".tmp")
+    cells.write_parquet(tmp)
+    tmp.rename(out)
+    stmp = sp.with_suffix(".tmp")
+    stmp.write_text(json.dumps(stamp))
+    stmp.rename(sp)
+
+
 def stage_cells(*, arms: list[str], stored: bool) -> None:
-    """Write the cells of every fit that exists and has none yet, one fit at a time."""
+    """Write the cells of every fit that exists and has no current cell file, one fit at a time.
+
+    A cell file is current when its stamp (the fit's code hash, the sha256 of its fits file, and
+    `CELLS_VERSION`) equals the fit's present one, so a refit never reuses an older arm's cells.
+    The two baselines are scored once per month on the stored rows' keys and written for each seed.
+    """
     ctx = make_context()
     count_rows = []
     for arm in arms:
         for mi, month in enumerate(MONTHS):
+            baseline_rows: pl.DataFrame | None = None
             for seed in SEEDS:
                 out = cell_path(arm=arm, month=month, seed=seed)
-                if out.exists():
+                if arm in {"stored", *BASELINES} and not stored:
+                    continue
+                stamp = stamp_of(arm=arm, month=month, seed=seed)
+                if stamp is None:
+                    continue
+                if cell_is_current(out=out, stamp=stamp):
                     continue
                 if arm == "stored":
-                    if not stored:
-                        continue
                     rows = contract_from_stored(month=month, seed=seed)
+                elif arm in BASELINES:
+                    if baseline_rows is None:
+                        baseline_rows = contract_from_stored(month=month, seed=0)
+                    rows = baseline_rows
                 else:
-                    path = fit_path(root=ROOT, arm=arm, month=month, seed=seed)
-                    if not path.exists():
-                        continue
-                    rows = contract_from_fit(path=path)
-                cells, counts = cells_from_contract(rows=rows, ctx=ctx, month_index=mi)
-                out.parent.mkdir(parents=True, exist_ok=True)
-                tmp = out.with_suffix(".tmp")
-                cells.write_parquet(tmp)
-                tmp.rename(out)
+                    rows = contract_from_fit(
+                        path=fit_path(root=ROOT, arm=arm, month=month, seed=seed)
+                    )
+                cells, counts = cells_from_contract(
+                    rows=rows, ctx=ctx, month_index=mi, baseline=arm if arm in BASELINES else None
+                )
+                write_cells(cells=cells, out=out, stamp=stamp)
                 count_rows.append({"arm": arm, "month": month, "seed": seed, **counts})
                 print("cells", arm, month, seed, counts, flush=True)
     if count_rows:
@@ -296,20 +434,33 @@ def stage_cells(*, arms: list[str], stored: bool) -> None:
 
 
 def load_arm(*, arm: str, months: tuple[str, ...] = MONTHS) -> pl.DataFrame | None:
-    """Return an arm's cells for the months, or None if any fit of those months lacks a file."""
+    """Return an arm's cells for the months, or None if any fit of those months lacks a current cell file.
+
+    The names of the missing fits are printed, so a dropped arm is told apart from a half-finished one.
+    A cell file whose stamp differs from the fit's present stamp counts as missing.
+    """
     parts = []
+    missing: list[str] = []
     for mi, month in enumerate(MONTHS):
         if month not in months:
             continue
         for seed in SEEDS:
             path = cell_path(arm=arm, month=month, seed=seed)
-            if not path.exists():
-                return None
+            stamp = stamp_of(arm=arm, month=month, seed=seed) if path.exists() else None
+            if stamp is None or not cell_is_current(out=path, stamp=stamp):
+                missing.append(f"{month}_s{seed}")
+                continue
             parts.append(
                 pl.read_parquet(path).with_columns(
                     seed=pl.lit(seed, pl.Int8), m=pl.lit(mi, pl.Int8)
                 )
             )
+    if missing:
+        print(
+            f"arm {arm}: no current cells for {len(missing)} of {len(months) * len(SEEDS)} fits: {missing[:6]}...",
+            flush=True,
+        )
+        return None
     return pl.concat(parts).sort(*KEY_COLUMNS)
 
 
@@ -328,6 +479,8 @@ class Pair:
     kinds: np.ndarray
     period: np.ndarray
     lead_ok: np.ndarray
+    unpaired: dict[str, int] = field(default_factory=dict)
+    """Rows of each arm in cells that were left out because the other arm lacks the cell or holds other rows in it."""
 
 
 def period_of(*, m: np.ndarray, vday: np.ndarray) -> np.ndarray:
@@ -343,12 +496,42 @@ def period_of(*, m: np.ndarray, vday: np.ndarray) -> np.ndarray:
     return out.astype(str)
 
 
-def make_pair(*, a: pl.DataFrame, b: pl.DataFrame, name: str, reference: str, weather) -> Pair:  # noqa: ANN001
-    """Join two arms' cells (every key must match, with equal row counts) and describe the rows."""
+def make_pair(
+    *, a: pl.DataFrame, b: pl.DataFrame, name: str, reference: str,
+    weather: tuple[win.DailyWeather, np.ndarray] | None, max_unpaired: float = MAX_UNPAIRED,
+) -> Pair:  # fmt: skip
+    """Join two arms' cells on their keys and keep the cells that hold the same rows in both arms.
+
+    A cell is paired when both arms have its key (month, seed, Primary, local date, lead day) and
+    the same row count and the same checksum of row keys (the sum of origin and valid grid indices),
+    so two arms with equal counts of different rows are not paired. The rows in unpaired cells are
+    printed and kept in `Pair.unpaired`.
+
+    Args:
+        a: The first arm's cells.
+        b: The reference arm's cells.
+        name: The first arm's name.
+        reference: The reference arm's name.
+        weather: The daily weather and its medians, or None.
+        max_unpaired: The largest share of either arm's rows that may be unpaired.
+
+    Returns:
+        The paired cells with their differences and row descriptors.
+    """
     keys = list(KEY_COLUMNS)
     joined = a.join(b, on=keys, how="inner", suffix="_ref", validate="1:1").sort(*keys)
-    assert joined.height == a.height == b.height, ("cell keys differ", name, reference)
-    assert (joined["n"] == joined["n_ref"]).all(), ("row counts differ", name, reference)
+    same = (joined["n"] == joined["n_ref"]) & (joined["chk"] == joined["chk_ref"])
+    joined = joined.filter(same)
+    rows_a, rows_b, rows_paired = (int(x["n"].sum()) for x in (a, b, joined))
+    unpaired = {name: rows_a - rows_paired, reference: rows_b - rows_paired}
+    print(
+        f"pair {name} - {reference}: {joined.height} cells paired, unpaired rows {unpaired}",
+        flush=True,
+    )
+    assert joined.height, ("no cell holds the same rows in both arms", name, reference)
+    assert unpaired[name] <= max_unpaired * rows_a and unpaired[reference] <= max_unpaired * rows_b, (
+        "too many rows differ between the arms", name, reference, unpaired,
+    )  # fmt: skip
     frame = joined.select(
         *keys,
         "n",
@@ -378,6 +561,7 @@ def make_pair(*, a: pl.DataFrame, b: pl.DataFrame, name: str, reference: str, we
         kinds=kinds,
         period=period_of(m=frame["m"].to_numpy().astype(np.int64), vday=codes),
         lead_ok=(lead >= LEAD_FIRST_DAY) & (lead <= LEAD_LAST_DAY),
+        unpaired=unpaired,
     )
 
 
@@ -385,25 +569,31 @@ def make_pair(*, a: pl.DataFrame, b: pl.DataFrame, name: str, reference: str, we
 
 
 def gather(
-    *, pair: Pair, mask: np.ndarray, column: str = "d_crps"
+    *, pair: Pair, mask: np.ndarray, column: str = "d_crps", block_mask: np.ndarray | None = None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (D, N, n_blocks) for a selection: sums of the column and of the row counts per (month, seed, block).
 
     Months with no selected row keep zeros. Blocks are the 7-day groups of valid dates that hold a
-    selected row, numbered inside each month.
+    row of `block_mask` (by default, a selected row), numbered inside each month. Two selections
+    gathered with the same `block_mask` share one block numbering, so a bootstrap pick means the
+    same calendar week in both.
     """
     f = pair.frame
-    m = f["m"].to_numpy().astype(np.int64)[mask]
-    s = f["seed"].to_numpy().astype(np.int64)[mask]
-    vday = f["vday"].to_numpy().astype(np.int64)[mask]
+    bm = mask if block_mask is None else block_mask
+    assert not (mask & ~bm).any(), "the selection must lie inside the block mask"
+    m_all = f["m"].to_numpy().astype(np.int64)
+    v_all = f["vday"].to_numpy().astype(np.int64)
+    block_all = np.zeros(len(m_all), dtype=np.int64)
     n_months = len(MONTHS)
-    block = np.zeros(len(m), dtype=np.int64)
     n_blocks = np.zeros(n_months, dtype=np.int64)
-    for mm in np.unique(m):
-        sel = m == mm
-        _, inv = np.unique(vday[sel] // BLOCK_DAYS, return_inverse=True)
-        block[sel] = inv
+    for mm in np.unique(m_all[bm]):
+        sel = bm & (m_all == mm)
+        _, inv = np.unique(v_all[sel] // BLOCK_DAYS, return_inverse=True)
+        block_all[sel] = inv
         n_blocks[mm] = inv.max() + 1
+    m = m_all[mask]
+    s = f["seed"].to_numpy().astype(np.int64)[mask]
+    block = block_all[mask]
     width = int(max(n_blocks.max(), 1))
     shape = (n_months, len(SEEDS), width)
     index = (m * len(SEEDS) + s) * width + block
@@ -463,7 +653,44 @@ def reading(
     *, pair: Pair, mask: np.ndarray, name: str, level: float, months: list[int], column: str = "d_crps",
     one_sided: bool = False,
 ) -> dict:  # fmt: skip
-    """Return one reading: the pooled paired difference, its interval, and the sign counts.
+    """Return one reading of the CRPS difference, with the normalised-MAE-of-the-median difference beside it.
+
+    The reading's own keys are those of `reading_of`, for the column `d_crps`. When the pair holds
+    `d_mae`, the same selection and the same bootstrap picks (the generator is seeded by the name)
+    give the keys `mae_estimate`, `mae_lower`, `mae_upper`, `mae_months_negative`, and
+    `mae_fits_negative`, in points of capacity.
+    """
+    out = reading_of(
+        pair=pair,
+        mask=mask,
+        name=name,
+        level=level,
+        months=months,
+        column=column,
+        one_sided=one_sided,
+    )
+    if column == "d_crps" and "d_mae" in pair.frame.columns:
+        twin = reading_of(
+            pair=pair,
+            mask=mask,
+            name=name,
+            level=level,
+            months=months,
+            column="d_mae",
+            one_sided=one_sided,
+        )
+        out |= {
+            f"mae_{k}": twin[k]
+            for k in ("estimate", "lower", "upper", "months_negative", "fits_negative")
+        }
+    return out
+
+
+def reading_of(
+    *, pair: Pair, mask: np.ndarray, name: str, level: float, months: list[int], column: str = "d_crps",
+    one_sided: bool = False,
+) -> dict:  # fmt: skip
+    """Return one reading: the pooled paired difference of a column, its interval, and the sign counts.
 
     Args:
         pair: The two arms' joined cells.
@@ -541,45 +768,72 @@ def inside_band(*, r: dict) -> bool:
     )
 
 
-def verdict(*, r: dict[str, dict]) -> dict:
+REQUIRED_READINGS: Final[dict[str, tuple[str, ...]]] = {
+    **dict.fromkeys(("C1 six", "C1 eight"), ("S", "R0")),
+    **dict.fromkeys(("C2 six", "C2 eight"), ("S", "SP")),
+    "C4": ("SKW", "SKWP"),
+    "C5": ("SE", "SEP"),
+    **dict.fromkeys(("SP-R0 six", "SP-R0 eight"), ("SP", "R0")),
+    "SKWP-S": ("SKWP", "S"),
+    "SEP-S": ("SEP", "S"),
+    "inland C4": ("SKW", "SKWP"),
+    "inland C5": ("SE", "SEP"),
+    **{f"year held-in {a} {g}": (a, "R0") for a in ("S", "SKW", "SE") for g in ("six", "eight")},
+}
+"""Every reading that the verdict reads, with the arms it needs. The no-harm bounds use the held-in rows only."""
+
+
+def verdict(*, r: dict[str, dict], dropped: frozenset[str] = frozenset()) -> dict:
     """Map the readings to the plan's verdict, first rule that applies.
 
     Args:
         r: The named readings: `C1 six`, `C1 eight`, `C2 six`, `C2 eight`, `C4`, `C5`; the placebos
-            `SP-R0 six`, `SP-R0 eight`, `SKWP-S`, `SEP-S`; the whole-year upper bounds `year S six`,
-            `year S eight`, `year SKW six`, `year SKW eight`, `year SE six`, `year SE eight`; the
-            inland placebo readings `inland C4` and `inland C5`. A reading of an arm that was
-            dropped is absent, and a claim that needs it does not hold.
+            `SP-R0 six`, `SP-R0 eight`, `SKWP-S`, `SEP-S`; the no-harm upper bounds on the held-in
+            rows `year held-in S six`, `year held-in S eight`, `year held-in SKW six`, and so on for
+            SKW and SE; the inland placebo readings `inland C4` and `inland C5`.
+        dropped: The arms that were dropped on purpose. A reading that needs a dropped arm may be
+            absent, and a claim that needs it does not hold.
 
     Returns:
         The verdict, the school claim per group, the coast claims, and the rule that decided.
+
+    Raises:
+        ValueError: If a reading of an arm that was not dropped is missing, because a missing
+            reading would otherwise turn into `inconclusive` without a word.
     """
+    absent = [
+        name
+        for name, arms in REQUIRED_READINGS.items()
+        if name not in r and not (set(arms) & dropped)
+    ]
+    if absent:
+        raise ValueError(f"readings missing for arms that were not dropped: {absent}")
 
     def has(name: str) -> bool:
         return name in r
 
     def school(group: str) -> bool:
         return (
-            has(f"C1 {group}") and has(f"C2 {group}") and has(f"SP-R0 {group}") and has(f"year S {group}")
+            has(f"C1 {group}") and has(f"C2 {group}") and has(f"SP-R0 {group}") and has(f"year held-in S {group}")
             and is_gain(r=r[f"C1 {group}"]) and is_gain(r=r[f"C2 {group}"])
             and not placebo_failed(r=r[f"SP-R0 {group}"])
-            and r[f"year S {group}"]["upper"] <= WHOLE_YEAR_BOUND
+            and r[f"year held-in S {group}"]["upper"] <= WHOLE_YEAR_BOUND
         )  # fmt: skip
 
     def coast(reading_name: str, placebo: str, arm: str) -> bool:
         needed = [
             reading_name,
             placebo,
-            f"year {arm} six",
-            f"year {arm} eight",
+            f"year held-in {arm} six",
+            f"year held-in {arm} eight",
             f"inland {reading_name}",
         ]
         return (
             all(has(n) for n in needed)
             and is_gain(r=r[reading_name])
             and not placebo_failed(r=r[placebo])
-            and r[f"year {arm} six"]["upper"] <= WHOLE_YEAR_BOUND
-            and r[f"year {arm} eight"]["upper"] <= WHOLE_YEAR_BOUND
+            and r[f"year held-in {arm} six"]["upper"] <= WHOLE_YEAR_BOUND
+            and r[f"year held-in {arm} eight"]["upper"] <= WHOLE_YEAR_BOUND
             and not placebo_failed(r=r[f"inland {reading_name}"])
         )
 
@@ -620,10 +874,11 @@ def group_mask(*, pair: Pair, indices: list[int]) -> np.ndarray:
 
 
 def pair_of(*, arms: dict[str, pl.DataFrame], a: str, b: str, weather) -> Pair | None:  # noqa: ANN001
-    """Return the joined pair of two arms, or None if either is missing."""
+    """Return the joined pair of two arms, or None if either is missing (a baseline may leave any share of rows unpaired)."""
     if a not in arms or b not in arms:
         return None
-    return make_pair(a=arms[a], b=arms[b], name=a, reference=b, weather=weather)
+    limit = 1.0 if {a, b} & set(BASELINES) else MAX_UNPAIRED
+    return make_pair(a=arms[a], b=arms[b], name=a, reference=b, weather=weather, max_unpaired=limit)
 
 
 def stage_contrasts(*, r0_from_stored: bool) -> dict:
@@ -636,17 +891,23 @@ def stage_contrasts(*, r0_from_stored: bool) -> dict:
     six, eight, coastal, inland = (
         groups[k] for k in ("six signed-MW", "eight MVA-only", "4 coastal", "3 inland placebo")
     )
-    weather_cache = ROOT / "weather_daily.npz"
+    weather_cache = ROOT / win.WEATHER_CACHE_NAME
     daily = win.daily_weather(expected_dir=win.EXPECTED_DIR, cache=weather_cache)
     weather = (daily, win.monthly_medians(weather=daily))
     arms: dict[str, pl.DataFrame] = {}
-    for arm in (*ARMS, "stored"):
+    for arm in (*ARMS, "stored", *BASELINES):
         loaded = load_arm(arm=arm)
         if loaded is not None:
             arms[arm] = loaded
     if "R0" not in arms and r0_from_stored and "stored" in arms:
         arms["R0"] = arms["stored"]
     print("arms scored in all 12 months:", sorted(arms), flush=True)
+    dropped = frozenset(
+        a
+        for a in ARMS[1:]
+        if not any(cell_path(arm=a, month=mo, seed=sd).exists() for mo in MONTHS for sd in SEEDS)
+    )
+    print("arms dropped (no cell file at all):", sorted(dropped), flush=True)
     held = list(range(HELD_IN_MONTHS))
     every = list(range(len(MONTHS)))
     readings: dict[str, dict] = {}
@@ -748,6 +1009,7 @@ def stage_contrasts(*, r0_from_stored: bool) -> dict:
             ("3 inland placebo", inland),
         ):
             mask = p.lead_ok & group_mask(pair=p, indices=idx)
+            held_mask = mask & (p.period == "held-in")
             add(
                 reading(
                     pair=p,
@@ -757,14 +1019,14 @@ def stage_contrasts(*, r0_from_stored: bool) -> dict:
                     months=every,
                     one_sided=True,
                 ),
-                tag=f"year {arm} - R0",
+                tag=f"year {arm} - R0 (all 12 refits, descriptive)",
                 group=gname,
                 level="one-sided 95",
             )
             add(
                 reading(
                     pair=p,
-                    mask=mask,
+                    mask=held_mask,
                     name=f"year held-in {arm} {gname}",
                     level=PLACEBO_LEVEL,
                     months=held,
@@ -774,7 +1036,8 @@ def stage_contrasts(*, r0_from_stored: bool) -> dict:
                 group=gname,
                 level="one-sided 95",
             )
-    summary = {"readings": readings, "verdict": verdict(r=readings)}
+    summary = {"readings": readings, "verdict": verdict(r=readings, dropped=dropped)}
+
     descriptive(
         arms=arms,
         pairs=get,
@@ -784,6 +1047,9 @@ def stage_contrasts(*, r0_from_stored: bool) -> dict:
         add=add,
         window_rows=window_rows,
     )
+    summary["unpaired_rows"] = {
+        f"{p.name} - {p.reference}": p.unpaired for p in pairs.values() if p is not None
+    }
     (out_dir / "readings.json").write_text(json.dumps(summary, indent=1, default=float))
     pl.DataFrame(rows, infer_schema_length=None).write_csv(out_dir / "readings.csv")
     by_fit_table(get=get, groups=groups, out=out_dir / "by_fit.csv")
@@ -804,6 +1070,8 @@ def descriptive(*, arms, pairs, groups, weather, held, add, window_rows) -> None
         ("SE", "SEP"),
         ("S", "SP"),
         ("R0", "stored"),
+        ("R0", "climatology"),
+        ("R0", "heuristic"),
     ):
         p = pairs(a, b)
         if p is None:
@@ -867,20 +1135,134 @@ def descriptive(*, arms, pairs, groups, weather, held, add, window_rows) -> None
                     )
     p = pairs("SKW", "SKWP")
     if p is not None:
-        add(
-            p4_reading(pair=p, group=coastal, held=held),
-            tag="P4",
-            group="4 coastal",
-            window="warm and sunny minus cold or wet",
-            period="held-in",
-            level="95",
+        for column, name in (("d_crps", "P4"), ("d_mae", "P4 MAE")):
+            add(
+                p4_reading(pair=p, group=coastal, held=held, column=column, name=name),
+                tag=name,
+                group="4 coastal",
+                window="warm and sunny minus cold or wet",
+                period="held-in",
+                level="95",
+            )
+    per_primary_and_leave_one_out(arms=arms, pairs=pairs, groups=groups, held=held, add=add)
+    slope_readings(pairs=pairs, held=held, add=add)
+    p6_table(arms=arms)
+
+
+def per_primary_and_leave_one_out(*, arms, pairs, groups, held, add) -> None:  # noqa: ANN001
+    """Add each Primary's reading and the leave-one-out readings of the groups of the family contrasts.
+
+    Every reading is the school-window contrast on the held-in rows at 95%. The leave-one-out
+    readings drop each member of a group in turn, so a gain that rests on one Primary shows.
+    """
+    labels = win.sites()["d_label"].to_list()
+    for tag, a, b, group_names in (
+        ("C1", "S", "R0", ("six signed-MW", "eight MVA-only")),
+        ("C2", "S", "SP", ("six signed-MW", "eight MVA-only")),
+        ("C4", "SKW", "SKWP", ("4 coastal",)),
+        ("C5", "SE", "SEP", ("4 coastal",)),
+    ):
+        p = pairs(a, b)
+        if p is None:
+            continue
+        base = p.masks[win.SCHOOL_WINDOW] & p.lead_ok & (p.period == "held-in")
+        for i, lab in enumerate(labels):
+            add(
+                reading(pair=p, mask=base & group_mask(pair=p, indices=[i]), name=f"{tag} Primary {lab}", level=PLACEBO_LEVEL, months=held),
+                tag=f"{tag} per Primary", group=f"Primary {lab}", level="95",
+            )  # fmt: skip
+        for gname in group_names:
+            members = groups[gname]
+            for left_out in members:
+                rest = [x for x in members if x != left_out]
+                add(
+                    reading(pair=p, mask=base & group_mask(pair=p, indices=rest), name=f"{tag} {gname} without {labels[left_out]}", level=PLACEBO_LEVEL, months=held),
+                    tag=f"{tag} leave one out", group=f"{gname} without {labels[left_out]}", level="95",
+                )  # fmt: skip
+
+
+def slope_readings(*, pairs, held, add) -> None:  # noqa: ANN001
+    """Add the slope of the school-window gain against the distance from the coast, in points of capacity per km.
+
+    Per Primary, the paired CRPS difference of the held-in school window is a ratio of sums; the
+    slope is the least-squares slope of those 16 ratios on the Primaries' coast distances. The
+    bootstrap draws months, seeds, and 7-day blocks once and recomputes the 16 ratios and the slope
+    on every draw, so the interval keeps the fit as the unit.
+    """
+    km = win.sites()["coast_km"].to_numpy().astype(np.float64)
+    for a, b in (("S", "R0"), ("SKW", "SKWP"), ("SE", "SEP"), ("SKW", "S")):
+        p = pairs(a, b)
+        if p is None:
+            continue
+        base = p.masks[win.SCHOOL_WINDOW] & p.lead_ok & (p.period == "held-in")
+        gathered = [
+            gather(pair=p, mask=base & group_mask(pair=p, indices=[i]), block_mask=base)
+            for i in range(len(km))
+        ]
+        n_blocks = gathered[0][2]
+        out = {"name": f"slope {a}-{b}", "level": PLACEBO_LEVEL, "rows": int(sum(g[1].sum() for g in gathered)), "estimate": math.nan, "lower": math.nan, "upper": math.nan, "n_months": 0, "months_negative": 0, "n_fits": 0, "fits_negative": 0}  # fmt: skip
+        if min(g[1].sum() for g in gathered) > 0:
+            ratios = np.asarray([g[0].sum() / g[1].sum() for g in gathered])
+            out["estimate"] = float(np.polyfit(km, ratios, 1)[0])
+            draws = bootstrap_sums(
+                parts=[(g[0], g[1]) for g in gathered],
+                n_blocks=n_blocks,
+                months=held,
+                rng=rng_for(name=out["name"]),
+            )
+            r = np.stack([d / np.where(n > 0, n, np.nan) for d, n in draws])
+            centred = km - km.mean()
+            slope = (centred[:, None] * (r - r.mean(axis=0))).sum(axis=0) / (centred**2).sum()
+            slope = slope[np.isfinite(slope)]
+            out["lower"], out["upper"] = (float(v) for v in np.quantile(slope, [0.025, 0.975]))
+        add(out, tag=f"slope {a} - {b}", group="16 Primaries by coast distance", window="school window", period="held-in", level="95")  # fmt: skip
+
+
+def p6_table(*, arms) -> None:  # noqa: ANN001
+    """Write P6: each arm's mean signed error of the 12 to 36 hour median at D19, D4, and D9 on 2026-10-24 to 2026-11-01.
+
+    The error is median minus actual in points of capacity, from the stored `s1236` sums of the
+    2026-10 refit's cells, and the table also holds each arm minus R0. P6 predicts that S minus R0
+    is at least +3 at the three Primaries.
+    """
+    table = win.sites()
+    first, last = cols.code_of(day=P6_FIRST), cols.code_of(day=P6_LAST)
+    rows = []
+    for arm, frame in arms.items():
+        sub = frame.filter(
+            (pl.col("m") == MONTHS.index(GATE_MONTH)) & pl.col("vday").is_between(first, last)
         )
+        for lab in P6_LABELS:
+            prim = int(table.filter(pl.col("d_label") == lab)["primary"][0])
+            for seed in (*SEEDS, None):
+                part = sub.filter(pl.col("primary") == prim)
+                if seed is not None:
+                    part = part.filter(pl.col("seed") == seed)
+                n = part["n1236"].sum()
+                rows.append({"arm": arm, "d_label": lab, "seed": "mean" if seed is None else str(seed), "rows": int(n), "signed_error": float(part["s1236"].sum() / n) if n else math.nan})  # fmt: skip
+    if not rows:
+        return
+    frame = pl.DataFrame(rows)
+    ref = frame.filter(pl.col("arm") == "R0").select(
+        "d_label", "seed", control=pl.col("signed_error")
+    )
+    frame = (
+        frame.join(ref, on=["d_label", "seed"], how="left")
+        .with_columns(minus_R0=pl.col("signed_error") - pl.col("control"))
+        .drop("control")
+    )
+    frame.write_csv(ROOT / "scores" / "p6.csv")
+    print(frame.filter(pl.col("seed") == "mean").sort("d_label", "arm"), flush=True)
 
 
-def p4_reading(*, pair: Pair, group: list[int], held: list[int]) -> dict:
+def p4_reading(
+    *, pair: Pair, group: list[int], held: list[int], column: str = "d_crps", name: str = "P4"
+) -> dict:
     """Return P4: the SKW-minus-SKWP gain on warm and sunny school-window days minus that on cold or wet days.
 
-    Both parts share one set of bootstrap picks. A gain is negative, so P4 expects a negative number.
+    Both parts share one set of bootstrap picks and one 7-day block numbering (numbered from the
+    union of the two parts' rows), so a pick means the same calendar week in both. A gain is
+    negative, so P4 expects a negative number.
     """
     base = (
         pair.masks[win.SCHOOL_WINDOW]
@@ -889,22 +1271,15 @@ def p4_reading(*, pair: Pair, group: list[int], held: list[int]) -> dict:
         & (pair.period == "held-in")
     )
     masks = [base & (pair.kinds == 0), base & (pair.kinds == 1)]
-    gathered = [gather(pair=pair, mask=m) for m in masks]
-    width = max(g[0].shape[2] for g in gathered)
-    pad = [
-        (
-            np.pad(g[0], ((0, 0), (0, 0), (0, width - g[0].shape[2]))),
-            np.pad(g[1], ((0, 0), (0, 0), (0, width - g[1].shape[2]))),
-        )
-        for g in gathered
-    ]
-    n_blocks = np.maximum(gathered[0][2], gathered[1][2])
-    out = {"name": "P4", "level": PLACEBO_LEVEL, "rows": int(sum(g[1].sum() for g in gathered)), "estimate": math.nan, "lower": math.nan, "upper": math.nan, "n_months": 0, "months_negative": 0, "n_fits": 0, "fits_negative": 0}  # fmt: skip
-    if min(g[1].sum() for g in gathered) == 0:
+    union = masks[0] | masks[1]
+    pad = [gather(pair=pair, mask=m, column=column, block_mask=union) for m in masks]
+    n_blocks = pad[0][2]
+    out = {"name": name, "level": PLACEBO_LEVEL, "rows": int(sum(g[1].sum() for g in pad)), "estimate": math.nan, "lower": math.nan, "upper": math.nan, "n_months": 0, "months_negative": 0, "n_fits": 0, "fits_negative": 0}  # fmt: skip
+    if min(g[1].sum() for g in pad) == 0:
         return out
     out["estimate"] = float(pad[0][0].sum() / pad[0][1].sum() - pad[1][0].sum() / pad[1][1].sum())
     (d0, n0), (d1, n1) = bootstrap_sums(
-        parts=pad, n_blocks=n_blocks, months=held, rng=rng_for(name="P4")
+        parts=[(g[0], g[1]) for g in pad], n_blocks=n_blocks, months=held, rng=rng_for(name="P4")
     )
     ok = (n0 > 0) & (n1 > 0)
     draws = d0[ok] / n0[ok] - d1[ok] / n1[ok]
@@ -983,9 +1358,9 @@ def metrics_tables(*, arms: dict[str, pl.DataFrame], weather, groups: dict, out:
                             g = sub.filter(pl.col("primary").is_in(idx))
                             if g.height == 0:
                                 continue
-                            n = g["n"].sum()
+                            n = int(g["n"].sum())
                             parts.append({"arm": arm, "window": wname, "weather": kname, "lead": bname, "period": pname, "group": gname, "rows": int(n),
-                                          **{c: float(g[c].sum() / n) for c in SUM_COLUMNS if c != "s1236"}})  # fmt: skip
+                                          **{c: float(g[c].sum()) / n for c in SUM_COLUMNS if c != "s1236"}})  # fmt: skip
     if parts:
         pl.DataFrame(parts).write_csv(out / "metrics.csv")
     if gaps:
@@ -1025,7 +1400,7 @@ def stage_gate() -> int:
     )
     (ROOT / "scores").mkdir(parents=True, exist_ok=True)
     (ROOT / "scores" / "gate.json").write_text(json.dumps({"worst": worst, "tolerance": GATE_TOLERANCE, "passed": passed, "rows_only_r0": only_r0, "rows_only_stored": only_stored}))  # fmt: skip
-    return 0 if passed else 1
+    return 0 if passed else GATE_EXIT_CODE
 
 
 def stage_smoke() -> int:
@@ -1090,7 +1465,9 @@ def main() -> int:
     if args.gate:
         return stage_gate()
     if args.stage in {"cells", "all"}:
-        stage_cells(arms=[*args.arms, *(["stored"] if args.stored else [])], stored=args.stored)
+        stage_cells(
+            arms=[*args.arms, *(["stored", *BASELINES] if args.stored else [])], stored=args.stored
+        )
     if args.stage in {"contrasts", "all"}:
         stage_contrasts(r0_from_stored=args.stored)
     return 0

@@ -34,6 +34,8 @@ import polars as pl
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 RESULTS: list[str] = []
+HOME_PREFIX = "/" + "home/jack"
+"""Built from two parts, so that this file does not itself hold an absolute path under the maintainer's home folder."""
 
 
 def passed(name: str) -> None:
@@ -480,7 +482,7 @@ def test_build_block() -> None:
             for d in (date(2026, 2, 14), date(2026, 2, 16), date(2026, 3, 4), date(2025, 12, 25))
         ]
     )
-    primary = np.asarray([0, 3, 15, 8])
+    primary = np.asarray([0, 3, 15, 8], dtype=np.int64)
     weather = np.asarray([[1.0, -1.0, 0.5]] * 4, dtype=np.float32)
     factors = cols.Factors(codes=codes, primary=primary, weather=weather)
     for name, spec in cols.ARMS.items():
@@ -576,6 +578,7 @@ def test_cells_known_answer() -> None:
         and r["m"] == 2
         and r["n1236"] == 1
         and np.isclose(r["s1236"], -0.5)
+        and r["chk"] == int(lib.grid_index(times=rows["power_fcst_init_time"])[0]) + 7 * index
     )
     assert r["vday"] == cols.code_of(day=date(2026, 1, 6)), (
         "valid 12:00 on 2026-01-06 is that local day"
@@ -622,6 +625,154 @@ def synthetic_pair(*, effect: float, noise: float, seed: int = 0) -> score.Pair:
         period=score.period_of(m=df["m"].to_numpy().astype(np.int64), vday=codes),
         lead_ok=np.ones(df.height, dtype=bool),
     )
+
+
+def cell_frame(*, rows: list[tuple]) -> pl.DataFrame:
+    """Return cells of (m, seed, primary, vday, lead_day, n, chk, crps, mae) with the columns `make_pair` reads."""
+    df = pl.DataFrame(
+        rows, schema=["m", "seed", "primary", "vday", "lead_day", "n", "chk", "crps", "mae"], orient="row"
+    ).with_columns(
+        pl.col("m").cast(pl.Int8), pl.col("seed").cast(pl.Int8), pl.col("primary").cast(pl.Int8),
+        pl.col("lead_day").cast(pl.Int8), pl.lit(0).alias("n1236"),
+    )  # fmt: skip
+    return df.with_columns(
+        [pl.col("crps").alias(c) for c in score.SUM_COLUMNS if c not in {"crps", "mae"}]
+    )
+
+
+def test_pair_on_row_keys() -> None:
+    """Cells pair only when both arms hold the same rows; equal counts of different rows, and a cell one arm lacks, are left out and counted."""
+    day = cols.code_of(day=date(2026, 1, 10))
+    a = cell_frame(
+        rows=[
+            (2, 0, 1, day, 1, 10, 100, 1.0, 1.0),
+            (2, 0, 1, day + 1, 1, 10, 200, 1.0, 1.0),
+            (2, 0, 1, day + 2, 1, 10, 300, 1.0, 1.0),
+            (2, 0, 1, day + 3, 1, 5, 400, 1.0, 1.0),
+        ]
+    )
+    b = cell_frame(
+        rows=[
+            (2, 0, 1, day, 1, 10, 100, 0.5, 0.5),
+            (2, 0, 1, day + 1, 1, 10, 999, 0.5, 0.5),
+            (2, 0, 1, day + 2, 1, 9, 300, 0.5, 0.5),
+        ]
+    )
+    pair = score.make_pair(a=a, b=b, name="a", reference="b", weather=None, max_unpaired=1.0)
+    assert pair.frame.height == 1 and pair.frame["vday"][0] == day, pair.frame
+    assert pair.unpaired == {"a": 25, "b": 19}, pair.unpaired
+    assert np.isclose(pair.frame["d_crps"][0], 0.5)
+    try:
+        score.make_pair(a=a, b=b, name="a", reference="b", weather=None)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("a large unpaired share must be refused by default")
+    passed(
+        "pairing: cells with the same rows pair; equal counts with different row keys do not; unpaired rows are counted and capped"
+    )
+
+
+def test_cell_stamps_and_atomic_writes() -> None:
+    """A cell file is current only while its stamp matches; a refit under a new code hash or fits file is refused."""
+    with tempfile.TemporaryDirectory(
+        dir=REPO / ".claude" / "scratch", prefix="00735-cells-test-"
+    ) as tmp:
+        out = Path(tmp) / "R0" / "2026-10_s0.parquet"
+        frame = pl.DataFrame({"x": [1]})
+        stamp = {"code_hash": "a", "input": "b", "version": score.CELLS_VERSION}
+        assert not score.cell_is_current(out=out, stamp=stamp)
+        score.write_cells(cells=frame, out=out, stamp=stamp)
+        assert score.cell_is_current(out=out, stamp=stamp)
+        assert not score.cell_is_current(out=out, stamp={**stamp, "code_hash": "c"})
+        assert not score.cell_is_current(out=out, stamp={**stamp, "input": "d"})
+        assert not list(out.parent.glob("*.tmp")), "no temporary file is left behind"
+    passed(
+        "cell files carry the fit's code hash and the sha256 of its fits file, and are written through a rename"
+    )
+
+
+def test_held_in_mask_excludes_july() -> None:
+    """The 2026-06 refit's valid times from 2026-07-01 are not `held-in`, so the no-harm bound never pools them."""
+    m = np.asarray([7, 7, 8, 11, 0])
+    v = np.asarray(
+        [
+            cols.code_of(day=d)
+            for d in (
+                date(2026, 6, 30),
+                date(2026, 7, 1),
+                date(2026, 7, 5),
+                date(2026, 10, 30),
+                date(2025, 11, 3),
+            )
+        ]
+    )
+    got = score.period_of(m=m, vday=v).tolist()
+    assert got == ["held-in", "july to september", "july to september", "october", "held-in"], got
+    assert "year held-in S six" in score.REQUIRED_READINGS and not any(
+        k.startswith("year S ") for k in score.REQUIRED_READINGS
+    )
+    passed("the held-in block ends on 2026-06-30 and the verdict reads the held-in no-harm bounds")
+
+
+def test_p4_shared_blocks() -> None:
+    """P4's two parts number their 7-day blocks from the union of their rows, so one pick is one calendar week in both."""
+    pair = synthetic_pair(effect=0.0, noise=0.0)
+    week = pair.frame["vday"].to_numpy() // score.BLOCK_DAYS
+    mask_a = week % 3 == 0
+    mask_b = week % 3 == 1
+    union = mask_a | mask_b
+    ga = score.gather(pair=pair, mask=mask_a, block_mask=union)
+    gb = score.gather(pair=pair, mask=mask_b, block_mask=union)
+    assert (ga[2] == gb[2]).all() and ga[0].shape == gb[0].shape
+    blocks_a = {tuple(x) for x in np.argwhere(ga[1].sum(axis=1) > 0)}
+    blocks_b = {tuple(x) for x in np.argwhere(gb[1].sum(axis=1) > 0)}
+    assert not blocks_a & blocks_b, "different weeks sit in different blocks"
+    alone_a = {
+        tuple(x) for x in np.argwhere(score.gather(pair=pair, mask=mask_a)[1].sum(axis=1) > 0)
+    }
+    alone_b = {
+        tuple(x) for x in np.argwhere(score.gather(pair=pair, mask=mask_b)[1].sum(axis=1) > 0)
+    }
+    assert alone_a & alone_b, "numbered separately, different weeks would share a block number"
+    passed("P4 numbers one set of blocks for both parts")
+
+
+def test_check_block_catches_silent_zeros() -> None:
+    """`check_block` refuses a float64 block, a zero K1, a zero S1 over holiday dates, and zero W1 on holiday rows."""
+    spec = cols.ARMS["SKW"]
+    codes = np.asarray([cols.code_of(day=date(2026, 2, 16)), cols.code_of(day=date(2026, 2, 17))])
+    factors = cols.Factors(
+        codes=codes, primary=np.asarray([9, 9]), weather=np.ones((2, 3), dtype=np.float32)
+    )
+    good = cols.build_block(
+        spec=spec, factors=factors, c_true=cols.coast_arrays()[0], c_permuted=cols.coast_arrays()[1]
+    )
+    cols.check_block(spec=spec, block=good, codes=codes, kind="train")
+    for broken in (
+        good.astype(np.float64),
+        np.where(np.arange(good.shape[1]) == 0, 0.0, good).astype(np.float32),
+        np.zeros_like(good),
+    ):
+        try:
+            cols.check_block(spec=spec, block=broken, codes=codes, kind="train")
+        except AssertionError:
+            continue
+        raise AssertionError("a broken block must be refused")
+    passed(
+        "check_block refuses a float64 block, a zero K1, and an all-zero block over half-term dates"
+    )
+
+
+def test_terms_csv_standard_reader() -> None:
+    """The 2026-27 term-date file parses with the standard CSV reader and a quoted source field."""
+    table = pl.read_csv(cols.TERMS_2026_27, try_parse_dates=True)
+    assert (
+        table.columns == ["academic_year", "term", "first_day", "last_day", "source"]
+        and table.height == 2
+    ), table
+    assert table["source"][0].startswith("savemyexams (third party")
+    passed("the 2026-27 term dates read with the standard CSV reader")
 
 
 def test_bootstrap() -> None:
@@ -724,7 +875,7 @@ def test_verdict_mapping() -> None:
         )
     }
     base |= {
-        f"year {a} {g}": reading(0.0, -0.01, 0.01)
+        f"year held-in {a} {g}": reading(0.0, -0.01, 0.01)
         for a in ("S", "SKW", "SE")
         for g in ("six", "eight")
     }
@@ -756,16 +907,31 @@ def test_verdict_mapping() -> None:
     # a failed placebo blocks the school claim; a whole-year bound above 0.02 blocks it too
     failed = {**full, "SP-R0 six": reading(-0.05, -0.08, -0.01, months=8, fits=24)}
     assert score.verdict(r=failed)["school_claim_six"] is False
-    harmful_year = {**full, "year S six": reading(0.05, 0.0, 0.03)}
+    harmful_year = {**full, "year held-in S six": reading(0.05, 0.0, 0.03)}
     assert score.verdict(r=harmful_year)["school_claim_six"] is False
     dropped = {
         k: v
         for k, v in full.items()
-        if k not in {"C5", "SEP-S", "year SE six", "year SE eight", "inland C5"}
+        if k not in {"C5", "SEP-S", "year held-in SE six", "year held-in SE eight", "inland C5"}
     }
-    assert score.verdict(r=dropped)["verdict"] == "supported", (
+    assert score.verdict(r=dropped, dropped=frozenset({"SE", "SEP"}))["verdict"] == "supported", (
         "a dropped arm does not block a claim that rests on the other arm"
     )
+    try:
+        score.verdict(r=dropped)
+    except ValueError as error:
+        message = str(error)
+    else:
+        raise AssertionError("a missing reading of an arm that was not dropped must raise")
+    assert "C5" in message, message
+    try:
+        score.verdict(
+            r={k: v for k, v in full.items() if k != "C1 six"}, dropped=frozenset({"SE", "SEP"})
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a missing C1 reading must raise, never give inconclusive")
     passed("verdict rules 1 to 6 and the four gain conditions each fire on synthetic readings")
 
 
@@ -776,7 +942,11 @@ def test_phase_runner() -> None:
     """The phase runner refuses without a marker, stops at 5.5 GPU-process-hours, and writes failure records with the traceback."""
     import e00735_phases as ph  # ty: ignore[unresolved-import]
 
-    assert len({ph.EXIT_FAILED, ph.EXIT_STOP, ph.EXIT_USAGE, 0}) == 4
+    codes = {0, ph.EXIT_FAILED, ph.EXIT_STOP, ph.EXIT_USAGE, ph.EXIT_GATE_FAILED, ph.EXIT_BUSY}
+    assert len(codes) == 6 and 1 not in codes and score.GATE_EXIT_CODE == ph.EXIT_GATE_FAILED
+    assert f"{ph.EXIT_BUSY}  " in (HERE / "e00735_run.sh").read_text(), (
+        "the exit codes are listed in run.sh"
+    )
     with tempfile.TemporaryDirectory(
         dir=REPO / ".claude" / "scratch", prefix="00735-phase-test-"
     ) as tmp:
@@ -854,14 +1024,14 @@ def test_run_script_never_writes_under_677() -> None:
         and "MemorySwapMax=0" in "\n".join(text)
         and "OOMPolicy=continue" in "\n".join(text)
     )
-    assert "/home/jack" not in "\n".join(text)
+    assert HOME_PREFIX not in "\n".join(text)
     for path in HERE.glob("e00735_*"):
         if path.suffix in {".py", ".sh"}:
-            assert "/home/jack" not in path.read_text() or path.name == Path(__file__).name, (
+            assert HOME_PREFIX not in path.read_text() or path.name == Path(__file__).name, (
                 path.name
             )
     passed(
-        "the driver writes only under experiment 735's folder, names its cap and cores, and has no /home/jack path"
+        "the driver writes only under experiment 735's folder, names its cap and cores, and has no absolute path under the maintainer's home folder"
     )
 
 
@@ -1032,6 +1202,9 @@ def test_zero_start() -> None:
 def main() -> None:
     """Run every test."""
     skip_build = "--skip-build" in sys.argv
+    if "--hashes-only" in sys.argv:
+        test_677_hashes()
+        return
     test_every_attribute_exists()
     test_local_date_convention()
     test_school_columns_equal_csv()
@@ -1042,6 +1215,12 @@ def main() -> None:
     test_w3_causal()
     test_build_block()
     test_cells_known_answer()
+    test_pair_on_row_keys()
+    test_cell_stamps_and_atomic_writes()
+    test_held_in_mask_excludes_july()
+    test_p4_shared_blocks()
+    test_check_block_catches_silent_zeros()
+    test_terms_csv_standard_reader()
     test_bootstrap()
     test_verdict_mapping()
     test_phase_runner()

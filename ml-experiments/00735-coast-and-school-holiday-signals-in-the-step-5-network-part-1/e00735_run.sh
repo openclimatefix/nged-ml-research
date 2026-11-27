@@ -15,8 +15,18 @@
 #        to .claude/scratch/e735_smoke/00735-smoke, never the experiment's data folder)
 # Every stage is skipped when its output exists. Each Python command runs in a systemd scope with a memory
 # cap and no swap, one BLAS thread, pinned to CORES. Phase times go to $R735/logs/phase_times.csv.
-# Exit codes: 0 done, 2 bad usage or missing input, 20 a stage of the chain failed (the launcher that
-# refuses to start a job while the GPU is busy has its own code, which is never 20).
+# EXIT CODES of this launcher and of `e00735_phases.py` (the only place that lists them; the Python
+# scripts point here):
+#   0   done
+#   2   bad usage, missing input, or a phase without its review marker (run.sh and phases.py)
+#   20  a stage of the chain failed (run.sh and phases.py)
+#   21  phases.py only: the GPU-hours stop line was reached
+#   22  e00735_score.py --gate (passed through by phases.py): the replay gate FAILED
+#   75  the GPU is busy (run.sh, passed through by phases.py): nothing was started and nothing failed;
+#       wait and run the same command again. The guard is the one of experiments 730 and 732
+#       (`nvidia-smi` totals leave room for 6 GB under 36 GB, at most 2 GPU processes across all
+#       agents, one process of this experiment, a lock file), with this code instead of their 1.
+#   1   is never used on purpose: it is a Python crash.
 set -uo pipefail
 ARM=$1; M=$2; PHASE=$3
 D="$(cd "$(dirname "$0")" && pwd)"
@@ -66,7 +76,7 @@ phase_time() {  # phase_time PHASE DEVICE START END: one CSV row per run phase
     echo "$ARM,$M,$1,$2,$3,$4" >&9 ) 9>>"$f"
 }
 
-CODE_HASH=$(cat "$D/e00735_k1.py" "$D/e00735_columns.py" "$D/e00735_model.py" | sha256sum | cut -d' ' -f1)
+CODE_HASH=$(cat "$D/e00735_k1.py" "$D/e00735_columns.py" "$D/e00735_model.py" "$D/e00735_diagnostic.py" | sha256sum | cut -d' ' -f1)  # the same files as E00735_CODE_HASH in e00735_k1.py
 check_code_hash() {  # a changed code state must not reuse earlier outputs (the smoke fits, for example)
   local marker=$ARMDIR/code_hash_$M.txt
   if [ -f "$marker" ] && [ "$(tr -d '[:space:]' < "$marker")" != "$CODE_HASH" ]; then
@@ -79,8 +89,30 @@ have_models() { for s in $SEEDS; do [ -f "$ARMDIR/models/P5/${M}_d0_s$s.pt" ] ||
 have_fits() { for s in $SEEDS; do [ -f "$ARMDIR/fits/P5/${M}_d0_s$s.parquet" ] || return 1; done; }
 have_valpred() { for s in $SEEDS; do [ -f "$ARMDIR/valpred/${M}_d0_s$s.parquet" ] || return 1; done; }
 
+EXIT_BUSY=75
+gpu_guard() {  # refuse to start while the GPU is busy; the lock is held until this script exits
+  command -v nvidia-smi >/dev/null || return 0
+  local used_mb ours=0 others=0 pid
+  used_mb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '{s+=$1} END {print s+0}')
+  if [ $((used_mb + 6144)) -gt 36864 ]; then
+    echo "the GPU holds ${used_mb} MB; 6 GB more would pass the 36 GB total" >&2; return 1
+  fi
+  for pid in $(nvidia-smi --query-compute-apps=pid --format=csv,noheader); do
+    if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q 'e00735'; then ours=$((ours + 1)); else others=$((others + 1)); fi
+  done
+  if [ $((ours + others)) -ge 2 ]; then
+    echo "GPU processes: ${ours} of experiment 735 and ${others} of others; at most 2 GPU processes run at once across all agents" >&2; return 1
+  fi
+  if [ "$ours" -ge 1 ]; then echo "a process of experiment 735 already holds the GPU" >&2; return 1; fi
+  mkdir -p "$HOME/.cache"
+  exec 8>"$HOME/.cache/e00735_gpu.lock"
+  flock -n 8 || { echo "another worker of experiment 735 holds the lock" >&2; return 1; }
+  return 0
+}
+
 run_stage() {  # run_stage NAME PHASE-ENV COMMAND ARGS...: time one Python stage; the log keeps the traceback
   local name=$1 phase=$2; shift 2
+  gpu_guard || { echo "$M $ARM $name not started: GPU busy (exit $EXIT_BUSY)"; return $EXIT_BUSY; }
   local t0; t0=$(date -u +%FT%TZ)
   E00677_PHASE=$phase py "$D/e00735_k1.py" "k1_$ARM" "$@" --step 5 --synthetic 1 $A > "$R735/logs/${TAG}_$name.log" 2>&1
   local code=$?

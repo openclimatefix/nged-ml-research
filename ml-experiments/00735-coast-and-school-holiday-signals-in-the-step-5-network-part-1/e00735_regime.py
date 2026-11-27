@@ -7,14 +7,13 @@ the same half-hours of the term-time days in the 14 days before and the 14 days 
 points of capacity (a point is 1% of the Primary's capacity). A bank holiday is compared with the
 same weekday in the 14 days either side that are neither school-holiday days nor bank holidays.
 Term dates before 2021-09 are not on disk. It relies on `e00735_columns` (the school calendar and the
-local-date convention), `e00735_windows` (the Primary table), and `e00668_score_lib` (the cleaned
-power). Run with the experiment folders on `PYTHONPATH` (source `ml-experiments/00524*/env.sh`).
+local-date convention), `e00735_windows` (the Primary table), `e00735_diagnostic` (the cut date of
+D15 and D18), and `e00668_score_lib` (the cleaned power). D15 and D18 are set to NaN before 2025-03-01. Run with the experiment folders on `PYTHONPATH` (source `ml-experiments/00524*/env.sh`).
 It writes `regime/regime.csv` and `regime/regime_by_year.svg` under experiment 735's data folder. No
 fit is involved. Series are Primary demand, never a metered generator.
 """
 
 import os
-from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
@@ -33,6 +32,7 @@ MIN_REFERENCE_DAYS: Final = 2
 def daily_profiles() -> tuple[np.ndarray, int]:
     """Return (primaries, local days, 48) mean power in points of capacity per local half-hour, and the first day code."""
     import e00668_score_lib as lib  # ty: ignore[unresolved-import]
+    import e00735_diagnostic as diag  # ty: ignore[unresolved-import]
 
     table = win.sites()
     ids = sorted(table["time_series_id"].to_list())
@@ -45,7 +45,13 @@ def daily_profiles() -> tuple[np.ndarray, int]:
         .sort("time_series_id")["capacity"]
         .to_numpy()
     )
-    grid = lib.cleaned_grid(ids=ids) * (100.0 / cap)[:, None]
+    raw = lib.cleaned_grid(ids=ids)
+    cut_index = int(lib.grid_index(times=pl.Series([diag.CUT_START]))[0])
+    label_of = dict(zip(table["time_series_id"].to_list(), table["d_label"].to_list(), strict=True))
+    for row, tid in enumerate(ids):
+        if label_of[tid] in win.REPORTED_ONLY:  # D15 and D18 are not trusted before 2025-03-01
+            raw[row, :cut_index] = np.nan
+    grid = raw * (100.0 / cap)[:, None]
     stamps = (
         int(lib.GRID_START.timestamp()) * 1_000_000
         + np.arange(grid.shape[1], dtype=np.int64) * lib.STEP_MINUTES * 60_000_000
@@ -170,17 +176,13 @@ def chart(*, summary: pl.DataFrame, path: Path) -> None:
         "summer": "#10C5F7",
         "bank holiday": "#B701FF",
     }
-    frame = (
-        summary.filter(pl.col("difference_points").is_finite()).to_pandas()
-        if False
-        else summary.filter(pl.col("difference_points").is_finite())
-    )
+    frame = summary.filter(pl.col("difference_points").is_finite())
     base = alt.Chart(frame).encode(
         x=alt.X("coast_km:Q", title="Distance from the coast (km)"),
         y=alt.Y("difference_points:Q", title="Demand on holiday days minus nearby term-time days (points of capacity)"),
         color=alt.Color("kind:N", scale=alt.Scale(domain=list(colours), range=list(colours.values())), legend=alt.Legend(orient="top", title=None)),
     )  # fmt: skip
-    layered = base.mark_circle(size=40) + base.mark_rule(strokeDash=[2, 2], color="#888").encode(
+    layered = base.mark_circle(size=40) + base.mark_rule(strokeDash=[2, 2], color="#888").encode(  # ty: ignore[unresolved-attribute]
         y=alt.datum(0)
     )
     chart = layered.properties(width=620, height=120).facet(row=alt.Row("academic_year:N", title=None)).properties(
@@ -194,4 +196,3 @@ def chart(*, summary: pl.DataFrame, path: Path) -> None:
 
 if __name__ == "__main__":
     main()
-    assert timedelta(days=1)

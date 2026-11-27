@@ -20,7 +20,7 @@ README. `CoastLagMdn` is a subclass of experiment 591's `AuxLagMdn` (the network
   `u` only.
 """
 
-from typing import Final
+from typing import Final, cast
 
 import e00397_models as base  # ty: ignore[unresolved-import]
 import e00559_model as m  # ty: ignore[unresolved-import]
@@ -163,7 +163,7 @@ def fresh_mixer(*, model: nn.Module) -> None:
     with torch.random.fork_rng(devices=[]):
         torch.manual_seed(FRESH_SEED)
         fresh = base.mlp(
-            n_in=first.in_features - n_new, hidden=m.MIXER_HIDDEN, layers=2,
+            n_in=cast(nn.Linear, first).in_features - n_new, hidden=m.MIXER_HIDDEN, layers=2,
             n_out=3 * m.COMPONENTS, dropout=m.DROPOUT,
         )  # fmt: skip
         base.init_head(head=fresh, components=m.COMPONENTS)

@@ -63,9 +63,9 @@ def forest(*, readings: pl.DataFrame, path: Path) -> None:
         ),
     )
     chart = (
-        base.mark_rule().encode(x=alt.X("lower:Q", title="CRPS, arm minus reference (points of capacity; more negative is better)"), x2="upper:Q")
-        + base.mark_point(filled=True, size=60).encode(x="estimate:Q")
-        + alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888", strokeDash=[3, 3]).encode(x="x:Q")
+        base.mark_rule().encode(x=alt.X("lower:Q", title="CRPS, arm minus reference (points of capacity; more negative is better)"), x2="upper:Q")  # ty: ignore[unresolved-attribute]
+        + base.mark_point(filled=True, size=60).encode(x="estimate:Q")  # ty: ignore[unresolved-attribute]
+        + alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888", strokeDash=[3, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )  # fmt: skip
     chart.properties(
         width=WIDTH,
@@ -89,7 +89,7 @@ def by_fit(*, table: pl.DataFrame, path: Path) -> None:
         contrast_group=pl.col("contrast") + " " + pl.col("group")
     )
     chart = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=45)
         .encode(
             x=alt.X("diff:Q", title="CRPS, arm minus reference (points of capacity; more negative is better)"),
@@ -138,7 +138,7 @@ def signed_error_by_distance(*, path: Path) -> None:
         return
     frame = pl.DataFrame(rows).join(table.select("primary", "d_label", "coast_km"), on="primary")
     chart = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_circle(size=45)
         .encode(
             x=alt.X("coast_km:Q", title="Distance from the coast (km)"),

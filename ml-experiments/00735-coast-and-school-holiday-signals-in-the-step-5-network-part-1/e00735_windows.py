@@ -66,11 +66,14 @@ REPORTED_ONLY: Final = tuple(SHORT_HISTORY_LABELS)
 SECONDS_PER_HALF_HOUR: Final = 1800.0
 EXPECTED_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
-    / "00560-modular-lag-encoder-capped-lags-and-block-dropout"
-    / "work"
+    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
+    / "inputs"
+    / "w560"
     / "expected"
 )
-"""The cache of the expected-weather table that experiment 560 wrote (read only)."""
+"""Experiment 667's extended cache of the expected-weather table (read only; it reaches 2026-11-15, where experiment 560's own cache ends on 2026-07-14). It is the table that `e.W560` names in the runner."""
+WEATHER_CACHE_NAME: Final = "weather_daily_w667.npz"
+"""The file name of the daily-weather cache; the name states which expected-weather table it was built from."""
 
 
 # ----------------------------------------------------------------------------- groups

@@ -35,18 +35,19 @@ prediction: >-
   Primary's capacity), days 1 to 10, on the rows of the school windows (7 days before, the holiday
   block, and 7 days after) of the 8 held-in refit months. P1: school columns minus the control (C1)
   is -0.03 to -0.10 at the six signed-MW Primaries and at the eight MVA-only Primaries, and the
-  whole-year change is within -0.01 to +0.01. P2: school columns minus the shifted calendar (C2) is
-  -0.02 to -0.08 at both groups. P3: the coast-and-weather columns minus their permuted twin (C4)
-  is 0.00 to -0.08 at the 4 coastal Primaries, with zero the likeliest value, because the
-  stored-forecast diagnostic gave no evidence either way. P4: the gain of C4 on warm, sunny holiday
-  days is at least 0.04 points larger than on cold or wet holiday days. P5: the coast term in the
-  embedding minus its permuted twin (C5) is within -0.02 to +0.02, because a term that is constant
-  per Primary adds nothing a free embedding cannot represent. P6 (October 2026, outside the
-  verdict): on 2026-10-24 to 2026-11-01 the school arm raises the signed error of the 12 to 36 hour
-  median at D19, D4, and D9 by at least 3 points of capacity (the control is 10 to 19 points under).
-  P7 (July to September 2026, outside the verdict): no prediction. The likeliest misses are P3, P4,
-  and P6, because 2026-10-24 was a cold day. The likeliest verdict is `inconclusive`, because the
-  interval treats fits as the unit and the effects sit near the seed noise.
+  change on all rows of the held-in months is within -0.01 to +0.01. P2: school columns minus the
+  shifted calendar (C2) is -0.02 to -0.08 at both groups. P3: the coast-and-weather columns minus
+  their permuted twin (C4) is 0.00 to -0.08 at the 4 coastal Primaries, with zero the likeliest
+  value, because the stored-forecast diagnostic gave no evidence either way. P4: the gain of C4 on
+  warm, sunny holiday days is at least 0.04 points larger than on cold or wet holiday days. P5: the
+  coast term in the embedding minus its permuted twin (C5) is within -0.02 to +0.02, because a term
+  that is constant per Primary adds nothing a free embedding cannot represent. P6 (October 2026,
+  outside the verdict): on 2026-10-24 to 2026-11-01 the school arm raises the signed error of the 12
+  to 36 hour median at D19, D4, and D9 by at least 3 points of capacity (the control is 10 to 19
+  points under). P7 (July to September 2026, outside the verdict): no prediction. The likeliest
+  misses are P3, P4, and P6, because 2026-10-24 was a cold day. The likeliest verdict is
+  `inconclusive`, because the interval treats fits as the unit and the effects sit near the seed
+  noise.
 decision_rule: >-
   The reference of C1 is R0, the stage-2-and-3 replay of arm 9a through this experiment's runner (or
   experiment 677's stored `k1_5w_sp1` forecasts, if the replay gate passes). A contrast is a paired
@@ -62,19 +63,20 @@ decision_rule: >-
   zero is harm. Placebo readings, at 95%: SP minus R0 at both groups, SKWP minus S and SEP minus S
   at the 4 coastal Primaries. A placebo fails, as the protocol states, when its interval lies wholly
   below zero. School claim at a group: C1 and C2 are gains there, SP minus R0 has not failed there,
-  and the whole-year contrast of S against R0 (all rows, days 1 to 10, the demand-v2 month-block
-  bootstrap) has a one-sided 95% upper bound of at most +0.02. Coast claim: C4 or C5 is a gain at
-  the 4 coastal Primaries, its placebo reading has not failed, the whole-year contrast of that arm
-  has an upper bound of at most +0.02 in each group, and the same contrast at the 3 inland placebo
-  Primaries (D11, D10, and D22) does not move in the same direction beyond its own 95% interval.
-  Verdict, first rule that applies: (1) `refuted` when C1 is harm at either group; (2) `supported`
-  when the school claim holds at both groups and the coast claim holds; (3) `partly supported` when
-  the school claim holds at one or both groups or the coast claim holds, but rule 2 does not apply;
-  (4) `small gain` when C1, C4, or C5 has an interval wholly below zero with a point estimate
-  between 0 and -0.02; (5) `not supported` when the intervals of C1 at both groups, of C4, and of C5
-  lie inside -0.05 to +0.05; (6) `inconclusive` otherwise. The family stays at 6 readings and 99.17%
-  even if arms are dropped. Every reading in October 2026 and in July to September 2026 is
-  pre-named and decides nothing. Numbers before the final scoring are interim.
+  and the no-harm contrast of S against R0 (all rows of the 8 held-in refit months with valid times
+  before 2026-07-01, days 1 to 10, the demand-v2 month-block bootstrap; July to October 2026 never
+  enters it) has a one-sided 95% upper bound of at most +0.02. Coast claim: C4 or C5 is a gain at
+  the 4 coastal Primaries, its placebo reading has not failed, the no-harm contrast of that arm
+  (held-in rows, as above) has an upper bound of at most +0.02 in each group, and the same contrast
+  at the 3 inland placebo Primaries (D11, D10, and D22) does not move in the same direction beyond
+  its own 95% interval. Verdict, first rule that applies: (1) `refuted` when C1 is harm at either
+  group; (2) `supported` when the school claim holds at both groups and the coast claim holds; (3)
+  `partly supported` when the school claim holds at one or both groups or the coast claim holds, but
+  rule 2 does not apply; (4) `small gain` when C1, C4, or C5 has an interval wholly below zero with
+  a point estimate between 0 and -0.02; (5) `not supported` when the intervals of C1 at both groups,
+  of C4, and of C5 lie inside -0.05 to +0.05; (6) `inconclusive` otherwise. The family stays at 6
+  readings and 99.17% even if arms are dropped. Every reading in October 2026 and in July to
+  September 2026 is pre-named and decides nothing. Numbers before the final scoring are interim.
 benchmark: >-
   R0 (arm 9a replayed from experiment 677's stored stage-1 weights); experiment 677's stored
   `k1_5w_sp1` forecasts as the reference row `stored`; the manual heuristic and climatology from
@@ -329,12 +331,12 @@ the placebo group.
 **Placebo readings, at 95%, gate the claims through the decision rule:** SP minus R0 at both
 groups, and SKWP minus S and SEP minus S at the 4 coastal Primaries. Each fails when it gains.
 
-**Descriptive readings, at 95%, decide nothing.** Whole-year no-harm contrasts of every arm against
-R0 per group; SKW minus S; SKW minus SKWP on warm, sunny days against cold or wet days (P4); each
-contrast on the bank-holiday slice and in each finer window; each contrast in October 2026 (at D19,
-D4, D9, and all 16 Primaries) and in July to September 2026; per-Primary and leave-one-out readings;
-the slope against distance; N1 (R0 minus `stored`); a table of every contrast by refit month and
-seed (24 held-in fits).
+**Descriptive readings, at 95%, decide nothing.** No-harm contrasts of every arm against R0 per
+group, on all 12 refits as well as on the held-in rows; SKW minus S; SKW minus SKWP on warm, sunny
+days against cold or wet days (P4); each contrast on the bank-holiday slice and in each finer
+window; each contrast in October 2026 (at D19, D4, D9, and all 16 Primaries) and in July to
+September 2026; per-Primary and leave-one-out readings; the slope against distance; N1 (R0 minus
+`stored`); a table of every contrast by refit month and seed (24 held-in fits).
 
 **What the intervals can show.** All rows of one refit month come from the same 3 fitted networks,
 so an arm difference carries a random effect for each fit. Experiment 704 reported that the

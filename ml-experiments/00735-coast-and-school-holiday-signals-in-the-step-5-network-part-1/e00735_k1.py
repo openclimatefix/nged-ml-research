@@ -112,10 +112,10 @@ E00735_ROOT_OK: _Final = os.environ.get("E00677_ROOT", "")
 E00735_CODE_HASH: _Final = _hashlib.sha256(
     b"".join(
         (Path(__file__).parent / n).read_bytes()
-        for n in ("e00735_k1.py", "e00735_columns.py", "e00735_model.py")
+        for n in ("e00735_k1.py", "e00735_columns.py", "e00735_model.py", "e00735_diagnostic.py")
     )
 ).hexdigest()
-"""The sha256 of this file, the column module, and the model module: every fit records it, and a changed code state refuses old outputs."""
+"""The sha256 of this file, the column module, the model module, and the diagnostic module (the coast distances): every fit records it, and a changed code state refuses old outputs."""
 assert "00735" in E00735_ROOT_OK, (
     "experiment 735 writes only under its own data folder: set E00677_ROOT to it",
     E00735_ROOT_OK,
@@ -210,7 +210,9 @@ def _with_columns(inner):
         if SPEC735.width:
             assert mr.x.shape[1] == 60, mr.x.shape
             block = BUILDER.month_block(month=month, mr=mr)
+            assert block.dtype == np.float32 and mr.x.dtype == np.float32, (block.dtype, mr.x.dtype)
             mr.x = np.concatenate([mr.x, block], axis=1)
+            assert mr.x.dtype == np.float32 and mr.x.shape[1] == 60 + SPEC735.width, mr.x.shape
             share = (block != 0).mean(axis=0)
             e.CHECK["months"][month]["new_columns_train"] = dict(
                 zip(SPEC735.names, share.round(4).tolist(), strict=True)
@@ -240,7 +242,10 @@ def build_test_columns(*, month, standardiser):
     if test is None or not SPEC735.width:
         return test
     assert test.x.shape[1] == 60, test.x.shape
-    block = BUILDER.test_block(month=month, test=test)
+    block = BUILDER.test_block(
+        month=month, test=test
+    )  # asserts float32, K1, S1, and W1 to W2 are non-zero
+    assert block.dtype == np.float32 and test.x.dtype == np.float32, (block.dtype, test.x.dtype)
     share = (block != 0).mean(axis=0)
     e.CHECK["months"].setdefault(month, {})["new_columns_test"] = dict(
         zip(SPEC735.names, share.round(4).tolist(), strict=True)
@@ -251,7 +256,9 @@ def build_test_columns(*, month, standardiser):
         e.CHECK["months"][month]["new_columns_test"],
         flush=True,
     )
-    return _dc.replace(test, x=np.concatenate([test.x, block], axis=1))
+    joined = np.concatenate([test.x, block], axis=1)
+    assert joined.dtype == np.float32, joined.dtype
+    return _dc.replace(test, x=joined)
 
 
 e.data.build_test = build_test_columns
@@ -459,7 +466,25 @@ elif MINE.command == "fit":
     e.k.build_month = arm.build_month_syn
     e.k.GpuMonth = arm.AuxGpuMonth
     e.fit_arm(months=e.ARGS.months, seeds=e.ARGS.seeds, stress=False, limit=None, device="cuda")
-    (OUT / "checks_fit.json").write_text(__import__("json").dumps(e.CHECK, indent=1, default=str))
+    _checks_dir = OUT / "work" / "checks"
+    _checks_dir.mkdir(parents=True, exist_ok=True)
+    for _month in e.ARGS.months:
+        for _seed in e.ARGS.seeds:
+            _name = f"checks_fit_{_month}_{E00735_ARM}_s{_seed}_{os.environ.get('E00677_PHASE', 'train')}.json"
+            (_checks_dir / _name).write_text(
+                _json2.dumps(
+                    {
+                        "month": _month,
+                        "arm": E00735_ARM,
+                        "seed": _seed,
+                        "code_hash": E00735_CODE_HASH,
+                        "checks": {a: v for a, v in e.CHECK.items() if a != "months"},
+                        "month_checks": e.CHECK["months"].get(_month, {}),
+                    },
+                    indent=1,
+                    default=str,
+                )
+            )
     print("CHECKS PASSED", {a: v for a, v in e.CHECK.items() if a != "months"})
 elif MINE.command == "valpred":
     # >>> E00735 PATCH BEGIN (H: the smoke test's forecast of the stage-3 validation rows; the scored month stays closed)
@@ -507,7 +532,9 @@ elif MINE.command == "valpred":
         )
         _path = OUT / "work" / "valpred" / f"{_month}_d0_s{_seed}.parquet"
         _path.parent.mkdir(parents=True, exist_ok=True)
-        _frame.write_parquet(_path)
+        _tmp = _path.with_suffix(".tmp")
+        _frame.write_parquet(_tmp)
+        _tmp.rename(_path)  # atomic, so `have_valpred` never sees a half-written file
         print("wrote", _path, _frame.height, "rows", flush=True)
         del _model
     # <<< E00735 PATCH END (H: the smoke test's forecast of the stage-3 validation rows; the scored month stays closed)

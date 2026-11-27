@@ -25,9 +25,11 @@ Before each GPU job this script sums the device-`cuda` rows of that file and of 
 GPU-process-hours, prints the running total, and refuses to start a job when the total reaches the
 stop line (5.5 hours) or when the total plus the mean job time would pass it. A failed job writes a
 record with the exception message and the traceback to `<root>/failures/` and ends the chain with
-exit code 20. The stop line ends the chain with exit code 21. A missing marker or a bad argument is
-exit code 2. The launcher that refuses to start a job while the GPU is busy has a code of its own,
-and none of these three.
+exit code 20. The stop line ends the chain with exit code 21, a failed replay gate with 22, a busy GPU
+with 75 (nothing failed: run the same command again later), and a missing marker or a bad argument
+with 2. The full list is at the top of `e00735_run.sh`. The `smoke`, `gate`, and `fit` phases compare
+the hashes of experiment 677's stage-1 files with the recorded ones before the first job, and the
+`fit` phase compares them again after the last job.
 
 Usage: python e00735_phases.py PHASE [--arms S SP ...] [--months 2025-11 ...] [--dry-run]
 [--accept-over-budget]. Environment: `CORES` (default 22,23), `CAP` (memory cap per process, default
@@ -62,6 +64,9 @@ STOP_HOURS: Final = 5.5
 EXIT_FAILED: Final = 20
 EXIT_STOP: Final = 21
 EXIT_USAGE: Final = 2
+EXIT_GATE_FAILED: Final = 22
+EXIT_BUSY: Final = 75
+"""All exit codes are listed at the top of `e00735_run.sh`."""
 SMOKE_ROOT: Final = REPO / ".claude" / "scratch" / "e735_smoke" / "00735-smoke"
 DROP_ORDER: Final = ("SEP", "SE")
 """If the measured time takes the total over the line, SEP is dropped first, then SE."""
@@ -162,10 +167,23 @@ def run_cpu(*, cmd: list[str], root: Path, cores: str, cap: str) -> int:
         "bash", "-c",
         f'cd {REPO} && source "$(ls -d ml-experiments/00524*)/env.sh" && '
         f"OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 POLARS_MAX_THREADS=2 "
+        f"NGED_S3_BUCKET_URL=x NGED_S3_BUCKET_ACCESS_KEY=x NGED_S3_BUCKET_SECRET=x "
         f"R735={root} taskset -c {cores} {REPO}/.venv/bin/python " + " ".join(cmd),
     ]  # fmt: skip
     print("cpu:", " ".join(cmd), flush=True)
     return subprocess.call(scoped, env=os.environ)
+
+
+def hashes_unchanged(*, root: Path, cores: str, cap: str) -> bool:
+    """Return True when the files of experiment 677's stage 1 still have the recorded hashes."""
+    cmd = [str(HERE / "e00735_tests_known_answer.py"), "--hashes-only"]
+    code = run_cpu(cmd=cmd, root=root, cores=cores, cap=cap)
+    if code != 0:
+        print(
+            "experiment 677's stage-1 files differ from the recorded hashes (or the check failed)",
+            flush=True,
+        )
+    return code == 0
 
 
 def main() -> int:  # noqa: PLR0911
@@ -189,12 +207,27 @@ def main() -> int:  # noqa: PLR0911
         start = datetime.now(UTC)
         if args.phase == "columns":
             cmds = [
-                [str(HERE / "e00735_tests_known_answer.py"), "--skip-build"],
+                [str(HERE / "e00735_tests_known_answer.py")],
                 [str(HERE / "e00735_gallery.py")],
                 [str(HERE / "e00735_regime.py")],
             ]
         else:
-            cmds = [[str(HERE / "e00735_score.py"), "--stage", "all"]]
+            gate = root / "scores" / "gate.json"
+            gate_passed = gate.exists() and bool(json.loads(gate.read_text()).get("passed"))
+            cmds = [
+                [
+                    str(HERE / "e00735_score.py"),
+                    "--stage",
+                    "all",
+                    *(["--stored"] if gate_passed else []),
+                ]
+            ]
+            print(
+                "replay gate passed, scoring with experiment 677's stored rows as R0:"
+                if gate_passed
+                else "no passed replay gate: R0 comes from this experiment's own fits",
+                flush=True,
+            )
         if args.dry_run:
             print("cpu phase:", cmds)
             return 0
@@ -237,6 +270,8 @@ def main() -> int:  # noqa: PLR0911
             print("no gate time in the log: the projection cannot be checked", flush=True)
             if not args.accept_over_budget and not args.dry_run:
                 return EXIT_STOP
+    if not args.dry_run and not hashes_unchanged(root=root, cores=cores, cap=cap):
+        return EXIT_FAILED
     print(f"{args.phase}: {len(jobs)} jobs, 1 GPU process at a time, cores {cores}", flush=True)
     print(
         f"fits starting: {len(jobs)} arm-months x {len(SEEDS)} seeds, memory cap {cap}, cores {cores},"
@@ -247,6 +282,10 @@ def main() -> int:  # noqa: PLR0911
         spent = gpu_hours(csv_paths=csvs)
         done_minutes = [job_minutes(path=csvs[0], arm=a, month=m) for a, m in jobs]
         mean_minutes = sum(done_minutes) / max(1, sum(1 for x in done_minutes if x > 0))
+        if (
+            mean_minutes == 0.0
+        ):  # no job of this phase has finished yet: use the gate's measured time
+            mean_minutes = job_minutes(path=csvs[0], arm="R0", month=GATE_MONTH)
         print(f"running total {spent:.3f} GPU-process-hours (stop line {STOP_HOURS})", flush=True)
         if spent >= STOP_HOURS or spent + mean_minutes / 60.0 > STOP_HOURS:
             print(f"STOP: {spent:.3f} GPU-process-hours, the next job would pass {STOP_HOURS}: ask")
@@ -258,6 +297,9 @@ def main() -> int:  # noqa: PLR0911
             code = run_job(
                 arm=arm, month=month, stage=stage, root=work_root, smoke=smoke, cores=cores
             )
+            if code == EXIT_BUSY:
+                print("GPU busy: nothing failed; run the same command again later", flush=True)
+                return EXIT_BUSY
             if code != 0:
                 record = failure_record(
                     root=work_root, arm=arm, month=month, stage=stage, code=code
@@ -276,6 +318,8 @@ def main() -> int:  # noqa: PLR0911
         return run_cpu(
             cmd=[str(HERE / "e00735_score.py"), "--gate"], root=root, cores=cores, cap=cap
         )
+    if args.phase == "fit" and not hashes_unchanged(root=root, cores=cores, cap=cap):
+        return EXIT_FAILED
     return 0
 
 

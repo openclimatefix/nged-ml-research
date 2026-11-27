@@ -194,8 +194,7 @@ def date_of(*, code: int) -> date:
 def terms() -> pl.DataFrame:
     """Return the term dates of experiment 11's csv and of the 2026-27 csv, in date order."""
     first = term_dates.read_terms()
-    # The source column of this csv holds an unquoted comma, so ragged lines are truncated.
-    second = pl.read_csv(TERMS_2026_27, try_parse_dates=True, truncate_ragged_lines=True)
+    second = pl.read_csv(TERMS_2026_27, try_parse_dates=True)
     return pl.concat([first.select(second.columns), second]).sort("first_day")
 
 
@@ -295,7 +294,9 @@ def dense_calendar() -> DenseCalendar:
     if _CALENDAR:
         return _CALENDAR[0]
     table = terms()
-    first_code = code_of(day=table["first_day"].min())
+    first_day = table["first_day"].min()
+    assert isinstance(first_day, date), first_day
+    first_code = code_of(day=first_day)
     last_code = code_of(day=CALENDAR_LAST)
     n = last_code - first_code + 1
     off = np.zeros(n, dtype=np.float32)
@@ -652,6 +653,50 @@ def build_block(
     return block
 
 
+def check_block(*, spec: ArmSpec, block: np.ndarray, codes: np.ndarray, kind: str) -> None:
+    """Raise `AssertionError` if an appended block of rows would be silently zero or the wrong type.
+
+    The checks: the block is float32 with `spec.width` columns; K1 is non-zero on every row of an
+    arm with coast columns; S1 is non-zero on some row whenever a row's local date is a day of a
+    school holiday block (read through the arm's shift); W1 and W2 are non-zero on some holiday row
+    of an arm with weather columns; and, for training rows only, W3 is too (a short test month may
+    hold no first warm day).
+
+    Args:
+        spec: The arm.
+        block: The appended columns, in the order of `spec.names`.
+        codes: Local day codes of the rows.
+        kind: `train` or `test`, for the message and for the W3 check.
+    """
+    assert block.dtype == np.float32, (kind, block.dtype)
+    assert block.shape == (len(codes), spec.width), (kind, block.shape, spec.width)
+    if not spec.width or not len(codes):
+        return
+    names = spec.names
+    if spec.coast_columns:
+        k1 = block[:, names.index("K1_c")]
+        assert (k1 != 0).all(), (kind, "K1 is zero on some row", int((k1 == 0).sum()))
+    if spec.school != "none":
+        shift = {"real": 0, "shifted": PLACEBO_SHIFT_DAYS}[spec.school]
+        dates = np.asarray([date_of(code=int(c) - shift) for c in np.unique(codes)])
+        holiday_rows = any(b.first <= d <= b.last for b in blocks() for d in dates)
+        s1 = block[:, names.index("S1_school_off")]
+        if holiday_rows:
+            assert (s1 != 0).any(), (
+                kind,
+                "S1 is zero on every row though holiday dates are present",
+            )
+        on_holiday = s1 != 0
+        if spec.weather_columns and on_holiday.any():
+            wanted = ["W1_c_school_warm", "W2_c_school_sunny"]
+            if kind == "train":
+                wanted.append("W3_c_school_first_warm")
+            for name in wanted:
+                assert (block[on_holiday, names.index(name)] != 0).any(), (
+                    kind, name, "is zero on every holiday row",
+                )  # fmt: skip
+
+
 # ----------------------------------------------------------------------------- the row builder
 
 
@@ -723,6 +768,11 @@ class RowBuilder:
             codes=local.code, primary=primary, weather=np.concatenate([w12, w3[:, None]], axis=1)
         )
 
+    def _checked(self, *, block: np.ndarray, factors: Factors, kind: str) -> np.ndarray:
+        """Return the block after `check_block`."""
+        check_block(spec=self.spec, block=block, codes=factors.codes, kind=kind)
+        return block
+
     def month_block(self, *, month: str, mr) -> np.ndarray:  # noqa: ANN001
         """Return the appended columns of every row of a `MonthRows`, fitting the month's anomalies first."""
         if self.spec.weather_columns:
@@ -735,15 +785,17 @@ class RowBuilder:
         factors = self._factors(
             month=month, primary=mr.primary, valid_us=mr.valid_us, origin_us=mr.origin_us, x=mr.x
         )
-        return build_block(
+        block = build_block(
             spec=self.spec, factors=factors, c_true=self.c_true, c_permuted=self.c_permuted
         )
+        return self._checked(block=block, factors=factors, kind="train")
 
     def test_block(self, *, month: str, test) -> np.ndarray:  # noqa: ANN001
         """Return the appended columns of a month's test rows, on the month's fitted anomalies."""
         factors = self._factors(
             month=month, primary=test.primary, valid_us=test.valid, origin_us=test.origin, x=test.x
         )
-        return build_block(
+        block = build_block(
             spec=self.spec, factors=factors, c_true=self.c_true, c_permuted=self.c_permuted
         )
+        return self._checked(block=block, factors=factors, kind="test")
