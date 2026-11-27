@@ -1,4 +1,4 @@
-# ruff: noqa: PT018
+# ruff: noqa: PT018, E501
 """Tests of `e00733_figures` and `e00733_attention`: the plotted rows, the stored pass marker, the
 device branches, and the attention shapes."""
 
@@ -175,3 +175,99 @@ def test_heatmap_refuses_non_finite() -> None:
     """A map with NaN is an error."""
     with pytest.raises(att.AttentionError):
         att.heatmap(matrix=np.array([[np.nan, 1.0]]), x_title="x", y_title="y", title="t")
+
+
+def _write_records(root: Path) -> None:
+    (root / "fits").mkdir(parents=True)
+    for arm, fold, seed in [
+        ("FU", "2026-01", 0),
+        ("FU", "2026-02", 0),
+        ("FU", "2026-01", 1),
+        ("YU", None, 0),
+        ("YU", None, 1),
+    ]:
+        record = _real_record(arm=arm, seed=seed) if fold else _synth_record(arm=arm)
+        record.update({"fold": fold, "seed": seed})
+        (root / "fits" / f"{arm}_{fold}_s{seed}.json").write_text(json.dumps(record))
+
+
+def test_loss_groups_take_seed_zero_of_each_fold_and_every_synthetic_seed(tmp_path: Path) -> None:
+    """The real arms give seed 0 of each fold, the synthetic arms every seed; no record is an error."""
+    _write_records(tmp_path)
+    groups = figs.pick_loss_groups(root=tmp_path)
+    assert [r["fold"] for r in groups["FU"]] == ["2026-01", "2026-02"]
+    assert [r["seed"] for r in groups["YU"]] == [0, 1]
+    chart = figs.loss_grid_chart(groups=groups)
+    assert len(chart.vconcat) == 2
+    with pytest.raises(figs.HistoryError):
+        figs.pick_loss_groups(root=tmp_path / "empty")
+
+
+def test_contrast_rows_include_every_lead_band_of_r8() -> None:
+    """R8 gives one row per lead band; a void reading gives none."""
+    band = {"relative": {"point": -0.01, "lower": -0.02, "upper": 0.0}}
+    readings = {
+        "C1": band,
+        "R8": {"bands": {"days 2 to 3": band, "days 4 to 6": band}},
+        "R9": {"status": "void"},
+    }
+    rows = figs.contrast_rows(readings=readings)
+    assert rows["contrast"].to_list() == ["C1", "R8, days 2 to 3", "R8, days 4 to 6"]
+
+
+def test_coverage_chart_reads_r9_and_refuses_an_empty_reading() -> None:
+    """Each arm and tail quantile gives a dot at its nominal level; no coverage is an error."""
+    r9 = {
+        "arms": {
+            "FU": {
+                "n": 10,
+                "coverage_q01": 0.0,
+                "coverage_q05": 0.04,
+                "coverage_q95": 0.9,
+                "coverage_q99": 0.99,
+            }
+        }
+    }
+    assert figs.coverage_rows(r9=r9).height == 4
+    figs.coverage_chart(r9=r9)
+    with pytest.raises(figs.HistoryError):
+        figs.coverage_chart(r9={"status": "void"})
+
+
+def test_reliability_chart_needs_a_bin_with_a_half_hour() -> None:
+    """A forecast with no scored half-hour gives no point; all forecasts empty is an error."""
+    xs, ys = figs.reliability_rows(p=np.array([0.1, 0.9, 0.95]), truth=np.array([0.0, 1.0, 1.0]))
+    figs.reliability_chart(curves={"YU": (xs, ys), "Y0": ([], [])})
+    with pytest.raises(figs.HistoryError):
+        figs.reliability_chart(curves={"YU": ([], [])})
+
+
+def test_real_attention_cases_are_the_sunniest_the_dullest_and_the_median_day_and_never_coincide() -> (
+    None
+):
+    """Each case takes its own origin; too few origins or an unknown case name is an error."""
+    sw = np.array([3.0, 9.0, 1.0, 5.0, np.nan, 7.0])
+    got = att.pick_real_cases(shortwave=sw, names=("sunny day", "dull day", "winter day"))
+    assert got == {"sunny day": 1, "dull day": 2, "winter day": 3}
+    with pytest.raises(att.AttentionError):
+        att.pick_real_cases(shortwave=np.array([1.0, np.nan]), names=("sunny day", "dull day"))
+    with pytest.raises(att.AttentionError):
+        att.pick_real_cases(shortwave=sw, names=("cloudy",))
+
+
+def test_the_synthetic_attention_case_is_an_s2_segment_with_reverse_flow_on_lead_day_2() -> None:
+    """Source S1 segments are skipped; with no reverse flow on an S2 lead-day-2 target day the pick is an error."""
+    import e00733_synth as sy
+
+    n_days = 6
+    x = np.zeros(n_days * 48)
+    x[2 * 48 : 2 * 48 + 20] = 1.0
+    seg = type("Seg", (), {"x_neg": x})()
+    quiet = type("Seg", (), {"x_neg": np.zeros(n_days * 48)})()
+    index = sy.SampleIndex(np.array([0, 1, 1]), np.array([0, 0, 1]), np.array([1, 1, 1]))
+    assert att.pick_synthetic_case(segments=[quiet, seg], sources=["S1", "S2"], index=index) in {
+        1,
+        2,
+    }
+    with pytest.raises(att.AttentionError):
+        att.pick_synthetic_case(segments=[quiet, seg], sources=["S2", "S1"], index=index)

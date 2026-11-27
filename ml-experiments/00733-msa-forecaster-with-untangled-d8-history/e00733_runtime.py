@@ -267,6 +267,10 @@ def stage_channels(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     ch.assert_coverage(coverages=coverages)
     ch.write_choice(path=paths.channels_json(root=root), choice=choice)
     ch.write_table(table=table, path=paths.table_path(root=root))
+    guards = assert_base_day_guards(
+        base_days=bank_base_days(root_730=paths.root_730()), channel_ok=channel_ok
+    )
+    print(f"base-day guards passed: {guards}")
     first = epoch_day(text=TRAIN_WINDOW_START)
     last = fold_days(fold=core.ALL_FOLDS[-1])[1]
     cal_last = int(cal.dates[-1].astype("datetime64[D]").astype(np.int64))
@@ -299,6 +303,86 @@ def stage_channels(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         "origins": len(all_outputs.origin_days),
         "origins_with_rerun": n_covered,
         "missing_ens_columns": windows.missing_ens_columns,
+        "base_day_guards": guards,
+    }
+
+
+HISTORY_DAYS_BEFORE_ORIGIN: Final = 15
+"""A sample at origin day D reads history days D - 15 to D - 1 (the oldest row has age 14 or 15)."""
+BANK_KINDS: Final = (("test", None), ("validation", None), ("shifted", None), ("train", 0), ("train", 1), ("train", 2), ("train", 3), ("train", 4))  # fmt: skip
+
+
+def bank_base_days(*, root_730: Path) -> np.ndarray:
+    """Return the sorted real base days (epoch days) of every bank of experiment 730 that exists.
+
+    Args:
+        root_730: Experiment 730's data folder.
+
+    Returns:
+        The unique base days.
+
+    Raises:
+        RuntimeError733: When no bank holds a base day (the guard would read nothing).
+    """
+    import e00729_banks as b729  # ty: ignore[unresolved-import]
+    import e00730_banks as b730  # ty: ignore[unresolved-import]
+
+    days: list[np.ndarray] = []
+    for kind, seed in BANK_KINDS:
+        path = b730.bank_path(root=root_730, kind=kind, seed=seed)
+        if not path.exists():
+            continue
+        for seg in b729.load_bank(path=path).segments:
+            dates = np.asarray(seg.dates).astype("datetime64[D]").astype(np.int64)
+            days.append(dates[np.asarray(seg.cal_index) >= 0])
+    if not days:
+        msg = "no bank of experiment 730 holds a base day"
+        raise RuntimeError733(msg)
+    return np.unique(np.concatenate(days))
+
+
+def assert_base_day_guards(*, base_days: np.ndarray, channel_ok: np.ndarray) -> dict[str, int]:
+    """Check that the base days precede every fold's history and that no history or channel touches one.
+
+    The fold layout gives each fold's first stage 2 or stage 3 origin (`TRAIN_WINDOW_START`) and last
+    origin; a sample at origin day D reads the history days D - 15 to D - 1. The two guards are
+    `assert_base_days_precede_history` and `assert_no_overlap` (the number of samples whose history
+    overlaps a base day, and the number of untangled channel days that sit on a base day).
+
+    Args:
+        base_days: The base days of experiment 730's banks, epoch days.
+        channel_ok: `(n_grid,)` whether an untangled channel exists at each half-hour of the grid.
+
+    Returns:
+        The count of base days, samples, and channel days read.
+
+    Raises:
+        CorrectnessFailureError: When a guard fails (verdict row 1).
+        RuntimeError733: When no channel exists in the table.
+    """
+    import e00733_leakage as lk
+
+    first = epoch_day(text=TRAIN_WINDOW_START)
+    first_history = dict.fromkeys(core.ALL_FOLDS, first - HISTORY_DAYS_BEFORE_ORIGIN)
+    lk.assert_base_days_precede_history(
+        base_days_epoch=base_days, first_history_epoch_day_by_fold=first_history
+    )
+    present = np.unique(
+        ch.GRID_START_EPOCH_DAY + np.flatnonzero(np.asarray(channel_ok)) // core.STEPS_PER_DAY
+    )
+    if present.size == 0:
+        msg = "the channel table holds no day, so the overlap guard would read nothing"
+        raise RuntimeError733(msg)
+    origins = np.arange(first, max(fold_days(fold=f)[1] for f in core.ALL_FOLDS) + 1)
+    n_samples, n_channels = lk.count_overlap(
+        sample_first_history_day=origins - HISTORY_DAYS_BEFORE_ORIGIN, sample_last_history_day=origins - 1,
+        base_days_epoch=base_days, channel_days_present=present,
+    )  # fmt: skip
+    lk.assert_no_overlap(n_samples=n_samples, n_channels=n_channels)
+    return {
+        "base_days": int(base_days.size),
+        "samples": int(origins.size),
+        "channel_days": int(present.size),
     }
 
 

@@ -16,6 +16,7 @@ import e00733_stages as st
 import numpy as np
 import pytest
 from e00733_channels import StoppedError
+from e00733_leakage import CorrectnessFailureError
 from test_e00733_stages import _ready
 
 
@@ -26,25 +27,50 @@ def _args(**kw: object) -> argparse.Namespace:
 
 
 def test_stage_functions_are_installed_by_main_and_not_at_import() -> None:
-    """Importing the CLI installs nothing; `install_runtime` installs the built stages and leaves
-    the stages of part 5c (figures, series, attention) without a function."""
+    """Importing the CLI installs nothing; `install_runtime` gives every stage that needs the real
+    files a function, so no stage exits 2 for a missing build (only `guard` and `timing` and `report`
+    run from the built-in table)."""
     assert cli.STAGE_FUNCTIONS == {}
     cli.install_runtime()
     try:
-        assert set(cli.STAGE_FUNCTIONS) == {
-            "banks",
-            "channels",
-            "limits",
-            "gallery",
-            "fit",
-            "chain",
-            "predict",
-            "score",
-            "smoke",
-        }
-        assert not {"figures", "series", "attention"} & set(cli.STAGE_FUNCTIONS)
+        installed = set(cli.STAGE_FUNCTIONS) | set(cli.BUILTIN)
+        assert set(cli.STAGES) - {"guard"} <= installed
     finally:
         cli.STAGE_FUNCTIONS.clear()
+
+
+def test_the_base_day_guards_pass_on_the_real_layout_and_fail_on_a_late_base_day_or_a_channel_on_one() -> (
+    None
+):
+    """Base days before the first history pass; a base day inside the history fails the first guard,
+    a channel on a base day fails the overlap guard, and an empty table is refused."""
+    first = rt.epoch_day(text=rt.TRAIN_WINDOW_START)
+    n_grid = (rt.epoch_day(text="2026-07-02") - ch.GRID_START_EPOCH_DAY) * 48
+    ok = np.zeros(n_grid, dtype=bool)
+    day = lambda d: (d - ch.GRID_START_EPOCH_DAY) * 48  # noqa: E731
+    ok[day(first) : day(first + 30)] = True
+    early = np.arange(first - 1000, first - 400)
+    got = rt.assert_base_day_guards(base_days=early, channel_ok=ok)
+    assert (
+        got == {"base_days": 600, "samples": got["samples"], "channel_days": 30}
+        and got["samples"] > 700
+    )
+    with pytest.raises(CorrectnessFailureError):
+        rt.assert_base_day_guards(base_days=np.array([first - 1000, first + 3]), channel_ok=ok)
+    with pytest.raises(CorrectnessFailureError):
+        rt.assert_base_day_guards(base_days=np.array([first - 14]), channel_ok=ok)
+    with pytest.raises(CorrectnessFailureError):
+        rt.assert_base_day_guards(
+            base_days=np.append(early, first - 20), channel_ok=ok | _on(first - 20, n_grid)
+        )
+    with pytest.raises(rt.RuntimeError733):
+        rt.assert_base_day_guards(base_days=early, channel_ok=np.zeros(n_grid, dtype=bool))
+
+
+def _on(day_: int, n_grid: int) -> np.ndarray:
+    out = np.zeros(n_grid, dtype=bool)
+    out[(day_ - ch.GRID_START_EPOCH_DAY) * 48] = True
+    return out
 
 
 def test_debug_arguments_are_refused_on_the_real_data_folder() -> None:

@@ -12,9 +12,9 @@ leaves
 `scores/failure_<stage>.json` with the message and the traceback.
 
 Stages built: `guard`, `banks`, `channels`, `limits`, `gallery`, `smoke`, `timing`, `fit`, `chain`,
-`predict`, `score`, `report`, and `loss_curves`. `main` installs the stage functions of
-`e00733_runtime` into `STAGE_FUNCTIONS`, never at import. The stages not built yet (`figures`,
-`attention`, `series`) have no function, and such a stage exits 2 with a message, never silently.
+`predict`, `score`, `report`, `figures`, `loss_curves`, `attention`, and `series`. `main` installs
+the stage functions of `e00733_runtime` and `e00733_figstages` into `STAGE_FUNCTIONS`, never at
+import. A stage with no function exits 2 with a message, never silently.
 """
 
 import argparse
@@ -101,6 +101,7 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
 
 def install_runtime() -> None:
     """Put the stage functions of `e00733_runtime` into `STAGE_FUNCTIONS`."""
+    import e00733_figstages as figstages
     import e00733_runtime as rt
     import e00733_scorestage as scorestage
     import e00733_smokerun as smokerun
@@ -110,7 +111,9 @@ def install_runtime() -> None:
             "banks": rt.stage_banks, "channels": rt.stage_channels, "limits": rt.stage_limits,
             "gallery": rt.stage_gallery, "fit": rt.stage_fit, "chain": rt.stage_chain,
             "predict": rt.stage_predict, "score": scorestage.stage_score,
-            "smoke": smokerun.stage_smoke,
+            "smoke": smokerun.stage_smoke, "figures": figstages.stage_figures,
+            "loss_curves": figstages.stage_loss_curves, "series": figstages.stage_series,
+            "attention": figstages.stage_attention,
         }
     )  # fmt: skip
 
@@ -140,16 +143,9 @@ def _report(args: argparse.Namespace, root: Path) -> Path:
     return rep.write_report(root=root, counted_read=not args.interim)
 
 
-def _loss_curves(args: argparse.Namespace, root: Path) -> Path:
-    import e00733_figures as figs
-
-    return figs.write_loss_curves(root=root, out=root / "figures" / "loss_curves.svg")
-
-
 BUILTIN: Final[dict[str, Callable[[argparse.Namespace, Path], Any]]] = {
     "timing": _timing,
     "report": _report,
-    "loss_curves": _loss_curves,
 }
 
 

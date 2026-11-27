@@ -34,7 +34,7 @@ import e00733_stages as st
 
 SMOKE_ARMS: Final = tuple(a for a in core.FIT_ORDER if a != "FU-screen")
 """Every fitted arm, one pass each."""
-LATER_STAGES: Final = ("score", "report", "figures", "loss_curves", "attention")
+LATER_STAGES: Final = ("score", "report", "figures", "loss_curves", "attention", "series")
 """The stages after the fits; each runs once on validation rows only."""
 
 

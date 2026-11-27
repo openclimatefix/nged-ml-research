@@ -156,21 +156,13 @@ def check_steps(*, root: Path) -> dict[str, Any]:
     }  # fmt: skip
 
 
-def not_built(*, name: str) -> Any:
-    """Return a later-stage function that fails with the reason (the stage belongs to part 5c)."""
-
-    def fail(validation_only: bool = True) -> str:
-        msg = f"the {name} stage is not built yet"
-        raise rt.RuntimeError733(msg)
-
-    return fail
-
-
-def later_steps(*, scratch: Path) -> dict[str, Any]:
+def later_steps(*, scratch: Path, device: str = "cpu") -> dict[str, Any]:
     """Return the later stages, each runnable on validation rows in the scratch folder."""
-    import e00733_figures as figs
+    import e00733_figstages as figstages
     import e00733_report as rep
     import e00733_scorestage as scorestage
+
+    args = argparse.Namespace(validation_only=True, device=device)
 
     def score(validation_only: bool = True) -> str:
         verdict = scorestage.run_score(root=scratch, rows="validation")
@@ -179,12 +171,17 @@ def later_steps(*, scratch: Path) -> dict[str, Any]:
     def report(validation_only: bool = True) -> str:
         return f"wrote {rep.write_report(root=scratch, counted_read=False).name}"
 
-    def loss_curves(validation_only: bool = True) -> str:
-        return f"wrote {figs.write_loss_curves(root=scratch, out=scratch / 'figures' / 'loss_curves.svg').name}"
+    def figure_stage(function: Any) -> Any:
+        def run(validation_only: bool = True) -> str:
+            result = function(args, scratch)
+            return f"wrote {len(result['files'])} figures: {', '.join(result['files'])}"
+
+        return run
 
     return {
-        "score": score, "report": report, "loss_curves": loss_curves,
-        "figures": not_built(name="figures"), "attention": not_built(name="attention"),
+        "score": score, "report": report, "figures": figure_stage(figstages.stage_figures),
+        "loss_curves": figure_stage(figstages.stage_loss_curves),
+        "attention": figure_stage(figstages.stage_attention), "series": figure_stage(figstages.stage_series),
     }  # fmt: skip
 
 
@@ -221,7 +218,7 @@ def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         fit_real=run_job,
         fit_synthetic=lambda arm, seed: run_job(arm, None, seed),
         predict=predict, read_stored=read_stored_step(scratch=scratch),
-        checks=check_steps(root=root), later=later_steps(scratch=scratch),
+        checks=check_steps(root=root), later=later_steps(scratch=scratch, device=args.device),
     )  # fmt: skip
     record = smoke.run_smoke(root=root, scratch=scratch, steps=steps, device=args.device)
     leak.assert_wrote_only_here(written=[root / st.SMOKE_FILE], data_root=root)

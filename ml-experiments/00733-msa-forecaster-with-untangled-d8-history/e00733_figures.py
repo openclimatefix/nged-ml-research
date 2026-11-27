@@ -90,7 +90,7 @@ def loss_panel(*, record: Mapping[str, object], title: str) -> alt.LayerChart:
     splits = list(dict.fromkeys(rows["split"].to_list()))
     lines = (
         alt.Chart(rows)
-        .mark_line(aria=False)
+        .mark_line(aria=False, point=True)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("pass:Q", title="Pass"),
             y=alt.Y("value:Q", title="Loss", scale=alt.Scale(zero=False)),
@@ -178,7 +178,13 @@ def contrast_rows(*, readings: Mapping[str, Any]) -> pl.DataFrame:
     An entry with `relative` or with `point`, `lower`, and `upper` gives a row; void entries are left out.
     """
     rows = []
+    entries: dict[str, Any] = {}
     for name, v in readings.items():
+        if isinstance(v, Mapping) and isinstance(v.get("bands"), Mapping):
+            entries.update({f"{name}, {band}": b for band, b in v["bands"].items()})
+        else:
+            entries[name] = v
+    for name, v in entries.items():
         if not isinstance(v, Mapping):
             continue
         r = v.get("relative", v)
@@ -287,7 +293,7 @@ def sign_series_chart(*, rows: pl.DataFrame, title: str) -> alt.Chart:
         alt.Chart(rows)
         .mark_line(aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("half_hour:Q", title="Half-hour of the 10 target days"),
+            x=alt.X("half_hour:Q", title="Half-hour of the target days (lead days 2 to 10)"),
             y=alt.Y("value:Q", title="Probability of reverse flow", scale=alt.Scale(domain=[0, 1])),
             color=alt.Color(
                 "series:N",
@@ -331,3 +337,260 @@ def write_loss_curves(*, root: Path, out: Path) -> Path:
     """
     save_svg(chart=loss_curves_chart(records=pick_loss_records(root=root)), path=out)
     return out
+
+
+# --------------------------------------------------------------------------- part 5c: the `figures` stage
+
+REAL_LOSS_ARMS: Final = ("F0r", "FU", "FU-S", "FS")
+SYNTHETIC_LOSS_ARMS: Final = ("Y0", "YU", "YT")
+CONTRAST_GROUPS: Final = {
+    "real": (("C1", "C2", "R1", "R2", "R3", "R4", "R8"), "Relative CRPS difference at D8 (negative: first arm better)"),
+    "synthetic": (("C3", "C4", "R5", "R7"), "Difference in Brier score of the probability of reverse flow (negative: first arm better)"),
+}  # fmt: skip
+"""The contrasts of each dot chart (an R8 row is one lead band) and the axis title."""
+COVERAGE_LEVELS: Final = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
+
+
+def pick_loss_groups(*, root: Path) -> dict[str, list[dict]]:
+    """Return the fit records of the loss-curve figure by arm: seed 0 of each fold, or every seed.
+
+    The real-fold arms (F0r, FU, FU-S, FS) are drawn at seed 0 in every fold they were fitted; the
+    synthetic arms (Y0, YU, YT) are drawn at every seed.
+
+    Args:
+        root: The data folder.
+
+    Returns:
+        The records of each arm that has any, in `REAL_LOSS_ARMS` then `SYNTHETIC_LOSS_ARMS` order.
+
+    Raises:
+        HistoryError: When no fit record exists.
+    """
+    records = [
+        json.loads(f.read_text())
+        for f in sorted((root / "fits").glob("*.json"))
+        if ".failed" not in f.name
+    ]
+    groups: dict[str, list[dict]] = {}
+    for arm in (*REAL_LOSS_ARMS, *SYNTHETIC_LOSS_ARMS):
+        mine = [r for r in records if r.get("arm") == arm]
+        if arm in REAL_LOSS_ARMS:
+            mine = [r for r in mine if r.get("seed") == LOSS_CURVE_SEED]
+        mine.sort(key=lambda r: (str(r.get("fold")), int(r.get("seed", 0))))
+        if mine:
+            groups[arm] = mine
+    if not groups:
+        msg = "no fit record exists, so there is no loss curve to draw"
+        raise HistoryError(msg)
+    return groups
+
+
+def loss_grid_chart(*, groups: Mapping[str, Sequence[Mapping[str, object]]]) -> alt.VConcatChart:
+    """Return the loss figure: one row per arm, one panel per fold (real) or seed (synthetic).
+
+    Each panel draws the training loss and the validation loss against the pass and marks the stored pass.
+    """
+    rows = []
+    for arm, records in groups.items():
+        n = len(records)
+        panels = [
+            loss_panel(
+                record=r,
+                title=f"{arm}, {r['fold'] or 'seed ' + str(r['seed'])}: stored pass {_stored(r)}",
+            ).properties(width=max(WIDTH_PX // max(n, 1) - 60, 120), height=120)
+            for r in records
+        ]
+        rows.append(alt.hconcat(*panels))
+    return alt.vconcat(*rows)
+
+
+def write_loss_grid(*, root: Path, out: Path) -> dict[str, int]:
+    """Write the loss-curve figure of every fitted arm and return the number of panels by arm."""
+    groups = pick_loss_groups(root=root)
+    save_svg(chart=loss_grid_chart(groups=groups), path=out)
+    return {arm: len(records) for arm, records in groups.items()}
+
+
+def coverage_rows(*, r9: Mapping[str, Any]) -> pl.DataFrame:
+    """Return the observed share below each tail quantile, by arm (R9), with the nominal level."""
+    rows = []
+    for arm, table in (r9.get("arms") or {}).items():
+        for q, level in COVERAGE_LEVELS.items():
+            value = table.get(f"coverage_{q}")
+            if value is not None and np.isfinite(value):
+                rows.append(
+                    {
+                        "arm": arm,
+                        "quantile": q,
+                        "nominal": level,
+                        "observed": float(value),
+                        "n": int(table["n"]),
+                    }
+                )
+    return pl.DataFrame(
+        rows,
+        schema={
+            "arm": pl.Utf8,
+            "quantile": pl.Utf8,
+            "nominal": pl.Float64,
+            "observed": pl.Float64,
+            "n": pl.Int64,
+        },
+    )
+
+
+def coverage_chart(*, r9: Mapping[str, Any]) -> alt.LayerChart:
+    """Return the coverage figure: observed share of readings below each tail quantile of D8.
+
+    The share is drawn against the nominal level, one dot per arm and quantile, with the diagonal
+    of perfect coverage.
+
+    Args:
+        r9: The R9 reading.
+
+    Returns:
+        The chart.
+
+    Raises:
+        HistoryError: When R9 holds no coverage.
+    """
+    data = coverage_rows(r9=r9)
+    if data.is_empty():
+        msg = "R9 holds no coverage to draw"
+        raise HistoryError(msg)
+    arms = list(dict.fromkeys(data["arm"].to_list()))
+    line = (
+        alt.Chart(pl.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0]}))  # ty: ignore[unresolved-attribute]
+        .mark_line(color="#555555", strokeDash=[4, 3])
+        .encode(x="x:Q", y="y:Q")
+    )  # ty: ignore[unresolved-attribute]
+    dots = (
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
+        .mark_circle(size=80)
+        .encode(
+            x=alt.X(
+                "nominal:Q", title="Nominal level of the quantile", scale=alt.Scale(domain=[0, 1])
+            ),
+            y=alt.Y(
+                "observed:Q",
+                title="Share of readings below the quantile",
+                scale=alt.Scale(domain=[0, 1]),
+            ),
+            color=alt.Color(
+                "arm:N",
+                scale=alt.Scale(domain=arms, range=[ARM_COLOURS.get(a, "#555555") for a in arms]),
+                legend=alt.Legend(orient="top", title=None),
+            ),
+        )
+    )  # ty: ignore[unresolved-attribute]
+    return (line + dots).properties(
+        width=WIDTH_PX // 2,
+        height=WIDTH_PX // 2,
+        title=alt.TitleParams("Coverage of D8's tail quantiles", anchor="start"),
+    )
+
+
+def reliability_chart(*, curves: Mapping[str, tuple[list[float], list[float]]]) -> alt.LayerChart:
+    """Return the reliability diagram of the forecasts of reverse flow: observed share by mean forecast.
+
+    Args:
+        curves: Each forecast's `reliability_rows`.
+
+    Returns:
+        The chart, with the diagonal of a reliable forecast.
+
+    Raises:
+        HistoryError: When no forecast has a bin that holds a half-hour.
+    """
+    parts = [
+        pl.DataFrame(
+            {"forecast": name, "mean_forecast": xs, "observed": ys},
+            schema={"forecast": pl.Utf8, "mean_forecast": pl.Float64, "observed": pl.Float64},
+        )
+        for name, (xs, ys) in curves.items()
+        if xs
+    ]
+    if not parts:
+        msg = "no forecast has a half-hour in any reliability bin"
+        raise HistoryError(msg)
+    data = pl.concat(parts)
+    names = list(dict.fromkeys(data["forecast"].to_list()))
+    colour = alt.Color(
+        "forecast:N",
+        scale=alt.Scale(domain=names, range=[ARM_COLOURS.get(n, "#555555") for n in names]),
+        legend=alt.Legend(orient="top", title=None),
+    )
+    diagonal = (
+        alt.Chart(pl.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0]}))  # ty: ignore[unresolved-attribute]
+        .mark_line(color="#555555", strokeDash=[4, 3])
+        .encode(x="x:Q", y="y:Q")
+    )  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(data).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X(
+            "mean_forecast:Q",
+            title="Mean forecast probability of reverse flow",
+            scale=alt.Scale(domain=[0, 1]),
+        ),
+        y=alt.Y(
+            "observed:Q", title="Observed share of reverse flow", scale=alt.Scale(domain=[0, 1])
+        ),
+        color=colour,
+    )
+    return (diagonal + base.mark_line(aria=False) + base.mark_circle(size=60)).properties(
+        width=WIDTH_PX // 2,
+        height=WIDTH_PX // 2,
+        title=alt.TitleParams("Reliability of the forecast of reverse flow", anchor="start"),
+    )
+
+
+def sign_reliability_curves(*, data: Any) -> dict[str, tuple[list[float], list[float]]]:
+    """Return the reliability bins of YU, Y0, and B-hist over the scored half-hours of the bank."""
+    keep = data.keep
+    return {
+        name: reliability_rows(p=data.probabilities[name][keep], truth=data.truth[keep])
+        for name in ("YU", "Y0", "B-hist")
+    }
+
+
+def run_figures(*, root: Path, rows: str) -> dict[str, Any]:
+    """Draw every figure that reads stored files and return what was written, with its checks.
+
+    The figures are the loss curves, the two contrast dot charts, the coverage of D8's tail
+    quantiles, and the reliability diagram of the forecast of reverse flow.
+
+    Args:
+        root: The data folder.
+        rows: "test" or "validation" (the rows the sign forecasts are read from).
+
+    Returns:
+        `files` (the SVG names written), `loss_panels` (the panels by arm), and `contrasts` (the
+        rows each dot chart drew).
+
+    Raises:
+        HistoryError: When a figure has nothing to draw.
+    """
+    import e00733_signdata as signdata
+
+    out = root / "figures"
+    out.mkdir(parents=True, exist_ok=True)
+    readings = json.loads((root / "scores" / "readings.json").read_text())
+    result: dict[str, Any] = {"files": [], "contrasts": {}}
+    result["loss_panels"] = write_loss_grid(root=root, out=out / "loss_curves.svg")
+    result["files"].append("loss_curves.svg")
+    every = contrast_rows(readings=readings)["contrast"].to_list()
+    for name, (heads, x_title) in CONTRAST_GROUPS.items():
+        chosen = [c for c in every if c.split(",")[0] in heads]
+        chart = contrast_dot_chart(
+            readings=readings, names=chosen, title=f"Contrasts ({name} forecasts)", x_title=x_title
+        )
+        save_svg(chart=chart, path=out / f"contrasts_{name}.svg")
+        result["files"].append(f"contrasts_{name}.svg")
+        result["contrasts"][name] = chosen
+    save_svg(chart=coverage_chart(r9=readings["R9"]), path=out / "coverage.svg")
+    result["files"].append("coverage.svg")
+    data = signdata.load_sign_data(root=root, rows=rows)
+    curves = sign_reliability_curves(data=data)
+    save_svg(chart=reliability_chart(curves=curves), path=out / "reliability_sign.svg")
+    result["files"].append("reliability_sign.svg")
+    result["reliability_bins"] = {name: len(xs) for name, (xs, _) in curves.items()}
+    return result
