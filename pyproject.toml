@@ -622,6 +622,8 @@ include = [
     "ml-experiments/00730-msa-d8-sign-detector-with-demand-head-and-masking/tests/*.py",
     "ml-experiments/00733-msa-forecaster-with-untangled-d8-history/*.py",
     "ml-experiments/00733-msa-forecaster-with-untangled-d8-history/tests/*.py",
+    "ml-experiments/00732-msa-d8-untangling-network-synthetic-injections/*.py",
+    "ml-experiments/00732-msa-d8-untangling-network-synthetic-injections/tests/*.py",
 ]
 
 [tool.ty.overrides.rules]
