@@ -20,6 +20,7 @@ path run the same code, and `to_numpy` is the only place a tensor becomes an arr
 then `numpy`).
 """
 
+import math
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
@@ -44,6 +45,26 @@ NEW_RATES: Final[dict[str, tuple[float, float]]] = {"u_gamma": (3e-3, 0.0)}
 NEW_DEFAULT: Final = (2e-3, tr.WEIGHT_DECAY)
 VALIDATION_LEADS_SYNTHETIC: Final = (1, 3, 6, 9)
 """Zero-based lead indices (days 2, 4, 7, and 10) of the synthetic validation loss."""
+
+
+class NonFiniteLossError(RuntimeError):
+    """A validation loss was NaN or infinite, so the fit has no state worth storing (a failed fit)."""
+
+
+def assert_finite_loss(*, value: float, stage: str, epoch: int) -> None:
+    """Raise `NonFiniteLossError` when a validation loss is not finite.
+
+    Args:
+        value: The validation loss.
+        stage: The stage's name, for the message.
+        epoch: The pass number (from 0).
+
+    Raises:
+        NonFiniteLossError: When `value` is NaN or infinite.
+    """
+    if not math.isfinite(value):
+        msg = f"the validation loss of {stage} is {value} at pass {epoch + 1}: the fit has diverged"
+        raise NonFiniteLossError(msg)
 
 
 def to_numpy(*, tensor: torch.Tensor) -> np.ndarray:
@@ -392,7 +413,7 @@ def validation_loss(
 # --------------------------------------------------------------------------- the real-fold loop
 
 
-def train_stage(
+def train_stage(  # noqa: PLR0912
     *, net: model.UntangledNet, world: object, stage: int, samples: object, seed: int, encoders: str,
     max_passes: int = 60, patience: int = tr.PATIENCE, new_lr_scale: float = 1.0,
     max_steps: int | None = None, train_source: UntSource | None = None,
@@ -470,6 +491,7 @@ def train_stage(
             break
         hist.train.append(total / max(weight_sum, 1e-9))
         val = validation_loss(net=net, source=source, samples=samples, cut=cut)
+        assert_finite_loss(value=val, stage=f"stage {stage}", epoch=epoch)
         hist.val.append(val)
         log.val_history.append(val)
         log.passes = epoch + 1
@@ -489,7 +511,9 @@ def train_stage(
     if stopped:
         net.eval()
         return log, hist
-    assert best_state is not None
+    if best_state is None:
+        msg = f"stage {stage} stored no state: no pass improved on an infinite loss"
+        raise NonFiniteLossError(msg)
     net.load_state_dict(best_state)
     net.eval()
     log.best_val = best
@@ -637,6 +661,7 @@ def train_synthetic(
             net=net, segments=val_segments, index=val_index, d8_index=d8_index,
             target_std=target_std, mode=mode, device=device,
         )  # fmt: skip
+        assert_finite_loss(value=val, stage="the synthetic fit", epoch=epoch)
         hist.val.append(val)
         hist.val_nll.append(v_nll)
         hist.val_bce.append(v_bce)
@@ -652,6 +677,9 @@ def train_synthetic(
     else:
         hist.cap_hit = True
     hist.still_falling = hist.cap_hit and len(hist.val) > 1 and hist.val[-1] < hist.val[-2]
+    if best_state is None and max_steps is None:
+        msg = "the synthetic fit stored no state: no pass improved on an infinite loss"
+        raise NonFiniteLossError(msg)
     if best_state is not None:
         net.load_state_dict(best_state)
     net.eval()

@@ -384,3 +384,23 @@ def test_progress_lines_and_names() -> None:
     with pytest.raises(fit.GuardError):
         fit.d8_index_from(labels=["D1"])
     assert fit.zero_check(values=np.zeros(3)) and not fit.zero_check(values=np.ones(3))
+
+
+def test_a_nan_validation_loss_raises_instead_of_returning_the_last_state(
+    tmp_path: Path, short_loop: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A synthetic fit whose validation loss is NaN fails and stores no network."""
+    monkeypatch.setattr(tn, "synthetic_validation", lambda **_: (float("nan"), 0.0, 0.0))
+    with pytest.raises(tn.NonFiniteLossError):
+        fit.fit_synthetic(
+            root=tmp_path, arm="YU", seed=0, device="cpu", loader=lambda *_: _synthetic_inputs()
+        )
+    assert not (tmp_path / "networks" / "YU_s0.pt").exists()
+
+
+def test_a_non_finite_loss_is_named_in_the_error() -> None:
+    """The helper accepts finite values and raises on NaN and infinity."""
+    tn.assert_finite_loss(value=1.5, stage="stage 2", epoch=0)
+    for bad in (float("nan"), float("inf")):
+        with pytest.raises(tn.NonFiniteLossError, match="pass 3"):
+            tn.assert_finite_loss(value=bad, stage="stage 2", epoch=2)

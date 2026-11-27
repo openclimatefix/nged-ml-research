@@ -28,3 +28,13 @@ def test_missing_world_file_raises(tmp_path: Path) -> None:
 def test_epoch_of_is_days_since_1970() -> None:
     """The ensemble-run epoch day of 1970-01-11 is 10."""
     assert world.epoch_of(date64=np.datetime64("1970-01-11")) == 10
+
+
+def test_a_non_finite_untangled_channel_is_a_world_error() -> None:
+    """A NaN or infinite output of the untangling network is a world error."""
+    world.assert_finite_channels(values=np.zeros((2, 3, 48)))
+    for bad in (np.nan, np.inf):
+        values = np.zeros((2, 3, 48))
+        values[1, 2, 5] = bad
+        with pytest.raises(world.WorldError):
+            world.assert_finite_channels(values=values)

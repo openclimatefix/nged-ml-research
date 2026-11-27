@@ -401,6 +401,20 @@ class ChannelEnv:
     n_seeds: int
 
 
+def assert_finite_channels(*, values: np.ndarray) -> None:
+    """Raise `WorldError` when the untangling network's outputs for stored windows are not finite.
+
+    Args:
+        values: The seed-averaged outputs of the stored windows.
+
+    Raises:
+        WorldError: When any value is NaN or infinite (the flag would mark a NaN channel as present).
+    """
+    if not np.isfinite(values).all():
+        msg = "the untangling network gave a non-finite channel for a stored window"
+        raise WorldError(msg)
+
+
 def attach_channels(
     *, arrays: sy.SegmentArrays, seg: Any, prepared: Any, env: ChannelEnv, runs: RunCache,
     run_days: set[int],
@@ -436,6 +450,7 @@ def attach_channels(
             [env.arms.plain_window(p=prepared, day=d, spec=env.spec, hidden=None) for d in days]
         ).astype(np.float32)
         out = env.predict(w).mean(axis=0)  # (len(days), 3, 48)
+        assert_finite_channels(values=out)
         for i, d in enumerate(days):
             sl = slice(d * steps, (d + 1) * steps)
             arrays.u_raw[sl] = out[i].T
