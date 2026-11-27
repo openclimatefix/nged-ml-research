@@ -49,11 +49,17 @@ def extract(
         path).
 
     Raises:
-        AttentionError: When the network returns no attention or a weight has the wrong shape.
+        AttentionError: When the network returns no attention, a weight has the wrong shape, or the
+            forecast with the flag differs from the forecast without it.
     """
     net.eval()
     with torch.no_grad():
-        out = net(inp.to(device), return_attention=True)
+        on_device = inp.to(device)
+        out = net(on_device, return_attention=True)
+        plain = net(on_device)
+    if not torch.equal(plain.out, out.out):
+        msg = "the forecast with return_attention=True differs from the forecast without it"
+        raise AttentionError(msg)
     if out.attention is None:
         msg = "the network returned no attention weights"
         raise AttentionError(msg)

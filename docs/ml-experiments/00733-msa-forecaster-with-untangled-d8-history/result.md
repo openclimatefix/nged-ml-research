@@ -810,8 +810,9 @@ published page carries the coverage counts.
   limit, 0.13 at 12 to 24 hours, 0.39 at 6 to 12 hours, and 0.6 within 3 hours, and the mean is 3e-4
   to 5e-3. G14 passes when the poison test passes, the mean absolute difference over origins more
   than 24 hours before the limit is below 0.01, and the difference does not increase with the hours
-  before the limit (binned by 6 hours, with a slack of 5e-4, which is 5% of the 0.01 limit, accepted by
-  the design lead on 2026-11-27 for bin-to-bin noise). The panel plots this table for the real networks.
+  before the limit (binned by 6 hours, with a slack of 5e-4, which is 5% of the 0.01 limit, accepted
+  by the design lead on 2026-11-27 for bin-to-bin noise). The panel plots this table for the real
+  networks.
 - **The top-row trailing columns of target-row B1 read the origin day's start (ruling of the design
   lead, 2026-11-26).** Experiment 713's getter cannot read observed valid-time columns for these
   columns, so the synthetic world and the real folds give them the weather of 00:00 UTC on the
@@ -905,7 +906,11 @@ the id as `e00733_`):
   word, and print every number of the page.
 - `e00733_gallery.py`, `e00733_figures.py`, and `e00733_attention.py` draw the gallery, the result
   figures, and the attention maps.
-- `e00733_smoke.py` runs the real-environment smoke test.
+- `e00733_series.py` draws the forecast time series, `e00733_signdata.py` joins the synthetic
+  world's forecasts of reverse flow to the truth, and `e00733_figstages.py` runs the figure stages,
+  optimises each SVG with `svgo`, and refuses a file over 500 KB.
+- `e00733_smoke.py` runs the real-environment smoke test, and `e00733_smoke729.py` runs experiment
+  729's real-file checks against experiment 730's banks.
 - `e00733_stages.py` and `e00733_cli.py` run the stages in order and write the chain status.
 - `run.sh` is experiment 732's launcher, copied, with this experiment's commands.
 - `tests/` holds the guards the code list requires: a test that every attribute taken from an
