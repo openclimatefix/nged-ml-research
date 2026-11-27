@@ -611,7 +611,8 @@ and 717 was 3.5 GB, under the cap of 6 GB.
 **The pre-registered cost is 10.56 GPU-process-hours, under the manager's limit of 12, and the stop
 line is 12.** The smoke test, the timing gate, and the re-runs of the untangling network (0.5 hours)
 count towards the 12 hours, as the table does. The timing gate runs before the first fit: 1 fold
-of FU at seed 0 and 5 passes of YU,
+of FU at seed 0 (the fold 2026-06, whose training window is the longest) and 5 passes of YU,
+each fit followed by its prediction on the test rows, with the target-poison check, and
 recording the seconds per fit and per pass, the peak GPU memory, and the peak resident memory. The
 gate projects every fit at its measured rate (FU-S, FS, and F0r at FU's rate; Y0 and YT at YU's).
 If the projection exceeds 12 hours, report-only arms are dropped from the end of the fit order until
@@ -892,6 +893,13 @@ published page carries the coverage counts.
   still exceeds the stop line after the drops, the line stops at verdict row 0 and goes to the
   manager. Precomputing every split's tensors was rejected because the history tensors of the two
   training banks would take about 29 GB, above the 14 GB host cap.
+- **The timing gate times the longest training window and the test-row prediction path (ruling of
+  the design lead, 2026-11-27, set before any experiment 733 fit exists).** The gate had timed FU
+  on the fold 2025-11, whose training window of 19 months is the shortest, and the fold 2026-06 has
+  26 months, so the 92 real fits were projected up to about 35% too low. The gate had also predicted
+  validation rows, where the target-poison check never runs. The gate now fits the fold 2026-06 and
+  predicts the test rows, with the check, in a scratch folder. It scores nothing, writes no
+  `test_started` marker, and no chain job reads its predictions.
 
 ## Method
 

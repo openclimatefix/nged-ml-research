@@ -33,6 +33,9 @@ FIRST_UNSCORED_VALID_TIME: Final = "2026-07-01"
 ALL_FOLDS: Final = (
     "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
 )  # fmt: skip
+TIMING_FOLD: Final = ALL_FOLDS[-1]
+"""The fold that the timing gate times: the latest, whose training window is the longest (about 26
+months against 19 for 2025-11), so the projection does not fall short on the later folds."""
 SCREEN_FOLDS: Final = ("2025-11", "2026-01", "2026-05", "2026-06")
 SCREEN_SEEDS: Final = (0, 1)
 F0R_FOLDS: Final = ("2025-11", "2026-05")

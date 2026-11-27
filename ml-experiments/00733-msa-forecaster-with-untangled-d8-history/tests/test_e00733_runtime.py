@@ -482,3 +482,30 @@ def test_a_new_process_exit_code_maps_to_the_error_of_the_chain(
     rt.run_stage_in_new_process(
         stage="fit", arm="Y0", fold=None, seed=0, device="cpu", root=tmp_path, data_root=None, max_passes=None
     )  # fmt: skip
+
+
+def test_the_timing_gate_times_the_longest_window_fold_on_test_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The gate fits and predicts the latest fold, and both jobs predict test rows (with the poison check)."""
+    import e00733_smokerun as smokerun
+
+    assert core.TIMING_FOLD == "2026-06"
+    calls: list[tuple[str, str | None, str]] = []
+
+    def fake_make(**kw: Any) -> Any:
+        def run(arm: str, fold: str | None, seed: int) -> dict[str, Any]:
+            calls.append((arm, fold, kw["rows"]))
+            return {
+                "seconds": 10.0, "predict_seconds": 1.0, "peak_gpu_gb": 1.0, "peak_rss_gb": 2.0,
+                "predict_peak_rss_gb": 2.0,
+            }  # fmt: skip
+
+        return run
+
+    monkeypatch.setattr(rt, "make_predicting_job", fake_make)
+    monkeypatch.setattr(smokerun, "link_inputs", lambda **_: [])
+    out = rt.measure_timing(_args(), tmp_path)
+    assert calls == [("FU", core.ALL_FOLDS[-1], "test"), ("YU", None, "test")]
+    assert out["seconds_per_real_fit"] == 11.0
+    assert not (tmp_path / "scores" / "test_started").exists()

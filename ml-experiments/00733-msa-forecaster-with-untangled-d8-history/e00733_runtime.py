@@ -1077,10 +1077,12 @@ def stage_chain(args: argparse.Namespace, root: Path) -> dict[str, Any]:
 def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
     """Measure the timing gate: one fold of FU at seed 0 and 5 passes of YU, each fit and predicted.
 
-    Each measured job is a whole chain job: the fit, then every prediction set (for FU the three
-    stored variants, with the masked and stored forecasts), and the target-poison check, on the
-    held-out validation rows. The jobs run in a scratch folder, `scores/timing_scratch`, that links
-    the inputs, so no chain job reads them and no test row is read.
+    Each measured job is a whole chain job, as the chain runs it: the fit, then every prediction
+    set on the test rows (for FU the three stored variants, with the masked and stored forecasts),
+    and the target-poison check, which runs on test rows only. The real fold is the latest, whose
+    training window is the longest. The jobs run in a scratch folder, `scores/timing_scratch`, that
+    links the inputs, so no chain job reads the predictions, and nothing is scored: the timing gate
+    writes no score and no `test_started` marker.
 
     Args:
         args: The parsed arguments (`--device`, `--max-passes` on a scratch root).
@@ -1098,12 +1100,12 @@ def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
     scratch = smokerun.scratch_root(outer=root / "scores" / "timing_scratch", root=root)
     smokerun.link_inputs(root=root, scratch=scratch)
     real_job = make_predicting_job(
-        root=scratch, device=args.device, max_passes=cap, rows="validation", new_process=False
+        root=scratch, device=args.device, max_passes=cap, rows="test", new_process=False
     )
-    real = real_job("FU", core.SCREEN_FOLDS[0], 0)
+    real = real_job("FU", core.TIMING_FOLD, 0)
     passes = 5 if cap is None else cap
     syn_job = make_predicting_job(
-        root=scratch, device=args.device, max_passes=passes, rows="validation", new_process=False
+        root=scratch, device=args.device, max_passes=passes, rows="test", new_process=False
     )
     syn = syn_job("YU", None, 0)
     per_pass = float(syn["seconds"]) / passes
