@@ -390,6 +390,18 @@ def test_w1_w2_monthly_anomaly() -> None:
     )
 
 
+def test_columns_read_no_era5() -> None:
+    """No code that builds a new input column reads ERA5: W1 and W2 come from the row's own B1 columns, W3 from the expected-weather table."""
+    folder = Path(__file__).parent
+    for name in ("e00735_columns.py", "e00735_model.py", "e00735_k1.py"):
+        code = "\n".join(
+            line
+            for line in (folder / name).read_text().splitlines()
+            if not line.lstrip().startswith(("#", '"', "-", "`"))
+        )
+        assert "era5" not in code.lower(), name
+
+
 def test_w3_causal() -> None:
     """W3 reads no expected-weather day that ended less than 24 hours before the origin (experiment 437's `check` pattern)."""
     n_days = 40
@@ -1213,6 +1225,7 @@ def main() -> None:
     test_permutation()
     test_w1_w2_monthly_anomaly()
     test_w3_causal()
+    test_columns_read_no_era5()
     test_build_block()
     test_cells_known_answer()
     test_pair_on_row_keys()

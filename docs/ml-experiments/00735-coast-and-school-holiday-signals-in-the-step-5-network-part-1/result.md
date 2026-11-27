@@ -212,7 +212,8 @@ the network can tell a half-term from a long holiday.
 addition, `lincolnshire_term_dates_2026_27.csv` in its own folder, which holds only terms 1 and 2 of
 2026-27 because only those are used: term 1 runs 2026-09-03 to 2026-10-23 and term 2 runs 2026-11-02
 to 2026-12-18, so the October half-term block is 2026-10-24 (a Saturday) to 2026-11-01. The source
-is a [third-party page](https://www.savemyexams.com/learning-hub/school-holidays/england/lincolnshire/lincolnshire-county-council/),
+is a [third-party
+page](https://www.savemyexams.com/learning-hub/school-holidays/england/lincolnshire/lincolnshire-county-council/),
 fetched with the maintainer's permission and not checked against the council's own page, as the
 csv's `source` column says. It is the only new data source. Dates after 2026-12-18 are unknown, so
 the calendar ends on 2026-11-30.
@@ -226,7 +227,12 @@ days later on its real weekdays. The placebo overlaps the real windows: placebo 
 (2026-01-10 to 01-26) overlaps the real "7 days after" window, and placebo Easter (2026-04-24 to
 05-11) overlaps the real "after" window and the 2026-05-04 bank holiday. The summer block overlaps
 its real dates by about 3 weeks. SP can therefore move the score, which is why SP is read against R0
-as well as against S. A test prints the share of placebo holiday days that are real holiday days.
+as well as against S. A test prints the share of placebo holiday days that are real holiday days. In
+the held-in months (November 2025 to June 2026) no shifted school-holiday day is also a real
+school-holiday day, because the shifted Christmas, Easter, and half-term blocks fall on real term
+days (the real "after" windows). In the July to September block the shifted calendar coincides with
+the real holiday on about half of the holiday days, so S minus SP understates the school effect
+there. That block decides nothing, and the page states this limit.
 
 **Coast interaction columns (SKW and SKWP).** K1 `c`; K2 `c × school_off`; K3
 `c × school_first_weekend`; K4 `c × bank_holiday`; K5 `c × weekend` (Saturday or Sunday). K1 alone
@@ -240,7 +246,8 @@ the row's valid time from the 00Z ECMWF ensemble run issued 9 hours before the 0
   those anomalies, clipped to ±3. The standardised column is negative all February and positive all
   Easter, so it would encode which block a row is in.
 - W2 sunny for the month: the same anomaly of the `sw_mean_24h` column (index 56).
-- W3 first warm day: the valid day's `t_max_day` (in kelvin) minus the mean daily maximum 2 m
+- W3 first warm day: the valid day's `t_max_day` (in degrees Celsius) minus the mean daily maximum 2
+m
   temperature over the 7 local days ending 24 hours before the origin (from the expected-weather
   table, which uses the freshest run issued before each half-hour), divided by 5 K and clipped to
   ±3. Every input of W3 was issued before the origin.
@@ -248,7 +255,8 @@ the row's valid time from the 00Z ECMWF ensemble run issued 9 hours before the 0
   does not load onto W1.
 
 **Coast in the embedding (SE and SEP).** The embedding of Primary i becomes `E[i] + c_i × u`, where
-`u` is a learned 8-number vector initialised to zero, applied wherever the embedding is read. Because
+`u` is a learned 8-number vector initialised to zero, applied wherever the embedding is read.
+Because
 `E[i]` stays free, SE can represent exactly the functions the control can and differs from S only in
 how updates are shared across Primaries. In SEP the term uses the permuted `c`.
 
@@ -266,7 +274,8 @@ never enter.
 **Each refit sees each kind of holiday block once or twice, and often at few leads.** Each refit
 holds out one validation week per cycle and purges 15 days before and 9 days after
 (`e00422_prep.purge_masks`). According to the plan review, the October 2025 and February 2025
-half-terms are entirely purged, the May 2025 half-term is held out, and Easter 2026 is mostly purged,
+half-terms are entirely purged, the May 2025 half-term is held out, and Easter 2026 is mostly
+purged,
 so the 2026-10 refit sees the 2025 half-term only at leads of 6 to 14 days. The `columns` phase
 tabulates the training rows that each block contributes to each refit by lead band, and the write-up
 reports the table.
@@ -367,21 +376,24 @@ experiment 731 dropped 24,060 D15 and D18 rows because the cleaned power table w
 
 **The network is arm 9a with the two CAMS columns, not the production variant without them.**
 Stored stage-1 weights exist for all 12 months only for arm 9a. D15 alone drove the arm difference
-in experiment 704, so the production port of a winner is re-checked on experiment 704's arm B weights
+in experiment 704, so the production port of a winner is re-checked on experiment 704's arm B
+weights
 (open question 1). The four load-shift scenarios are not required, because no arm changes the lags,
 the injected events, or the masks.
 
 ### Tests to add before any fit
 
 - Every attribute taken from an imported module exists (`hasattr`).
-- The school columns equal the two csv files on every date from 2024-04-01 to 2026-11-30 (every block
+- The school columns equal the two csv files on every date from 2024-04-01 to 2026-11-30 (every
+block
   start, end, and first weekend); S3 is 1 only in blocks of at most 10 days.
 - Every new column uses the stamp-minus-15-minutes local date, at the 00:00 stamp and across the
   clock changes of 2025-10-26, 2026-03-29, and 2026-10-25.
 - The placebo calendar is the real calendar 21 days later on the same weekdays; the share of placebo
   holiday days that are real holiday days is printed by block and window.
 - The coast permutation is a derangement, fixed by the seed.
-- Every window mask against hand-written dates for two blocks, at midnight and at a 00:30 stamp after
+- Every window mask against hand-written dates for two blocks, at midnight and at a 00:30 stamp
+after
   a clock change.
 - W3 is causal (experiment 437's `check` pattern), and W1 and W2 equal the monthly anomaly of the B1
   columns.
@@ -403,7 +415,8 @@ measures the time per arm-month for the GPU-hours check.
 **One arm-month of stages 2, 3, and the prediction pass, for 3 seeds, takes about 4.0 minutes on the
 GPU.** Experiment 704's logs show stage 2 at 1.5 to 1.8 minutes, stage 3 at 1.3 to 1.5, and the
 prediction pass at about 1.0. Experiment 731's `fit` log shows about 10 seconds of training per seed
-inside a process of about 1.45 minutes, so most of the process time is CPU row building. Pre-training
+inside a process of about 1.45 minutes, so most of the process time is CPU row building.
+Pre-training
 is not rerun.
 
 | Item | Arm-months | Hours |
@@ -426,7 +439,8 @@ at 5.5 GPU-process-hours and asks.
 
 ### Memory for scoring
 
-**The scorer's peak should be about 4 GB.** One arm and seed over 12 refits is about 3.9 million rows
+**The scorer's peak should be about 4 GB.** One arm and seed over 12 refits is about 3.9 million
+rows
 of 11 float32 quantiles plus keys (about 300 MB). The scorer streams one arm and seed at a time
 against R0 and builds the bootstrap loss frame from the window rows at days 1 to 10 only (about 1.2
 million rows). The string `time` key that `losses_for_bootstrap` builds adds about 120 MB per arm
@@ -450,13 +464,15 @@ and seed. The scorer runs under `MemoryMax=12G` and records its measured peak.
 
 Median minus mean forecast per Primary; the MAE of the median beside every CRPS contrast; the replay
 gate and N1; the zero-start test; the placebo overlap share; the holiday-day counts by weather kind;
-dropped half-hours per fold; which audit triggers fired; leave-one-out contrasts (including D15); the
+dropped half-hours per fold; which audit triggers fired; leave-one-out contrasts (including D15);
+the
 tails; the table of training rows per block and refit.
 
 ### Standing practices
 
 - **Followed:** monthly refits; cleaned data with dropped half-hours counted; the D15 and D18 cut;
-  every fitted network and loss history saved; stored predictions reused; tails, avoidable-curtailment
+  every fitted network and loss history saved; stored predictions reused; tails,
+  avoidable-curtailment
   cost, and cold winter nights reported; example forecasts; loss plots; a test that every input with
   a valid time is known at the origin; streamed scoring with a stated peak; a "fits starting" line,
   time log, and GPU-hours stop; review markers; a draft pull request; anonymisation.
@@ -476,7 +492,8 @@ refits. **Departed from:** experiment 325's six seed sets (budget).
 
 ### Review gates, phase by phase
 
-1. `columns` (CPU): build and test the columns, the per-year check, the weather counts, and the table
+1. `columns` (CPU): build and test the columns, the per-year check, the weather counts, and the
+table
    of training rows; the manager views the column gallery.
 2. Opus code review of every script, triage, a re-check of each edited script; marker `smoke`.
 3. `smoke` (GPU, about 0.35 hours); marker `gate`.
@@ -499,7 +516,8 @@ refits. **Departed from:** experiment 325's six seed sets (budget).
 - **The embedding term `u` breaks the missing-key assertion in `e00572_model.load_lag_pre_into_ft`
   (line 75),** which allows only `mixer_ft.*` and two knot keys to be missing.
 - **The `fit` command installs `arm.build_month_syn` only when `MINE.synthetic` is set**
-  (`e00677_k1.py`, lines 167 to 171), and `build_month_syn` calls the `_build_month_p5` captured when
+  (`e00677_k1.py`, lines 167 to 171), and `build_month_syn` calls the `_build_month_p5` captured
+  when
   `e00591_arm` is imported. A wrapper on `e.k.build_month` is dropped in stage 3. Wrap
   `arm.build_month_syn` (or patch `arm._build_month_p5`) and test that the new columns reach
   stage-3 rows.
@@ -522,12 +540,14 @@ refits. **Departed from:** experiment 325's six seed sets (budget).
 
 - The step-5 network is arm 9a (`k1_5w_sp1`) of [experiment
   677](../00677-building-up-the-candidate-demand-network-one-component-at-a-time/result.md): a
-  weather encoder and a date-time encoder pre-trained on ERA5 and CAMS rows, a shared lag encoder, an
+  weather encoder and a date-time encoder pre-trained on ERA5 and CAMS rows, a shared lag encoder,
+  an
   8-number embedding and an output offset per Primary, and a mixer that outputs a three-component
   mixture with 11 quantile levels.
 - Each new arm adds 3 to 12 zero-initialised columns to the mixer's input, or a term `c × u` in the
   embedding (SE and SEP), as defined above. The encoders take no new column.
-- Weather inputs come from the 00Z ECMWF ensemble run issued 9 hours before the 09:00 UTC origin, and
+- Weather inputs come from the 00Z ECMWF ensemble run issued 9 hours before the 09:00 UTC origin,
+and
   lags follow the 24-hour rule, so no input is later than the origin (W3 has a causality test).
 
 ### Training regime
@@ -544,7 +564,8 @@ refits. **Departed from:** experiment 325's six seed sets (budget).
 
 - The scored rows are 12 refit months of daily 12:00 UTC origins at days 1 to 10 and every demand-v2
   lead band, against cleaned actuals. The 8 held-in months carry the verdict.
-- The metrics are CRPS, normalised MAE of the median, signed error, and the tails, per group, Primary,
+- The metrics are CRPS, normalised MAE of the median, signed error, and the tails, per group,
+Primary,
   window, and weather split. The baselines are R0, `stored`, the manual heuristic, and climatology.
 - Intervals, sign rules, placebo readings, and the verdict follow the decision rule above.
 

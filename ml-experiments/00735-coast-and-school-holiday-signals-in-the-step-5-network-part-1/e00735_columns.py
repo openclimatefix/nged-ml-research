@@ -757,6 +757,10 @@ class RowBuilder:
         two, raw_tmax = self._b1(month=month, x=x)
         w12 = apply_anomalies(fit=self.fits[month], primary=primary, month=local.month, b1=two)
         baseline = week_baseline(daily=self.daily(), primary=primary, origin_us=origin_us)
+        latest = week_latest_run_us(daily=self.daily(), primary=primary, origin_us=origin_us)
+        assert (latest <= np.asarray(origin_us, dtype=np.int64)).all(), (
+            "W3's baseline reads a weather run issued after the forecast origin"
+        )
         w3 = first_warm_day(tmax_celsius=raw_tmax, baseline=baseline)
         self.last_report = {
             "w3_rows_without_baseline": float(np.isnan(baseline).mean()),
