@@ -26,6 +26,8 @@ def _ready(root: Path, *, through: str = "review") -> None:
             paths.channels_dir(root=root).mkdir(parents=True, exist_ok=True)
             paths.channels_json(root=root).write_text("{}")
             paths.table_path(root=root).write_text("")
+            for name in st.PRE_FIT_GUARD_NAMES:
+                st.record_pre_fit_guard(root=root, name=name, payload={})
         elif step == "limits":
             (root / "limits.json").write_text("{}")
         elif step == "gallery":
@@ -338,3 +340,20 @@ def test_exit_codes_are_never_the_slot_busy_code() -> None:
     ]
     assert codes == [3, 4, 2, 5] and 1 not in codes
     assert fit.chain_exit_code(status={"state": "failed"}) == 5
+
+
+def test_a_fit_stage_needs_the_base_day_and_test_segment_guards(tmp_path: Path) -> None:
+    """The chain refuses until the base-day and test-segment guards have been recorded."""
+    _ready(tmp_path, through="timing")
+    (tmp_path / st.PRE_FIT_GUARDS).unlink()
+    for recorded in ((), ("base_day_guards",), ("test_segment_coverage",)):
+        (tmp_path / st.PRE_FIT_GUARDS).unlink(missing_ok=True)
+        for name in recorded:
+            st.record_pre_fit_guard(root=tmp_path, name=name, payload={"n": 1})
+        with pytest.raises(st.GuardError, match="pre_fit_guards"):
+            st.guard_run(root=tmp_path, stage="chain", banks_digest=DIGEST)
+    for name in st.PRE_FIT_GUARD_NAMES:
+        st.record_pre_fit_guard(root=tmp_path, name=name, payload={"n": 1})
+    st.guard_run(root=tmp_path, stage="chain", banks_digest=DIGEST)
+    with pytest.raises(st.GuardError):
+        st.record_pre_fit_guard(root=tmp_path, name="other", payload={})

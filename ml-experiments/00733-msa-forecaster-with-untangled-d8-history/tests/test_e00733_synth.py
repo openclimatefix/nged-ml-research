@@ -273,3 +273,12 @@ def test_a_segment_without_origin_time_record_cannot_be_gathered() -> None:
     times = sy.OriginTimes.empty(b=1)
     with pytest.raises(sy.SynthError):
         times.take(n=0, seg=seg, d=10, k=0)
+
+
+def test_the_test_segment_rule_stops_the_line_on_counts() -> None:
+    """More than half of the test segments left out, or none at all, is a stop (verdict row 0)."""
+    sy.assert_enough_test_segments_counted(n_segments=64, n_left_out=8)
+    with pytest.raises(sy.StoppedError):
+        sy.assert_enough_test_segments_counted(n_segments=64, n_left_out=40)
+    with pytest.raises(sy.StoppedError):
+        sy.assert_enough_test_segments_counted(n_segments=0, n_left_out=0)

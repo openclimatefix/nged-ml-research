@@ -210,6 +210,28 @@ def assert_enough_test_segments(*, result: CoverageResult) -> None:
         raise StoppedError(msg)
 
 
+def assert_enough_test_segments_counted(*, n_segments: int, n_left_out: int) -> None:
+    """Run `assert_enough_test_segments` on the counts that the world builder returns.
+
+    Args:
+        n_segments: The segments of the test bank.
+        n_left_out: The segments with no covered base date.
+
+    Raises:
+        StoppedError: When the test split holds no segment or the left-out share is above the limit.
+    """
+    assert_enough_test_segments(
+        result=CoverageResult(
+            covered=(),
+            n_segments=n_segments,
+            n_left_out=n_left_out,
+            n_fully_covered=0,
+            n_base_dates=0,
+            n_covered=0,
+        )
+    )
+
+
 def kept_segments(*, result: CoverageResult) -> list[int]:
     """Return the indices of the segments that keep at least one covered origin."""
     return [i for i, c in enumerate(result.covered) if c.any()]

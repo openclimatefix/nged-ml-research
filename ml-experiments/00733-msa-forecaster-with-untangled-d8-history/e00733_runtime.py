@@ -140,6 +140,14 @@ def stage_banks(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         if not segments:
             msg = f"the bank {kind} holds no covered segment, so the world has nothing to read"
             raise st.CorrectnessFailureError(msg)
+        if kind == "test":
+            sy.assert_enough_test_segments_counted(
+                n_segments=counts["n_segments"], n_left_out=counts["n_left_out"]
+            )
+            st.record_pre_fit_guard(
+                root=root, name="test_segment_coverage",
+                payload={k: counts[k] for k in ("n_segments", "n_left_out")},
+            )  # fmt: skip
         write_origin_time_example(root=root, kind=kind, segments=segments)
         world.write_world(root=root, kind=kind, segments=segments, extra={**counts, "limit": limit})
         result[kind] = counts
@@ -306,12 +314,13 @@ def stage_channels(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     for name, share in coverages.items():
         print(f"channel coverage {name}: {share:.3f}")
     ch.assert_coverage(coverages=coverages)
-    ch.write_choice(path=paths.channels_json(root=root), choice=choice)
-    ch.write_table(table=table, path=paths.table_path(root=root))
     guards = assert_base_day_guards(
         base_days=bank_base_days(root_730=paths.root_730()), channel_ok=channel_ok
     )
     print(f"base-day guards passed: {guards}")
+    st.record_pre_fit_guard(root=root, name="base_day_guards", payload=guards)
+    ch.write_choice(path=paths.channels_json(root=root), choice=choice)
+    ch.write_table(table=table, path=paths.table_path(root=root))
     first = epoch_day(text=TRAIN_WINDOW_START)
     last = fold_days(fold=core.ALL_FOLDS[-1])[1]
     cal_last = int(cal.dates[-1].astype("datetime64[D]").astype(np.int64))

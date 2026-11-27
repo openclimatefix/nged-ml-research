@@ -46,6 +46,11 @@ CHAIN_DONE_STATES: Final = ("complete", "failed", "stopped")
 REVIEW_GATE: Final = "scores/review_gate.json"
 """Written by the session that runs the experiment once the Opus code review and the review of its
 fixes have passed."""
+PRE_FIT_GUARDS: Final = "scores/pre_fit_guards.json"
+"""The record of the guards that must pass before any fit: the base days precede every fold's history
+with no overlap (written by `channels`), and the synthetic test segments are covered by ensemble
+runs (written by `banks`)."""
+PRE_FIT_GUARD_NAMES: Final = ("base_day_guards", "test_segment_coverage")
 SMOKE_FILE: Final = "scores/smoke.json"
 TIMING_FILE: Final = "scores/timing.json"
 SCREEN_FILE: Final = "scores/screen.json"
@@ -253,6 +258,35 @@ def channels_passed(*, root: Path) -> bool:
     return paths.channels_json(root=root).exists() and paths.table_path(root=root).exists()
 
 
+def record_pre_fit_guard(*, root: Path, name: str, payload: Mapping[str, Any]) -> None:
+    """Add one passed guard to `scores/pre_fit_guards.json`.
+
+    Args:
+        root: The data folder of this experiment.
+        name: One of `PRE_FIT_GUARD_NAMES`.
+        payload: What the guard counted.
+
+    Raises:
+        GuardError: When `name` is not a pre-fit guard.
+    """
+    if name not in PRE_FIT_GUARD_NAMES:
+        msg = f"{name} is not a pre-fit guard"
+        raise GuardError(msg)
+    path = root / PRE_FIT_GUARDS
+    record = read_json(path=path) if path.exists() else {}
+    record[name] = dict(payload)
+    write_json(path=path, payload=record)
+
+
+def pre_fit_guards_passed(*, root: Path) -> bool:
+    """Return whether every guard of `PRE_FIT_GUARD_NAMES` has been recorded as passed."""
+    path = root / PRE_FIT_GUARDS
+    if not path.exists():
+        return False
+    record = read_json(path=path)
+    return all(name in record for name in PRE_FIT_GUARD_NAMES)
+
+
 def guard_run(*, root: Path, stage: str, banks_digest: str) -> None:  # noqa: PLR0912
     """Refuse to run a stage on the outputs of another run, or without its gates.
 
@@ -294,6 +328,10 @@ def guard_run(*, root: Path, stage: str, banks_digest: str) -> None:  # noqa: PL
         for what, ok in (
             ("channels.json and the channel table", channels_passed(root=root)),
             ("limits.json, written before any fit", (root / "limits.json").exists()),
+            (
+                f"{PRE_FIT_GUARDS} with the base-day and test-segment guards passed",
+                pre_fit_guards_passed(root=root),
+            ),
             (
                 f"{PANEL_CHECK} with every panel passed (the gallery gate of the plan)",
                 gallery_passed(root=root, banks_digest=banks_digest),
