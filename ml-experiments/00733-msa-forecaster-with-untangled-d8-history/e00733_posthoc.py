@@ -151,6 +151,15 @@ def _scored_arrays(
 
     The world (the bank's segments) is read from `root`, the data folder of the main run.
 
+    Args:
+        root: The data folder of the main run.
+        root_of: The folder that holds each arm's archives.
+        arms: The arms to read.
+        rows: The row set to read, `test` or `validation`.
+
+    Returns:
+        The seed 0 archives by arm, the scored-row mask, and the true sign.
+
     Raises:
         sc.ScoreError: When an archive holds another number of samples than the bank, or two arms
             disagree on the true sign.
@@ -426,6 +435,12 @@ def contrast_figure(*, readings: Mapping[str, Any]) -> Any:
     """Return the figure of the four contrasts; every label says post hoc.
 
     The real contrasts carry intervals; the single-seed synthetic ones are dots without an interval.
+
+    Args:
+        readings: The post hoc readings P1 to P4.
+
+    Returns:
+        The Altair chart.
 
     Raises:
         ValueError: When no contrast has a reading to draw.
