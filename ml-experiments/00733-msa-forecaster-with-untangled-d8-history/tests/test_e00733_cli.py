@@ -154,8 +154,16 @@ def test_the_cpu_stages_of_run_sh_are_the_stages_that_default_to_the_cpu() -> No
     assert "attention" in st.CPU_ONLY_STAGES
 
 
-def test_a_cpu_stage_refuses_the_gpu(tmp_path: Path) -> None:
-    """`--device cuda` on a stage that `run.sh` runs without the GPU check exits 2."""
-    _ready(tmp_path, through="timing")
-    (tmp_path / "scores" / st.TEST_MARKER).touch()
-    assert cli.run_stage(args=_args("attention", device="cuda"), root=tmp_path, digest=DIGEST) == 2
+def test_a_cpu_stage_refuses_the_gpu(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--device cuda` on a CPU-only stage exits 2 with a clear message and never runs the stage."""
+    ran: list[str] = []
+    monkeypatch.setattr(cli, "STAGE_FUNCTIONS", {"figures": lambda *_: ran.append("figures")})
+    for stage in st.CPU_ONLY_STAGES:
+        assert cli.run_stage(args=_args(stage, device="cuda"), root=tmp_path, digest=DIGEST) == 2
+        assert "refuses --device cuda" in capsys.readouterr().err
+    assert ran == []
+    assert cli.main(["figures", "--device", "cuda", "--data-root", str(tmp_path)]) == 2
+    assert ran == []
+    assert not (tmp_path / "scores").exists()

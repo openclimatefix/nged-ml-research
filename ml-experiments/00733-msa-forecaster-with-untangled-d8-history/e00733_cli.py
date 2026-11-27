@@ -67,7 +67,18 @@ def banks_digest(*, root730: Path) -> str:
 
 
 def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
-    """Run one stage under its guard and return its exit code."""
+    """Run one stage under its guard and return its exit code.
+
+    A stage of `CPU_ONLY_STAGES` given `--device cuda` is refused with exit code 2, before the
+    guard, and records no failure.
+    """
+    if args.stage in st.CPU_ONLY_STAGES and getattr(args, "device", None) == "cuda":
+        print(
+            f"stage {args.stage} computes on the CPU and refuses --device cuda: "
+            "run it without --device or with --device cpu",
+            file=sys.stderr,
+        )
+        return st.EXIT_GUARD
     try:
         st.guard_run(
             root=root,
