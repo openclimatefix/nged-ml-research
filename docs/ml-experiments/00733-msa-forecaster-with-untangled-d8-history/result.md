@@ -745,9 +745,18 @@ section "What changed from the plan and what limits the page" gives the rule and
 real folds is read at 98.75%, and the synthetic check reports point differences only. The results
 follow.
 
-**Giving the forecaster only the probability of reverse flow (FS) changed the CRPS at D8 by no detectable amount.** FS minus FU is +0.03% of FU's mean CRPS (post hoc, interval −0.06% to +0.14%, 102,078 rows), so dropping the transfer step made no detectable difference. FS minus M\* is +0.82% of M\*'s mean CRPS (post hoc, interval −0.84% to +2.62%), and the mean absolute error of the median differs by +1.00%. Neither interval excludes zero, so the post hoc FS fits give no sign that the noisy transfer step hid a gain.
+**Giving the forecaster only the probability of reverse flow (FS) changed the CRPS at D8 by no
+detectable amount.** FS minus FU is +0.03% of FU's mean CRPS (post hoc, interval −0.06% to +0.14%,
+102,078 rows), so dropping the transfer step made no detectable difference. FS minus M\* is +0.82%
+of M\*'s mean CRPS (post hoc, interval −0.84% to +2.62%), and the mean absolute error of the median
+differs by +1.00%. Neither interval excludes zero, so the post hoc FS fits give no sign that the
+noisy transfer step hid a gain.
 
-**On the synthetic world, the sign Brier score of the forecaster changed by less than 0.001 in every arm, even with the true history.** The one-seed point differences (post hoc, no interval claim, 407,808 half-hours) are YOb minus Y0b −0.00067 and YUb minus Y0b −0.00046. The sign head's validation cross-entropy stopped the three fits at pass 3 of 23 (Y0b), pass 2 of 22 (YUb), and pass 3 of 23 (YOb), so the new rule still stored an early pass.
+**On the synthetic world, the sign Brier score of the forecaster changed by less than 0.001 in every
+arm, even with the true history.** The one-seed point differences (post hoc, no interval claim,
+407,808 half-hours) are YOb minus Y0b −0.00067 and YUb minus Y0b −0.00046. The sign head's
+validation cross-entropy stopped the three fits at pass 3 of 23 (Y0b), pass 2 of 22 (YUb), and pass
+3 of 23 (YOb), so the new rule still stored an early pass.
 
 | Arm (post hoc, seed 0) | Stopped on | Stored pass | Validation sign cross-entropy | Sign Brier score |
 |---|---|---|---|---|
@@ -757,11 +766,18 @@ follow.
 | YUb | sign cross-entropy | 2 of 22 | 0.1168 | 0.02230 |
 | YOb | sign cross-entropy | 3 of 23 | 0.1158 | 0.02209 |
 
-**The post hoc readings leave the verdict at row 7 and point to explanations 1 and 2 of the null C4 rather than a stopping artefact.** A forecaster that receives the true sign and the true solar output of the history improves the Brier score of the future sign by 0.00067 at most (one seed). The future sign is therefore hard to forecast from lagged power in this synthetic world, whichever signal the history carries. This reading rests on one seed and on a stopping rule that still stops within 3 passes.
+**The post hoc readings leave the verdict at row 7 and point to explanations 1 and 2 of the null C4
+rather than a stopping artefact.** A forecaster that receives the true sign and the true solar
+output of the history improves the Brier score of the future sign by 0.00067 at most (one seed). The
+future sign is therefore hard to forecast from lagged power in this synthetic world, whichever
+signal the history carries. This reading rests on one seed and on a stopping rule that still stops
+within 3 passes.
 
 ![The post hoc contrasts P1 to P4](posthoc_contrasts.svg)
 
-**The post hoc fits cost 3.46 GPU-process-hours (FS 1.51, Y0b 0.65, YUb 0.64, YOb 0.67).** With the main chain's 7.00 (the 7.2 above less the 0.20 of the smoke test), the running total is 10.47 against the stop line of 12.
+**The post hoc fits cost 3.46 GPU-process-hours (FS 1.51, Y0b 0.65, YUb 0.64, YOb 0.67).** With the
+main chain's 7.00 (the 7.2 above less the 0.20 of the smoke test), the running total is 10.47
+against the stop line of 12.
 
 ## The design as registered
 
