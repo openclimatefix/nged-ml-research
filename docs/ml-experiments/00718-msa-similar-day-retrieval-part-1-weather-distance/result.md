@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - weather-products-and-blending
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -51,7 +51,123 @@ metric: >-
   origin, with the mean absolute error of the median forecast normalised by capacity beside it; q01
   and q99 pinball loss; cold winter nights; the read-out weights by age; the four load-shift
   scenarios.
+verdict: not supported
+best_arm: >-
+  `M*` (the last 14 days) is not beaten. `R` (the 14 nearest-weather days of the past 91) minus `M*`
+  is -0.013 points of capacity at the six signed-MW Primaries (98.75% interval -0.088 to +0.049)
+  and +0.069 at the eight MVA-only Primaries (-0.077 to +0.212).
+headline: >-
+  Choosing the 14 history rows by the weather distance to the target day's ensemble forecast, from
+  the past 91 days, forecasts no better than the last 14 days: -0.013 points of capacity at the six
+  signed-MW Primaries and +0.069 at the eight MVA-only Primaries, with both intervals including
+  zero. Two audit triggers fire at the six (one Primary, D5, drives the point estimate), the
+  cold-night and selection-swap guards are unread, and the scores are ceilings for a live forecast.
+lessons: >-
+  A plain mean of the nearest-weather rows was no better than a plain mean of the last 14 days in
+  the exploration, and the attention network is no better either. The nearest-weather rows lose to
+  the union of three measures of part 2 by 0.04 to 0.11 points. Masking the history rows costs
+  0.3 points, so the network relies on them. Reverse flow at D8 does not explain the eight's wider
+  spread. The attention-over-history stop-rule count was exceeded, so both parts printed every
+  Primary.
+take_home_message: >-
+  Picking the demand network's history days by how closely their weather matches the forecast for
+  the target day did not improve the forecast over simply using the last 14 days, at either group
+  of substations. The nearest-weather days also forecast worse than the mixture of recent,
+  same-weekday, and weather-matched days of the companion experiment. Weather similarity alone is
+  therefore not a useful way to choose history rows, and the cold-night and selection-swap checks
+  remain unread.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Do not choose history rows by weather distance alone: the 14 nearest-weather days of the past
+    91 did not forecast better than the last 14 days (A1, A2).
+  - >-
+    Check which Primary drives a group's point estimate before reading it: D5 alone moves the six's
+    A1 (leave-one-Primary-out guard).
 ---
+
+**We asked whether the axial-attention demand network of experiment 713 forecasts a Primary
+substation better when its 14 history rows are the 14 past days with the weather nearest to the
+target day's forecast weather, instead of the last 14 days.** The network reads a matrix of past
+days by 48 half-hours and attends over the days. For each target day we ranked the past 91 days by
+the distance between each day's weather and the target day's ensemble weather forecast, and gave the
+network the nearest 14. We compared the forecasts with two references: the network with the last 14
+days, and the network with 14 random days of the same ages as the nearest 14. We scored 8 months of
+forecasts at 16 Primaries. The nearest-weather rows forecast no better than the last 14 days at
+either group of Primaries: the difference was 0.01 points of capacity better at the 6 Primaries that
+meter signed power and 0.07 worse at the 8 Primaries that meter only apparent power (MVA), and both
+intervals include zero.
+
+**Verdict: not supported.** Every interval below is at 98.75% (month-block bootstrap, 8 monthly
+folds, seeds 0 and 1, CRPS in points of capacity, negative favours the nearest-weather rows).
+
+| Contrast | Group | Point and interval | Reading |
+|---|---|---|---|
+| A1: nearest weather `R` minus last 14 days `M*` | six | -0.013 [-0.088, +0.049] | no detectable difference |
+| A1 | eight | +0.069 [-0.077, +0.212] | no detectable difference |
+| A2: `R` minus the same-age random placebo `R-A` | six | -0.034 [-0.095, +0.050] | cannot tell |
+| A2 | eight | -0.045 [-0.195, +0.059] | no detectable difference |
+
+**An audit is due before this page merges, because two audit triggers fire at the six.** The
+leave-one-Primary-out guard and the guard that the mean absolute error moves with CRPS both fail at
+the six. One Primary drives the six's A1: D5 is -0.283, and the other five signed-MW Primaries are
+between -0.059 and +0.129. The cold-night and selection-swap guards are unread, so the `all guards
+hold` field is false by rule. All scores are ceilings for a live forecast, because the rows were
+retrieved with the stored ensemble forecast and the lab shortcut that experiment 713 documents.
+Experiment 713's known-answer gate was waived by the maintainer on 2026-11-24, and F9's own gate
+passed (checks KS1, KS2, and KS3 on the synthetic worlds).
+
+## What the post hoc readings show
+
+**The nearest-weather rows are worse than the last 14 days at 9 of the 16 Primaries and better at 7
+(post hoc, report-only).** The largest losses are at D12 (+0.207) and D4 (+0.140), and D15 (the
+short-history Primary, outside both groups) is -1.957. The eight's monthly A1 ranges from -0.211 to
++0.335 (standard deviation 0.174) against 0.083 at the six. Reverse flow does not explain the
+eight's wider spread: D8, the reverse-flow Primary, is +0.010, and the eight without D8 are +0.078.
+
+**The network uses its history rows.** Masking all history power at prediction raises the error of
+`R` by 0.30 points at the six [0.19, 0.41] and 0.30 at the eight [0.18, 0.45], at 95% (a read-out
+with no refit).
+
+**Retrieval picks rows the network reads no better than a mixture.** Report-only at 95%, `R` minus
+the mixture `U` of part 2 is +0.043 at the six [+0.005, +0.080] and +0.110 at the eight [+0.028,
++0.193], so the nearest-weather rows forecast worse than the mixture. `R` minus the placebo network
+`P` (14 random days of the past year) is -0.163 at the six [-0.256, -0.068] and -0.093 at the eight
+[-0.220, +0.022], so the nearest-weather rows forecast better than 14 random days of the past year
+at the six.
+
+## Plots
+
+- **Contrasts by Primary.** ![A1 and A2 at each of the 16 Primaries](contrasts_primary_part1.svg)
+- **Ages of the retrieved rows,** fold 2026-01. ![Ages of the retrieved
+  rows](ages_part1_2026-01.svg)
+- **Read-out weight by row age** (unreviewed plot). ![Read-out weight by
+  age](alpha_by_age_part1.svg)
+- **Attention maps** of `R` at D5 and D8 (unreviewed plots). ![Attention of R at
+  D5](attention_part1_R_D5.svg) ![Attention of R at D8](attention_part1_R_D8.svg)
+- **Training and validation loss by pass** (unreviewed plot). ![Validation loss](loss_part1.svg)
+- **Day-ahead and 14-day forecasts** of `M*`, `R`, `R-A`, and the Candidate at D5 and D8 in winter
+  and summer. ![Day-ahead forecast, D5, winter](series_part1_day_winter_D5.svg) ![14-day forecast,
+  D8, summer](series_part1_fourteen_summer_D8.svg)
+
+## Checks
+
+- **Triggers.** Audit trigger 3 (error of the median moves against CRPS) and trigger 4
+  (leave-one-Primary-out) fire at the six, so an audit is due. Triggers 1 and 5 did not fire on the
+  screen.
+- **Numbers from code that has not had its Opus review.** The post hoc per-Primary table, the
+  masked-history scores, the loss plot, the read-out weight plot, and the attention maps come from
+  scripts that wait for one Opus diff-limited review before the pull request leaves draft.
+- **Not done.** The selection-swap read-out was not built, so the cold-night and selection-swap
+  guards are unread.
+- **Unlogged events.** NGED's load-shift logs may miss events, so the clean-lag rows may hold events
+  no label covers.
+
+## The plan as registered
+
+The sections below are the plan as registered before any fit, followed by the method,
+departures, reviews, and files.
 
 **We ask whether the axial-attention network of experiment 713 forecasts a Primary substation's
 demand better when its 14 history rows are the 14 past days with the weather nearest to the target

@@ -661,12 +661,26 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["screen", "headline", "report-only", "closure", "christmas", "self-test"],
+        choices=[
+            "screen",
+            "headline",
+            "report-only",
+            "secondary",
+            "closure",
+            "christmas",
+            "self-test",
+        ],
     )
     parser.add_argument("part", nargs="?", type=int, choices=[1, 2])
     parser.add_argument(
         "--seeds", type=int, default=2, help="seeds per counted arm of the headline: 2 or 5"
     )
+    parser.add_argument(
+        "--folds",
+        default=None,
+        help="`secondary` only: comma-separated fold months the arms were fitted on",
+    )
+    parser.add_argument("--tag", default=None, help="`secondary` only: name of the score file")
     args = parser.parse_args()
     if args.command == "self-test":
         return self_test()
@@ -719,6 +733,20 @@ def main() -> int:
                 labels=labels,
             ),
         )  # fmt: skip
+    elif args.command == "secondary":
+        assert args.folds and args.tag, "`secondary` needs --folds and --tag"
+        folds = tuple(args.folds.split(","))
+        named = {n for pair in REPORT_ONLY_PAIRS[part] for n in pair} - {"STAR"}
+        per_seed, averaged, groups, star = _load(
+            part=part, months=folds, seeds=arms.SCREEN_SEEDS, optional=sorted(named)
+        )
+        sites = s713.k578.sites()  # ty: ignore[unresolved-attribute]
+        labels = dict(zip(sites["time_series_id"].to_list(), sites["label"].to_list(), strict=True))
+        out = report_only(
+            part=part, per_seed=per_seed, averaged=averaged, groups=groups, star=star, labels=labels
+        )
+        out["folds"] = list(folds)
+        _write(part=part, name=f"secondary_{args.tag}", obj=out)
     elif args.command == "christmas":
         months = ("2025-12", "2026-01")
         _, averaged, _, star = _load(
