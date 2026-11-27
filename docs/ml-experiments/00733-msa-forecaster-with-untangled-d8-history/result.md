@@ -820,6 +820,14 @@ published page carries the coverage counts.
 - **The fold-coverage training window starts at 2024-04-01 (ruling of the design lead,
   2026-11-26),** the first run of experiment 607, because no ensemble run exists earlier, so no origin
   earlier has a re-run.
+- **The history path is gated by the per-token flag, and F0r trains with the path's rates at zero
+  (ruling of the design lead, 2026-11-27, set before any experiment 733 score or fit exists).** An
+  ungated path added `gamma * W2 * GELU(b1) / r` to every history token even with every flag off, so
+  after a one-pass fit `gamma` was up to 0.12 and F0r differed from M\* by up to 0.307. The path's
+  output is now multiplied by the flag, so it is exactly 0 where the channel is absent, on every arm.
+  F0r also trains with the new parameters' learning rates set to 0, and the fit stops with a
+  correctness failure if any new parameter, `gamma` included, differs from its initial value
+  afterwards.
 - **All 16 Primaries with the channels at D8 alone,** so that M\* is an exact control and the recipe
   stays experiment 713's.
 - **No sign head on the real folds,** because no real day has a known sign, and a head trained on

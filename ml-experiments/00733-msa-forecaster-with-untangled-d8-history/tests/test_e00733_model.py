@@ -165,3 +165,38 @@ def test_control_arm_has_the_sign_head_and_no_path() -> None:
         atol=1e-6,
     )
     assert model.new_parameter_count(model=net) == (80 * 32 + 32) + (32 + 1)
+
+
+def test_flags_off_outputs_equal_m_star_and_the_path_removed_network_with_a_trained_path() -> None:
+    """With a trained path and a nonzero gain, a token without its flag gets exactly zero."""
+    m = _m_star()
+    inp = make_inputs(channels=True)
+    absent = inp.absent()
+    net = _untangled(state=m.state_dict())
+    removed = _untangled(state=m.state_dict(), path=False)
+    with torch.no_grad():
+        net.u_gamma.normal_(std=0.3)
+        net.u_head_in.weight.normal_(std=0.1)
+        for p in (net.u_w1.weight, net.u_w1.bias, net.u_w2.weight):
+            p.normal_(std=1.0)
+        want = m(absent).out
+        assert torch.equal(net(absent).out, want)
+        assert torch.equal(removed(absent).out, want)
+        assert torch.equal(net.hist_path(absent), torch.zeros_like(net.hist_path(absent)))
+        # Tokens whose flag is off receive nothing even when other tokens of the batch carry a channel.
+        path = net.hist_path(inp)
+        assert bool((path[~inp.hist_u_ok] == 0).all()) and bool((path[inp.hist_u_ok] != 0).any())
+
+
+def test_f0r_architecture_loaded_with_m_stars_state_reproduces_m_star_within_tolerance() -> None:
+    """The F0r network with a moved gain and no channel equals M* within the tolerance."""
+    import e00733_real as real
+
+    m = _m_star(seed=3)
+    inp = make_inputs(channels=True, seed=4).absent()
+    net = _untangled(state=m.state_dict())
+    with torch.no_grad():
+        net.u_gamma.fill_(0.12)  # the largest gain a one-pass fit reached before the gate
+    with torch.no_grad():
+        diff = (m(inp).out - net(inp).out).abs().max()
+    assert float(diff) <= real.TOLERANCE_REPRODUCTION

@@ -154,28 +154,48 @@ RealLoader = Callable[[str, str, int, str], RealInputs]
 def train_with_rerun(
     *, net: model.UntangledNet, world: object, stage: int, samples: object, seed: int, encoders: str,
     start_state: Mapping[str, torch.Tensor], max_passes: int | None = None,
+    new_lr_scale: float = 1.0,
 ) -> list[train.History]:  # fmt: skip
     """Train a stage at a cap of 60 passes.
 
     A stage that ends at the cap is rerun from its starting state at 120. `max_passes` (the smoke
     test's
-    one pass) replaces both caps.
+    one pass) replaces both caps. `new_lr_scale` multiplies the new parameters' rates.
     """
     cap_first, cap_rerun = (
         (CAP_FIRST, CAP_RERUN) if max_passes is None else (max_passes, max_passes)
     )
     _, first = train.train_stage(
         net=net, world=world, stage=stage, samples=samples, seed=seed, encoders=encoders,
-        max_passes=cap_first,
+        max_passes=cap_first, new_lr_scale=new_lr_scale,
     )  # fmt: skip
     if not first.cap_hit:
         return [first]
     net.load_state_dict(start_state)
     _, again = train.train_stage(
         net=net, world=world, stage=stage, samples=samples, seed=seed, encoders=encoders,
-        max_passes=cap_rerun,
+        max_passes=cap_rerun, new_lr_scale=new_lr_scale,
     )  # fmt: skip
     return [first, again]
+
+
+def assert_new_parameters_unchanged(
+    *, net: model.UntangledNet, before: Mapping[str, torch.Tensor], arm: str
+) -> None:
+    """Raise when any new parameter (the gain `u_gamma` included) differs from its initial value.
+
+    Args:
+        net: The fitted network.
+        before: The new parameters as the network was built.
+        arm: The arm, for the message.
+
+    Raises:
+        CorrectnessFailureError: When a new parameter has moved (verdict row 1).
+    """
+    for name, value in net.named_parameters():
+        if name in before and not torch.equal(value.detach().cpu(), before[name].cpu()):
+            msg = f"{arm}: the new parameter {name} moved during a fit that reads no channel"
+            raise CorrectnessFailureError(msg)
 
 
 def fit_real(
@@ -213,6 +233,10 @@ def fit_real(
         net.freeze_encoders()
     net = net.to(device)
     sampler = make_samples if make_samples is not None else tr713.make_samples
+    new_lr_scale = 1.0 if inputs.has_channels else 0.0
+    new_before = {
+        n: p.detach().clone() for n, p in net.named_parameters() if n.startswith(model.NEW_PREFIXES)
+    }
     stages: list[dict[str, Any]] = []
     for stage in (2, 3):
         samples = sampler(world=inputs.world, stage=stage, placebo=False)
@@ -232,7 +256,10 @@ def fit_real(
         histories = train_with_rerun(
             net=net, world=inputs.world, stage=stage, samples=samples, seed=seed,
             encoders=inputs.encoders, start_state=start_state, max_passes=max_passes,
+            new_lr_scale=new_lr_scale,
         )  # fmt: skip
+        if not inputs.has_channels:
+            assert_new_parameters_unchanged(net=net, before=new_before, arm=arm)
         final = histories[-1]
         save_state(
             state=net.state_dict(),

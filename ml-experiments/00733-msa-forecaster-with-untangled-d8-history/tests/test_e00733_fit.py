@@ -223,6 +223,43 @@ def test_real_fold_fit_stores_both_stages_and_reruns_a_stage_that_hits_the_cap(
     assert [s["label"] for s in curve["series"]] == ["stage 2", "stage 3"]
 
 
+def test_an_arm_without_channels_trains_with_new_rates_of_zero_and_keeps_its_new_parameters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F0r reads no channel: every new parameter, the gain included, keeps its initial value."""
+    _patch_713(monkeypatch)
+    seen: list[float] = []
+    real_groups = tn.param_groups
+
+    def _spy(**kw: object) -> list[dict]:
+        seen.append(float(kw["new_lr_scale"]))  # ty: ignore[invalid-argument-type]
+        return real_groups(**kw)  # ty: ignore[invalid-argument-type]
+
+    monkeypatch.setattr(tn, "param_groups", _spy)
+    inputs = _real_inputs(tmp_path)
+    inputs.has_channels = False
+    fit.fit_real(
+        root=tmp_path, arm="F0r", fold="a", seed=0, device="cpu", loader=lambda *_: inputs, make_samples=_samples,
+    )  # fmt: skip
+    assert seen and set(seen) == {0.0}
+    state = torch.load(tmp_path / "networks" / "F0r_a_s0_stage3.pt")
+    assert bool((state["u_gamma"] == 0).all())
+    fresh = model.UntangledNet(seed=0).state_dict()
+    for name in ("u_w1.weight", "u_w1.bias", "u_w2.weight", "u_head_in.weight"):
+        assert torch.equal(state[name], fresh[name])
+
+
+def test_a_moved_new_parameter_is_a_correctness_failure() -> None:
+    """The check after an F0r fit raises when any new parameter has moved."""
+    net = model.UntangledNet(seed=0)
+    before = {n: p.detach().clone() for n, p in net.named_parameters() if n.startswith("u_")}
+    fit.assert_new_parameters_unchanged(net=net, before=before, arm="F0r")
+    with torch.no_grad():
+        net.u_gamma[0] += 1e-6
+    with pytest.raises(fit.CorrectnessFailureError):
+        fit.assert_new_parameters_unchanged(net=net, before=before, arm="F0r")
+
+
 def test_real_fold_fit_refuses_a_stored_or_synthetic_arm(tmp_path: Path) -> None:
     """A stored arm and a synthetic arm are not fitted by the real-fold path."""
     for arm in ("M*", "YU"):

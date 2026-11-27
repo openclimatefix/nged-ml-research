@@ -4,7 +4,8 @@
 `UntangledNet` subclasses experiment 713's `MsaNet`, keeps every module name, and builds the new
 modules last, so a state dictionary of M* loads into it with only the new keys (`u_*` and `sign_*`)
 missing. Every new path starts at exactly zero effect, so a network that loads M*'s state and reads
-every channel as absent gives M*'s output bit for bit.
+every channel as absent gives M*'s output bit for bit, whatever the new weights hold, because the
+history path's output is gated by the per-token flag.
 
 Three new parts:
 
@@ -166,9 +167,14 @@ class UntangledNet(mdl.MsaNet):
         return self.u_w2(functional.gelu(self.u_w1(features)))
 
     def hist_path(self, inp: UntInputs) -> torch.Tensor:
-        """Return the history token path output `(B, 14, 48, 64)`."""
+        """Return the history token path output `(B, 14, 48, 64)`.
+
+        The output is gated by the per-token flag, so a token whose channel is absent receives
+        exactly zero, whatever the weights and the gain hold.
+        """
         assert self.u_gamma is not None
-        return self.u_gamma * (self.raw_path_output(inp=inp) / self.u_r)
+        okf = inp.hist_u_ok.to(inp.hist_u.dtype)[..., None]
+        return okf * (self.u_gamma * (self.raw_path_output(inp=inp) / self.u_r))
 
     @torch.no_grad()
     def calibrate_scale(self, *, batches: list[UntInputs]) -> float:
