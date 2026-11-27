@@ -5,7 +5,7 @@ Usage: e00718_nohist_score.py
 
 `<arm>-nohist` is the arm's stage 3 network forecasting with all history power masked (`e00718_predict.py --mask-history`).
 Prints, at 95% on the headline band over all 8 folds and seeds 0 and 1, the CRPS contrast of the masked forecast minus the
-unmasked forecast of the same arm (how much the network relies on the history rows), and minus `P`'s unmasked forecast, in points
+unmasked forecast of the same arm (how much the network relies on the history rows), and minus `M*`'s unmasked forecast, in points
 of capacity, at the six, the eight, and all 16 Primaries. A positive first contrast says the history rows help.
 """
 

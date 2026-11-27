@@ -26,7 +26,6 @@ def main() -> int:
     """Print the post hoc tables."""
     part = int(sys.argv[1])
     spec = con.COUNTED[part]
-    treat, ref1, ref2 = spec["first"][1], spec["first"][2], spec["second"][2]
     seeds = (0, 1)
     _per_seed, averaged, _groups, star = con._load(part=part, months=ALL_FOLDS, seeds=seeds)
     treat = spec["first"][1]
@@ -34,11 +33,6 @@ def main() -> int:
     ref2 = spec["placebo_arm"]
     sites = s713.k578.sites()  # ty: ignore[unresolved-attribute]
     labels = dict(zip(sites["time_series_id"].to_list(), sites["label"].to_list(), strict=True))
-    truth = s713.truth_stack()
-    print(
-        "truth min per Primary (share of capacity):",
-        {labels.get(i, i): round(float(np.nanmin(truth[i])), 3) for i in range(truth.shape[0])},
-    )
 
     def diff(frame_t: pl.DataFrame, frame_r: pl.DataFrame) -> pl.DataFrame:
         f = lambda x: x.filter((pl.col("lead_hours") >= BAND[0]) & (pl.col("lead_hours") < BAND[1]))  # noqa: E731
@@ -81,7 +75,10 @@ def main() -> int:
         }
         out[name]["by_sign_of_observed_power"] = {
             k: {
-                "negative_half_hours": int((v["actual"] < 0).sum()),
+                "negative_forecast_rows": int((v["actual"] < 0).sum()),
+                "negative_distinct_valid_times": int(
+                    v.filter(pl.col("actual") < 0)["valid_time"].n_unique()
+                ),
                 "mean_d_negative": None
                 if (v["actual"] < 0).sum() == 0
                 else round(float(v.filter(pl.col("actual") < 0)["d"].mean()), 4),

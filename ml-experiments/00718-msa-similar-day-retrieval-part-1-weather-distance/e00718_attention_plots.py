@@ -7,7 +7,7 @@ Loads each arm's stage 3 state of the fold and seed, builds the arm's batch for 
 D8 of the eight) and lead day 1 (the day after the origin day), and uses `e00718_readouts.internals_for_case`. Writes two kinds of
 chart: `attention_part<P>_<arm>_<Primary>.svg` (left, the read-out weight alpha of each history row at each half-hour of the target
 day; right, the across-day attention of the last block's target-row query, averaged over heads and half-hours, per history row) and
-`alpha_by_age_part<P>.svg` (the mean total read-out weight by row age over 120 random (Primary, origin) cases, per arm). Rows are
+`alpha_by_age_part<P>.svg` (the mean total read-out weight by row age over 120 random (Primary, origin) cases, the same for every arm, counting only the cases that hold a row of that age). Rows are
 ordered by age, so a sorted order reads as recency. Plots only; the scores come from the contrast scripts.
 """
 
@@ -66,6 +66,30 @@ def load(*, arm: str, month: str, seed: int, device: str) -> tuple[f9.F9Net, fb.
     return model, source, data
 
 
+def case(
+    *, model: f9.F9Net, source: fb.F9Source, primary: int, c_idx: int, lead_day: int
+) -> dict[str, np.ndarray]:
+    """Return the read-out weights, across-day attention, and present rows of one case, built as `e00718_predict.py` builds a scored sample (ensemble inputs, no target cut)."""
+    dev = source.device
+    one = lambda v: torch.tensor([v], dtype=torch.long, device=dev)  # noqa: E731
+    batch = source.assemble(
+        primary=one(primary),
+        c_idx=one(c_idx),
+        lead_day=one(lead_day),
+        ensemble=True,
+        target_end=10**9,
+    )
+    got = ro.extract(model=model, inputs=batch.inputs)
+    last = max(int(k.split("_")[1]) for k in got if k.startswith("across_"))
+    present = batch.inputs.row_exists[0].cpu().numpy().astype(bool)
+    return {
+        "alpha": got["alpha"][0].cpu().numpy()[present],
+        "across": got[f"across_{last}"][0].cpu().numpy(),
+        "present": present,
+        "ages": batch.ages[0].cpu().numpy()[present],
+    }
+
+
 def main() -> int:
     """Write the charts."""
     import e00578_common as k578  # ty: ignore[unresolved-import]
@@ -80,19 +104,25 @@ def main() -> int:
     sites = k578.sites().sort("primary")
     prim_of = dict(zip(sites["label"].to_list(), sites["primary"].to_list(), strict=True))
     rng = np.random.default_rng(0)
+    c_pick = p_pick = None
     pooled = []
     for arm in ARMS[args.part]:
         model, source, data = load(arm=arm, month=args.month, seed=args.seed, device=args.device)
         c_all = data.test_origin_idx + lay713.NATIVE_OFFSET_STEPS
+        if c_pick is None:
+            c_pick = rng.choice(c_all, N_CASES)
+            p_pick = rng.integers(0, 16, N_CASES)
         c_case = int(c_all[len(c_all) // 2])
         for label in ("D5", "D8"):
-            got = ro.internals_for_case(
+            got = case(
                 model=model, source=source, primary=int(prim_of[label]), c_idx=c_case, lead_day=1
             )
             order = np.argsort(got["ages"])
             alpha, ages = got["alpha"][order], got["ages"][order]
             across = got["across"].mean(axis=(0, 1))
-            across_rows = np.concatenate([[across[0]], across[1:][order]])
+            across_present = np.concatenate([[True], got["present"]])
+            across_kept = across[across_present]
+            across_rows = np.concatenate([[across_kept[0]], across_kept[1:][order]])
             heat = pl.DataFrame(
                 {
                     "age_days": np.repeat(ages, 48),
@@ -138,13 +168,9 @@ def main() -> int:
                 title=f"Arm {arm}, fold {args.month}, seed {args.seed}, Primary {label}, one test origin, lead day 1"
             )
             f713.save(chart, path=args.out_dir / f"attention_part{args.part}_{arm}_{label}.svg")
-        # pooled mean read-out weight by age
-        c_pick = rng.choice(c_all, N_CASES)
-        p_pick = rng.integers(0, 16, N_CASES)
+        # pooled mean read-out weight by age, over the same cases for every arm
         for c, p in zip(c_pick, p_pick, strict=True):
-            got = ro.internals_for_case(
-                model=model, source=source, primary=int(p), c_idx=int(c), lead_day=1
-            )
+            got = case(model=model, source=source, primary=int(p), c_idx=int(c), lead_day=1)
             mass = got["alpha"].sum(axis=1) / 48.0
             pooled += [
                 {"arm": arm, "age_days": int(a), "mass": float(m)}

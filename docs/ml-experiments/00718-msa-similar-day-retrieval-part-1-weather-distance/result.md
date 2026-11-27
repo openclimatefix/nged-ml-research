@@ -124,7 +124,8 @@ passed (checks KS1, KS2, and KS3 on the synthetic worlds).
 (post hoc, report-only).** The largest losses are at D12 (+0.207) and D4 (+0.140), and D15 (the
 short-history Primary, outside both groups) is -1.957. The eight's monthly A1 ranges from -0.211 to
 +0.335 (standard deviation 0.174) against 0.083 at the six. Reverse flow does not explain the
-eight's wider spread: D8, the reverse-flow Primary, is +0.010, and the eight without D8 are +0.078.
+eight's wider spread: D8, the Primary the maintainer named as the reverse-flow case, is +0.010, and
+the eight without D8 are +0.078.
 
 **The network uses its history rows.** Masking all history power at prediction raises the error of
 `R` by 0.30 points at the six [0.19, 0.41] and 0.30 at the eight [0.18, 0.45], at 95% (a read-out
@@ -156,9 +157,15 @@ at the six.
 - **Triggers.** Audit trigger 3 (error of the median moves against CRPS) and trigger 4
   (leave-one-Primary-out) fire at the six, so an audit is due. Triggers 1 and 5 did not fire on the
   screen.
-- **Numbers from code that has not had its Opus review.** The post hoc per-Primary table, the
-  masked-history scores, the loss plot, the read-out weight plot, and the attention maps come from
-  scripts that wait for one Opus diff-limited review before the pull request leaves draft.
+- **Review of the new analysis code.** One Opus review
+  (`briefs/msa_architecture/f9_result_code_review.md`) covered the post hoc, masked-history,
+  loss-plot, attention-plot, and `secondary` code. It reproduced the printed B1 numbers, the D8-only
+  value, and the 792 negative rows exactly. It found two must-fix faults in the attention plots (the
+  batch used ERA5 weather, and absent rows were drawn as real rows of age 2), and the charts were
+  redrawn after the fix. The remaining findings were fixed or reworded. The review did not recompute
+  the masked-history scores, the `secondary` contrasts, B2, or the part 1 numbers, and the redrawn
+  attention charts have not had a second look. A Sonnet check confirmed that the `secondary` command
+  changes no line of the headline path (file hash `3706cc64757a1bfa`).
 - **Not done.** The selection-swap read-out was not built, so the cold-night and selection-swap
   guards are unread.
 - **Unlogged events.** NGED's load-shift logs may miss events, so the clean-lag rows may hold events
