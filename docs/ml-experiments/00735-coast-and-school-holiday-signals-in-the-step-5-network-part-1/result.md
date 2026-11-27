@@ -254,6 +254,25 @@ m
 - W4 `c × W1` without the school factor, so that a warm-day coastal effect outside school holidays
   does not load onto W1.
 
+**Look-ahead check for the weather columns.** For a target day 1 to 14 days after the forecast
+origin, every weather input of W1 to W4 was available at the origin:
+
+- W1 and W2 come from the row's own B1 columns `t_max_day` and `sw_mean_24h`, which experiment 437
+  builds from the ensemble-mean forecast of the ECMWF ensemble run issued at the origin, taken over
+  the target local day. The anomaly means and standard deviations come from the refit's training
+  rows only.
+- W3's baseline comes from the expected-weather table, which holds the ensemble mean of each run's
+  first day (leads 9.5 to 33 hours), for the 7 local days that end at least 24 hours before the
+  origin. A runtime assertion checks that the latest run read was issued at or before the origin.
+- W4 is the coast closeness times W1, so it adds no weather source.
+- No new column reads ERA5, CAMS, or realised weather. ERA5 and CAMS enter only the frozen stage-1
+  pre-training, which does not see the new columns, and the warm-and-sunny split of the results uses
+  realised weather for analysis only.
+- Tests: `test_w3_causal` changes every expected-weather day after the last complete day and checks
+  that W3's baseline does not move; a second test checks the latest run origin the baseline reads;
+  `test_columns_read_no_era5` checks that the column, model, and runner code contains no ERA5
+  reference.
+
 **Coast in the embedding (SE and SEP).** The embedding of Primary i becomes `E[i] + c_i × u`, where
 `u` is a learned 8-number vector initialised to zero, applied wherever the embedding is read.
 Because

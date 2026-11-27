@@ -198,7 +198,7 @@ def w_panels(*, daily: win.DailyWeather, c_true: np.ndarray, labels: list[str], 
         )
         .properties(width=620, height=70)
         .facet(row=alt.Row("column:N", sort=names, title=None, header=alt.Header(labelAngle=0, labelAlign="left", labelOrient="top")))
-        .properties(title=alt.TitleParams("The weather columns W1 to W4 around the October 2026 half-term, D19 (coastal) and D11 (inland)", subtitle=["From realised daily weather (ERA5 to 2026-07-31, then the expected-weather table), not from the ENS rows. The half-term is 2026-10-24 to 2026-11-01. Substation demand only."]))
+        .properties(title=alt.TitleParams("The weather columns W1 to W4 around the October 2026 half-term, D19 (coastal) and D11 (inland)", subtitle=["This picture uses realised daily weather (ERA5 to 2026-07-31, then the expected-weather table) for illustration only; the model inputs do not (they use the ensemble forecast issued at the origin). The half-term is 2026-10-24 to 2026-11-01. Substation demand only."]))
     )  # fmt: skip
     chart_.save(str(out / "w_panels.svg"))
 
