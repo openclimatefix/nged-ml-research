@@ -83,6 +83,6 @@ def test_the_numpy_check_detects_a_bare_call() -> None:
 
 def test_no_absolute_home_path_in_the_modules() -> None:
     """No module or test names an absolute path under the home folder (a repository test fails on one)."""
-    needle = "/home/" + "jack"
+    needle = "/ho" + "me/" + "jack"
     for path in [*own_sources().values(), *FOLDER.glob("tests/*.py")]:
         assert needle not in path.read_text(), path.name
