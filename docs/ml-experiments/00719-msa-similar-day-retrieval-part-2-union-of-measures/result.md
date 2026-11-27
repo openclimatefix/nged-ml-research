@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - weather-products-and-blending
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -49,7 +49,144 @@ metric: >-
   origin, with the mean absolute error of the median forecast normalised by capacity beside it; q01
   and q99 pinball loss; cold winter nights; the read-out weights by age and by measure; the four
   load-shift scenarios.
+verdict: small gain
+best_arm: >-
+  `U` (five weather-nearest, five most recent, and four same-weekday blocks of the past 379 days).
+  `U` minus `M*` (the last 14 days) is -0.055 points of capacity at the six signed-MW Primaries
+  (98.75% interval -0.111 to -0.006) and -0.041 at the eight MVA-only Primaries (-0.131 to +0.057).
+headline: >-
+  A mixture of weather-matched, recent, and same-weekday history rows forecasts 0.055 points of
+  capacity better than the last 14 days at the six signed-MW Primaries and 0.062 better than a
+  random mixture of the same ages. At the eight MVA-only Primaries the gain over the last 14 days is
+  not detectable (-0.041, interval -0.131 to +0.057). Two guards (cold winter nights and the
+  selection swap) are unread, and the scores are ceilings for a live forecast.
+lessons: >-
+  The weaker reading at the eight is month-to-month spread, not reverse flow: D8, the reverse-flow
+  Primary, gains most (-0.174), and the eight without D8 gain -0.022. Masking the history rows
+  costs 0.3 to 0.4 points of capacity, so the network relies on them. Adding the rows of earlier
+  winters for the days around Christmas (`UX`) did not help on folds 2025-12 and 2026-01. The
+  attention-over-history stop-rule count was exceeded, so both parts printed every Primary.
+take_home_message: >-
+  Feeding the demand network a mixture of recent, same-weekday, and weather-matched past days
+  lowers its error a little, about 0.06 points of capacity at the six substations with signed
+  power, and by an amount we cannot detect at the eight substations with apparent power only. The
+  gain over a random mixture of the same ages is of the same size, so the choice of rows by
+  similarity and recency adds a small amount. The cold-night and selection-swap checks are unread,
+  so the result is a candidate and not a finding to port.
+production_status: candidate
+adopted_in: none
+advice:
+  - >-
+    Choose history rows by a mixture of recency, weekday, and weather similarity rather than the
+    last 14 days alone for Primaries with signed power, and expect a gain of about 0.06 points of
+    capacity (B1, B2).
+  - >-
+    Do not assume that reverse flow explains a weaker result at the MVA-only Primaries: test the
+    eight with and without D8 and read the monthly spread first (post hoc reverse-flow table).
+  - >-
+    Score the cold-night and selection-swap guards before treating a retrieval gain as
+    adoptable (guards table).
 ---
+
+**We asked whether the axial-attention demand network of experiment 713 forecasts a Primary
+substation better when its 14 history rows are a mixture of recent, same-weekday, and
+weather-matched past days instead of the last 14 days.** The network reads a matrix of past days by
+48 half-hours and attends over the days. We fitted the network with five rows chosen by weather
+similarity to the target day's ensemble weather forecast, five of the most recent days, and four of
+the most recent days with the same weekday, taken from the past 379 days. We compared the forecasts
+with two references: the network with the last 14 days, and the network with the same recent rows
+and random rows of matched ages. We scored 8 months of forecasts at 16 Primaries. The
+weather-and-recency mixture forecast about 0.06 points of capacity better than the network with the
+last 14 days at the 6 Primaries that meter signed power, and not detectably better at the 8
+Primaries that meter only apparent power (MVA).
+
+**Verdict: small gain.** The two-seed rule of experiment 713 gives `small gain` at the six and `no
+detectable difference` at the eight for the first contrast. Every interval below is at 98.75%
+(month-block bootstrap, 8 monthly folds, seeds 0 and 1, CRPS in points of capacity, negative favours
+the mixture).
+
+| Contrast | Group | Point and interval | Reading |
+|---|---|---|---|
+| B1: mixture `U` minus last 14 days `M*` | six | -0.055 [-0.111, -0.006] | small gain |
+| B1 | eight | -0.041 [-0.131, +0.057] | no detectable difference |
+| B2: `U` minus the matched-age random placebo `U-A` | six | -0.062 [-0.100, -0.021] | gain |
+| B2 | eight | -0.045 [-0.076, -0.012] | small gain |
+
+**The gain is small, and the two guards that need extra scoring have not been read.** The cold-night
+guard and the selection-swap guard of the decision rule are unread, so the page's `all guards hold`
+field is false by rule. The leave-one-Primary-out, leave-one-month-out, tail, and
+error-of-the-median guards hold at both groups. The table of guards, the screen reading, and the
+clean-fold reading are in the printed report under `data/ml-experiments/00719-*/score/`. All scores
+are ceilings for a live forecast, because the rows were retrieved with the stored ensemble forecast
+and the lab shortcut that experiment 713 documents. Experiment 713's own known-answer gate was
+waived by the maintainer on 2026-11-24, and F9's gate passed (checks KS1, KS2, and KS3 on the
+synthetic worlds).
+
+## What the post hoc readings show
+
+**Reverse flow does not explain why the gain is weaker at the eight (post hoc, report-only, from the
+stored forecasts).** The maintainer asked whether reverse flow at D8 is the reason.
+
+- **Per Primary, B1 is below zero at 11 of the 16 Primaries and above zero at 5.** The eight's B1 is
+  positive at D2 (+0.007), D3 (+0.012), and D4 (+0.064), and negative at D8 (-0.174) and D12
+  (-0.113).
+- **D8 is where the mixture helps the eight most.** Without D8 the eight's B1 is -0.022, with D8
+  alone -0.174. Leaving D8 out makes the eight weaker, so the reverse-flow Primary is not the cause.
+- **The data cannot separate reverse-flow half-hours at the eight.** The eight are stored as
+  apparent power with no negative values. At the six, 792 half-hours have negative observed power,
+  and B1 on those half-hours is -0.499 against -0.055 elsewhere. That is 0.3% of rows and probably
+  one Primary, so it is an observation and not a result.
+- **The eight's monthly B1 swings about twice as much as the six's.** The standard deviation of the
+  8 monthly means is 0.114 at the eight (range -0.185 to +0.139), 0.123 at the eight without D8, and
+  0.063 at the six. B2 has the same spread at both groups (0.040 and 0.048). The month-to-month
+  spread, not reverse flow, is the likelier reason for the wider interval.
+
+**The network uses its history rows.** Masking all history power at prediction (a read-out with no
+refit) raises the error of `U` by 0.40 points at the six [0.27, 0.54] and 0.33 at the eight [0.24,
+0.43], at 95%. `R` of part 1 loses about 0.30 at both groups.
+
+**The 28-row and Christmas variants are report-only.** Scored on the 4 screen folds, `U27` (28 rows:
+the last 14 days plus 7 weather and 6 same-weekday rows from older days) minus `M*` is -0.024 at the
+six [-0.065, +0.014] and +0.015 at the eight [-0.007, +0.038]. `U27` minus its random placebo
+`U27-A` is -0.060 at the six [-0.122, -0.002]. `UX` (calendar-matched rows of earlier winters for
+the days around Christmas), scored on folds 2025-12 and 2026-01, forecast 0.062 points worse than
+`U` at the six [+0.054, +0.069] and 0.070 worse at the eight, and 0.082 better than `M*` at the six.
+`UX` therefore adds no gain over `U` on those two folds. The refit of `M*` through F9's code (arm
+`Z`) reproduces experiment 713's forecasts exactly (difference 0.000).
+
+## Plots
+
+- **Contrasts by Primary.** ![B1 and B2 at each of the 16 Primaries](contrasts_primary_part2.svg)
+- **Ages of the retrieved rows,** fold 2026-01. ![Ages of the retrieved
+  rows](ages_part2_2026-01.svg)
+- **Read-out weight by row age** (unreviewed plot). ![Read-out weight by
+  age](alpha_by_age_part2.svg)
+- **Attention maps** of `U` at D5 and D8 (unreviewed plots). ![Attention of U at
+  D5](attention_part2_U_D5.svg) ![Attention of U at D8](attention_part2_U_D8.svg)
+- **Training and validation loss by pass** (unreviewed plot). ![Validation loss](loss_part2.svg)
+- **Day-ahead and 14-day forecasts** of `M*`, `U`, `U-A`, and the Candidate at D5 and D8 in winter
+  and summer. ![Day-ahead forecast, D5, winter](series_part2_day_winter_D5.svg) ![14-day forecast,
+  D8, summer](series_part2_fourteen_summer_D8.svg)
+
+## Checks
+
+- **Triggers.** Audit triggers 1 (placebo and `Z` rule) and 5 (nested arm beating its container) did
+  not fire on the screen. The error-of-the-median guard moves with CRPS at both groups, so trigger 3
+  did not fire. Leave-one-Primary-out keeps the sign at both groups, so trigger 4 did not fire.
+- **Numbers from code that has not had its Opus review.** The post hoc reverse-flow table, the
+  masked-history scores, the `U27`, `UX`, and `Z` contrasts (a new `secondary` command in
+  `e00718_contrasts.py`), the loss plot, the read-out weight plot, and the attention maps all come
+  from scripts that wait for one Opus diff-limited review before the pull request leaves draft. The
+  `secondary` command changes no line of the headline path.
+- **Not done.** The selection-swap read-out (rows chosen with live-fair weather) was not built. The
+  cold-night guard and the selection-swap guard are therefore unread.
+- **Unlogged events.** NGED's load-shift logs may miss events, so the clean-lag rows may hold events
+  no label covers.
+
+## The plan as registered
+
+The sections below are the plan as registered before any fit, followed by the method,
+departures, reviews, and files.
 
 **We ask whether the axial-attention network of experiment 713 forecasts a Primary substation's
 demand better when its 14 history rows are a union of the 5 weather-nearest, the 5 most recent, and
