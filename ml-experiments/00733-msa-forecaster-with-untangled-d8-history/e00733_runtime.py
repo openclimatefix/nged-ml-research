@@ -10,6 +10,7 @@ of each bank. The official run on the real data folder refuses that argument.
 
 import argparse
 import json
+import shutil
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -1082,7 +1083,9 @@ def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
     and the target-poison check, which runs on test rows only. The real fold is the latest, whose
     training window is the longest. The jobs run in a scratch folder, `scores/timing_scratch`, that
     links the inputs, so no chain job reads the predictions, and nothing is scored: the timing gate
-    writes no score and no `test_started` marker.
+    writes no score and no `test_started` marker. The stage deletes that scratch folder at its start,
+    so a second run refits and reports fresh seconds, and deletes the folder's test-row predictions
+    once both jobs have finished.
 
     Args:
         args: The parsed arguments (`--device`, `--max-passes` on a scratch root).
@@ -1097,7 +1100,9 @@ def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
 
     started = time.monotonic()
     cap = check_max_passes_allowed(args=args)
-    scratch = smokerun.scratch_root(outer=root / "scores" / "timing_scratch", root=root)
+    outer = root / "scores" / "timing_scratch"
+    shutil.rmtree(outer, ignore_errors=True)
+    scratch = smokerun.scratch_root(outer=outer, root=root)
     smokerun.link_inputs(root=root, scratch=scratch)
     real_job = make_predicting_job(
         root=scratch, device=args.device, max_passes=cap, rows="test", new_process=False
@@ -1109,6 +1114,7 @@ def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
     )
     syn = syn_job("YU", None, 0)
     per_pass = float(syn["seconds"]) / passes
+    shutil.rmtree(scratch / "predictions", ignore_errors=True)
     smoke_path = root / st.SMOKE_FILE
     smoke_seconds = (
         float(st.read_json(path=smoke_path).get("seconds", 0.0)) if smoke_path.exists() else 0.0

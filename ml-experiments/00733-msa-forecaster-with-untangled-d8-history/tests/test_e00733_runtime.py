@@ -509,3 +509,37 @@ def test_the_timing_gate_times_the_longest_window_fold_on_test_rows(
     assert calls == [("FU", core.ALL_FOLDS[-1], "test"), ("YU", None, "test")]
     assert out["seconds_per_real_fit"] == 11.0
     assert not (tmp_path / "scores" / "test_started").exists()
+
+
+def test_the_timing_gate_clears_stale_scratch_and_deletes_its_test_row_predictions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second timing run starts from an empty scratch, and no test-row forecast stays behind."""
+    import e00733_smokerun as smokerun
+
+    scratch = tmp_path / "scores" / "timing_scratch" / tmp_path.name
+    stale = scratch / "fits" / "stale.json"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("{}")
+    seen: dict[str, bool] = {}
+
+    def fake_make(**kw: Any) -> Any:
+        def run(arm: str, fold: str | None, seed: int) -> dict[str, Any]:
+            seen[arm] = stale.exists()
+            (kw["root"] / "predictions" / arm).mkdir(parents=True, exist_ok=True)
+            (kw["root"] / "predictions" / arm / "test.npz").write_text("x")
+            return {
+                "seconds": 10.0, "predict_seconds": 1.0, "peak_gpu_gb": 1.0, "peak_rss_gb": 2.0,
+                "predict_peak_rss_gb": 2.0,
+            }  # fmt: skip
+
+        return run
+
+    monkeypatch.setattr(rt, "make_predicting_job", fake_make)
+    monkeypatch.setattr(smokerun, "link_inputs", lambda **_: [])
+    keep = tmp_path / "scores" / "other.json"
+    keep.write_text("{}")
+    rt.measure_timing(_args(), tmp_path)
+    assert seen == {"FU": False, "YU": False}
+    assert not (scratch / "predictions").exists()
+    assert keep.exists()
