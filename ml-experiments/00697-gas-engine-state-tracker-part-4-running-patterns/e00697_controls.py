@@ -12,7 +12,7 @@ r"""Experiment 697's controls: a real reading with a known engine injected, then
   truth, seeds 0 to 2.
 - **C1s:** C1 with one constant subtracted from the reading before the injection, null truth, seeds
   0 to 2. The design expects D8's weekday daytime demand to be about 9 MW before the engine and
-  about 3 MW in the solar era, so that a 5 MW engine pushes the reading through the MVA fold (the
+  about 3 MW in the solar era, so that the engine pushes the reading through the MVA fold (the
   reading is apparent power and never negative). The constant is C1's weekday 09:00 to 16:00 median
   reading minus the same median of the demand level (`lmean`) that experiment 695 fitted for a
   target era, and the scaled reading is floored at 0.3 MVA. A constant keeps the size of C1's
@@ -244,7 +244,7 @@ def run_job(job: Job, *, write: bool = True) -> str:
                 seconds=seconds,
             )
         tmp.replace(path)
-    return f"{job.name}: {seconds:.0f} s, K={track.k_max}, unit={track.unit:.2f} MW"
+    return f"{job.name}: {seconds:.0f} s, K={track.k_max}, unit=[withheld]"
 
 
 def load_control(*, job: Job) -> dict[str, np.ndarray]:

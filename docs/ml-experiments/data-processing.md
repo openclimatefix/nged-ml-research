@@ -76,6 +76,16 @@ page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-cle
 [experiment
 6](00006-stage1a-demand-input-feature-sweep/result.md), which scores on cleaned power.
 
+**Score every arm of a comparison on a cleaned-power table of one date, because the table is
+rewritten (experiments; provisional).** Between 2026-11-10 and 2026-11-25 the cleaned table gained
+the flag `initial_analogue_noise` on D15 and D18 before 2025-05-07 and 2025-03-30. A score of the
+same forecast then covers 24,060 fewer half-hours of the backtest year (D15 and D18, 2025-12 to
+2026-03) and reads 7.3646 instead of 7.3946 for arm 9a. Evidence:
+[experiment 731](00731-step-5-recency-and-injection-ablations-monthly-refits/result.md), which scored
+arm 9a, its replay, and every variant with one scorer. The old table version no longer exists, so
+the cause is inferred from the first unflagged dates. The evidence covers the 16 Primaries of the
+2025-11 to 2026-10 backtest.
+
 **Count a series' history from its first unflagged row, which is later than its first row of any
 kind (high confidence).** D9 starts in 2023-04 and its first unflagged row is in 2023-08. Only five
 Primaries hold long histories: D5, D10, and D11 start in 2019-09, D14 in 2019-10, and D16 in
@@ -330,9 +340,9 @@ pooled CRPS for July 2026 by 0.68. Applies to experiments. Evidence: [experiment
 steps at D15 and D18 (16 Primaries, origin months 2025-11 to 2026-10, provisional).
 
 **Treat D8's reading as including one gas engine's output until 2023-08-15, and as excluding it
-afterwards (provisional, medium confidence).** The engine connected on 2023-06-13 and its own
-readings carry output from 2023-07-03. While those readings arrived, D8's residual rose by 0.02 MW
-per MW of engine output, where a reading without the output would fall by 1 MW per MW.
+afterwards (provisional, medium confidence).** While the engine's own readings arrived, D8's
+residual rose by 0.02 MW per MW of engine output, where a reading without the output would fall by 1
+MW per MW.
 
 D8's share of half-hours with a residual below -2.5 MW then stepped from 0.010 to 0.257 in the week
 of 2023-08-14 and stayed between 0.10 and 0.46 in every month to January 2026. The share fell from
@@ -345,10 +355,10 @@ whether it applies to production awaits NGED's answer. Evidence:
 **Give a forecast the engine state it will have at forecast time, and train the engine term on that
 same lagged state (provisional, medium confidence).** *Applies to: experiments.* D8's engine
 detector gives a state for each half-hour that is built from that half-hour's own reading. A
-coefficient fitted on that contemporaneous state is 3.6 MW per half-hour with one or more units
-running, but the state of the last settled day is worth 0.15 MW (interval -0.06 to 0.32) out of sample,
+coefficient fitted on that contemporaneous state is more than 20 times what the state of the last
+settled day is worth out of sample (0.15 MW; interval -0.06 to 0.32),
 so applying the contemporaneous coefficient to the lagged state makes the quantile score 10% worse.
-Trained on the lagged state, the coefficient is 0.9 to 1.0 MW and the score is 3% better than a
+Trained on the lagged state, the coefficient is smaller and the score is 3% better than a
 model without the term ([experiment
 294](00294-regime-aware-model-at-d8-engine-state-term/result.md)).
 

@@ -38,19 +38,19 @@ Experiment 697: data audit
 3. Tracker labels
   [ok  ] net: 26256 half-hours
   [ok  ] net: flagged share 0.268: 0.2677
-  [ok  ] net: fitted unit 1.75 MW: 1.75
+  [ok  ] net: fitted unit is positive (the value is withheld)
   [ok  ] net: agreement of Ts with Ta is 0.999: 0.9992
-  net: K = 3, unit 1.75 MW
+  net: K = 3, unit [withheld]
   [ok  ] solar: 16416 half-hours
   [ok  ] solar: flagged share 0.384: 0.3836
-  [ok  ] solar: fitted unit 2.25 MW: 2.25
+  [ok  ] solar: fitted unit is positive (the value is withheld)
   [ok  ] solar: agreement of Ts with Ta is 0.989: 0.9889
-  solar: K = 3, unit 2.25 MW
+  solar: K = 3, unit [withheld]
   [ok  ] fade: 5856 half-hours
   [ok  ] fade: flagged share 0.262: 0.2623
-  [ok  ] fade: fitted unit 3.5 MW: 3.5
+  [ok  ] fade: fitted unit is positive (the value is withheld)
   [ok  ] fade: agreement of Ts with Ta is 0.867: 0.8668
-  fade: K = 2, unit 3.5 MW
+  fade: K = 2, unit [withheld]
   Weekday running share by local half-hour (start of the half-hour), 15:00 to 19:30:
   net: block starts at 16:00 local; 15:00=0.37 15:30=0.49 16:00=0.75 16:30=0.83 17:00=0.85 17:30=0.87 18:00=0.86 18:30=0.83 19:00=0.65 19:30=0.57
   solar: block starts at 16:00 local; 15:00=0.58 15:30=0.65 16:00=0.72 16:30=0.77 17:00=0.82 17:30=0.83 18:00=0.84 18:30=0.83 19:00=0.75 19:30=0.71

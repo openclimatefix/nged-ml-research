@@ -25,50 +25,51 @@ hypothesis: >-
   the known-answer recall and removes the false alarms, except where the Embedded Capacity
   Register (ECR) lists a real engine.
 prediction: >-
-  Written before any result. Look-first (done before this plan was committed, on the recorded
-  output of G2, a metered gas-engine generator): 71% of G2's start and stop edges are a single-
-  half-hour jump and 29% have one partial half-hour (74% for the recorded output alone, 71% after
-  injection into D8's noise); the real transfers' edges (24 of the 70 edges of the 35 transfers
-  are large enough to measure, 12 onsets and 12 ends) have a partial half-hour in 75% to 92%; but
-  65% of large unlabelled steps in D8's clean history are also single-half-hour jumps, so edge
-  shape may not separate an engine from the steps that cause false alarms. The night-only arm
-  keeps recall at 1 unit within 0.05 of 196's 0.83 and 0.85, and cuts the night flagged share at
-  D8 from 2025-03 from about 40% to under 10%, the cap of the relaxed bar. The edge-shape arm
-  (whose thresholds came from this look at G2's edges, so K1 and K2 cannot test it independently)
-  is expected to help little at D10 and D11; the false alarms there are an independent test. The
-  price arm cuts false alarms by under a tenth, because price moves the chance of running only
-  from 9% to 27%. All three together meet the 196 false-alarm bar at D3, D8 clean history, D10,
-  D11, D14, and D16. The flagged days at D5 follow the spark spread more than matched unflagged
-  days do; those at D10 and D11 do not.
+  Written before any result. Look-first (done before this plan was committed, on the recorded output
+  of G2, a metered gas-engine generator): 71% of G2's start and stop edges are a single- half-hour
+  jump and 29% have one partial half-hour (74% for the recorded output alone, 71% after injection
+  into D8's noise); the real transfers' edges (24 of the 70 edges of the 35 transfers are large
+  enough to measure, 12 onsets and 12 ends) have a partial half-hour in 75% to 92%; but 65% of large
+  unlabelled steps in D8's clean history are also single-half-hour jumps, so edge shape may not
+  separate an engine from the steps that cause false alarms. The night-only arm keeps recall at 1
+  unit within 0.05 of 196's 0.83 and 0.85, and cuts the night flagged share at D8 from 2025-03 from
+  about 40% to under 10%, the cap of the relaxed bar. The edge-shape arm (whose thresholds came from
+  this look at G2's edges, so K1 and K2 cannot test it independently) is expected to help little at
+  D10 and D11; the false alarms there are an independent test. The price arm cuts false alarms by
+  under a tenth, because price moves the chance of running only from 9% to 27%. All three together
+  meet the 196 false-alarm bar at D3, D8 clean history, D10, D11, D14, and D16.
+  The flagged days at D5 follow the spark spread more than matched unflagged days do; those at D10
+  and D11 do not.
 decision_rule: >-
   Fixed before any score is read, and revised once after a Sonnet plan review (no score had been
-  read). The verdict arm is v2 = night evidence (N2) plus edge test (S) plus price gate (P),
-  scored on night rows. Known-answer thresholds, pooled over K1 and K2: recall at 1 unit at least
-  0.83, recall at 2 or 3 units at least 0.80, precision at least 0.80, energy error within 15%. K1
-  and K2 are also reported separately, with day-resampled 95% intervals. False-alarm bar (the
-  night-row version of experiment 196's bar, which that experiment scored on all rows): at most 3%
-  of clean night half-hours flagged and at most one false active day a month, an active day being
-  a UTC date with 4 or more flagged night half-hours. Bar list, each entry a separate test: D3, D8
-  clean history (even months, which the noise fit did not use), D10, D11, D14, D16, D8 2025-03 to
-  2025-12, and D8 2026-01 to 2026-06. For the two D8 periods the share bar is relaxed to 3% plus
-  the share of night half-hours below -2.5 MW, capped at 10%, because an engine may be present.
-  `supported`: every known-answer threshold passes and every entry of the bar list passes. `partly
-  supported`: recall at 1 unit and at 2 or 3 units pass, and either precision or the energy error
-  fails, or exactly one entry of the bar list fails. `not supported`: recall at 1 unit falls under
-  0.83, or two or more entries of the bar list fail. D5 is on the bar list as a secondary line and
-  does not enter the verdict, because the ECR lists a real engine there. We wrote the exception
+  read). The verdict arm is v2 = night evidence (N2) plus edge test (S) plus price gate (P), scored
+  on night rows. Known-answer thresholds, pooled over K1 and K2: recall at 1 unit at least 0.83,
+  recall at 2 or 3 units at least 0.80, precision at least 0.80, energy error within 15%. K1 and K2
+  are also reported separately, with day-resampled 95% intervals. False-alarm bar (the night-row
+  version of experiment 196's bar, which that experiment scored on all rows): at most 3% of clean
+  night half-hours flagged and at most one false active day a month, an active day being a UTC date
+  with 4 or more flagged night half-hours. Bar list, each entry a separate test: D3, D8 clean
+  history (even months, which the noise fit did not use), D10, D11, D14, D16, D8
+  2025-03 to 2025-12, and D8 2026-01 to 2026-06. For the two D8 periods the share bar is relaxed to
+  3% plus the share of night half-hours below -2.5 MW, capped at 10%, because an engine may be
+  present. `supported`: every known-answer threshold passes and every entry of the bar list passes.
+  `partly supported`: recall at 1 unit and at 2 or 3 units pass, and either precision or the energy
+  error fails, or exactly one entry of the bar list fails. `not supported`: recall at 1 unit falls
+  under 0.83, or two or more entries of the bar list fail. D5 is on the bar list as a secondary line
+  and does not enter the verdict, because the ECR lists a real engine there. We wrote the exception
   list after experiment 196 had shown D5 failing, before any flagged period of experiment 199 was
   read, and from the ECR workbook alone (printed_ecr.txt). A Primary is on the list if it has a
   connected gas or oil engine (CHP or not) or battery of at least 0.5 MW registered within 5 km,
-  connected before 2025-01-01. Only D5 qualifies (a 1.0 MW oil engine 3.25 km away, connected
-  2021-03-11). D11's only battery is 0.2 MW and connected 2026-04-13, and its other nearby plant
-  is a 0.499 MW biomass steam turbine, which is not price-following; D10 has none. PS3 and later
-  stages run only on `supported`, and on `partly supported` only for the Primaries and periods
-  that pass. Each feature's separate value (v1 plus S, v1 plus P, N alone) is reported with the
-  same scores and does not decide the verdict. K3 (G2's record injected into night rows of D8 from
-  2025-03, where an engine may already be present) is descriptive: recall only.
+  connected before 2025-01-01. Only D5 qualifies (an oil engine within 5 km, connected before the
+  first flagged period; its size, date, and distance are withheld). D11's only battery is 0.2 MW and
+  connected 2026-04-13, and its other nearby plant is a 0.499 MW biomass steam turbine, which is not
+  price-following; D10 has none. PS3 and later stages run only on `supported`, and on `partly
+  supported` only for the Primaries and periods that pass. Each feature's separate value (v1 plus S,
+  v1 plus P, N alone) is reported with the same scores and does not decide the verdict. K3 (G2's
+  record injected into night rows of D8 from 2025-03, where an engine may already be present) is
+  descriptive: recall only.
 benchmark: >-
-  Experiment 196's detector (frozen fits_fixed.pkl, wide prior, unit size 1.75 MW), scored on all
+  Experiment 196's detector (frozen fits_fixed.pkl, wide prior), scored on all
   rows and on night rows.
 row_set_id: >-
   none (a detector is scored on injected half-hours and on clean history, not on forecasts)
@@ -102,14 +103,14 @@ advice:
     Primaries, because experiment 196's daytime flags at D5 and D10 vanish at night (Figure 1).
   - >-
     Do not use an edge-sharpness test to separate an engine from other steps at half-hourly
-    resolution, because 65% of unlabelled steps are sharp too and the pre-registered test cuts recall
-    at 1 unit from 0.95 to 0.53 (Figures 2 and 3).
+    resolution, because 65% of unlabelled steps are sharp too and the pre-registered test cuts
+    recall at 1 unit from 0.95 to 0.53 (Figures 2 and 3).
   - >-
     Do not read D8's flags after 2025-03 as an engine or as solar noise until the night-time steps
     there are explained, because night rows are flagged 29% to 36% of the time (Figure 1).
   - >-
-    Do not treat the flagged days at D5, D10, and D11 as price-following engines, because they do not
-    follow the spark spread while D8's visible engine does (Figure 4).
+    Do not treat the flagged days at D5, D10, and D11 as price-following engines, because they do
+    not follow the spark spread while D8's visible engine does (Figure 4).
 code: ml-experiments/00199-ps2b-engine-detector-v2-ramp-night-price/
 ---
 
@@ -178,18 +179,19 @@ written for this experiment.
 - **K3 (G2 injected into D8's night rows from 2025-03, recall only, descriptive).** v1 recall at 1
   unit 0.92 (0.79 to 0.99); v2 0.36 (0.19 to 0.55). Precision is not meaningful for K3.
 - **False alarms at night (flagged share; false active days a month).** Bar: 3% and 1 day. v1 passes
-  at D3 (0.4%, 0.22), D5 (0.3%, 0.07), D10 (0.1%, 0.04), D14, D16, and D8's engine-free history, and
-  fails at D11 (4.6%, 1.08). N fails at D8's engine-free history (2.6%, 1.45). v2 is 0.0% with 0.00
-  days at every one of these, and v2 on all rows is also 0.0% at D3, D5, D10, D11, D14, and D16.
+  at D3 (0.4%, 0.22), D5 (0.3%, 0.07), D10 (0.1%, 0.04), D14, D16, and D8's
+  engine-free history, and fails at D11 (4.6%, 1.08). N fails at D8's engine-free history (2.6%,
+  1.45). v2 is 0.0% with 0.00 days at every one of these, and v2 on all rows is also 0.0% at D3, D5,
+  D10, D11, D14, and D16.
 - **D8 from 2025-03 (relaxed bar capped at 10%).** v1 flags 36.3% of night half-hours (22.9 days a
   month) in 2025-03 to 2025-12 and 32.5% (18.8) in 2026-01 to 2026-06. N: 33.1% and 30.3%. v2: 16.7%
   (10.6) and 16.5% (9.7). Post hoc lenient: 31.6% and 28.7%. The left tail below -2.5 MW holds 18.8%
   and 11.6% of night half-hours. Both periods fail the bar for every arm.
 - **Price gate.** The gate changes little: at night it removes under 1.5% of D8's flagged half-hours
-  from 2025-03 and none at D3, D10, or D14. On all rows it cuts D5's false active days from 2.02 to
-  1.72 a month and D10's from 1.05 to 0.90. The gate is only scored from 2023-06 (D8's engine-free
-  history has 576 even-month rows with a price), and K2's price is G2's own at the time it recorded
-  the output, a choice that favours the gate.
+  from 2025-03 and none at D3, D10, or D14. On all rows it cuts D5's false active
+  days from 2.02 to 1.72 a month and D10's from 1.05 to 0.90. The gate is only scored where prices
+  exist (D8's engine-free history has 576 even-month rows with a price), and K2's price is G2's own
+  at the time it recorded the output, a choice that favours the gate.
 - **Flagged periods at D5, D10, and D11 (supporting evidence only, `printed_step5.txt`).**
     - D8 while the engine is visible (2023-09 to 2025-02, positive control): flagged days have a
       positive spark spread +11.1 points more often than matched unflagged days (95% 3.5 to 18.1)
@@ -202,11 +204,12 @@ written for this experiment.
       profile, which suggests a few long spells that are not an engine's evening pattern.
     - D8 from 2025-03: +6.8 points (-4.5 to +18.2), but 482 of 485 days are flagged, so only 3
       unflagged days exist, reused to match 44 flagged days, and the test cannot be read.
-- **ECR (`printed_ecr.txt`; supporting evidence, NGED has not been asked).** D5 has a 1.0 MW oil
-  engine 3.25 km away, connected 2021-03-11, before every flagged period. D10 has no gas, oil, CHP,
-  or battery site within 5 km. D11 has a 0.2 MW battery connected 2026-04-13 and a 0.499 MW biomass
-  steam turbine connected 2014, neither of which is a price-following engine in the flagged period.
-  D5's flags do not follow the spark spread, so the ECR engine and the flagged periods do not match.
+- **ECR (`printed_ecr.txt`; supporting evidence, NGED has not been asked).** D5 has an oil engine
+  within 5 km, connected before every flagged period (size, date, and distance withheld). D10 has no
+  gas, oil, CHP, or battery site within 5 km. D11 has a 0.2 MW battery connected 2026-04-13 and a
+  0.499 MW biomass steam turbine connected 2014, neither of which is a price-following engine in the
+  flagged period. D5's flags do not follow the spark spread, so the ECR engine and the flagged
+  periods do not match.
 
 ## Checks
 
@@ -220,10 +223,10 @@ written for this experiment.
   shows that the positive control works. Trigger 5: v1 on night rows beats N (which holds less
   input) at D8's engine-free history (0.0% against 2.6%).
 - **Edge-test thresholds** (an edge is sharp when one half-hour carries 0.6 of the step, and the
-  step is at least 0.5 of an engine unit, 0.875 MW) came from the look at G2's edges, so K1 and K2
+  step is at least half of an engine unit) came from the look at G2's edges, so K1 and K2
   could not test them independently; the test fails even there.
 - **Lab shortcuts.** We used the expected power in the stored panel, which is driven by ERA5
-  weather, smoothed posterior probabilities, the frozen 1.75 MW unit from experiment 196, noise for
+  weather, smoothed posterior probabilities, the frozen unit size from experiment 196, noise for
   the other Primaries fitted on their whole history. The noise fit saw D8's odd months, so D8's
   engine-free history is scored on even months.
 - **Edge cases.** D3's coordinates are approximate (the night mask moves by minutes). Night is
@@ -232,6 +235,11 @@ written for this experiment.
 - **Plan review.** A Sonnet reviewer raised 10 objections to the plan before any score was read; the
   plan was revised for 9 of them (the price in the K2 injections was kept at G2's own recording
   time, flagged as favourable to the gate).
+
+**The scripts read the engine's connection date and recorded unit size from a private file.**
+`ml-experiments/engine_constants.py` loads them from
+`data/ml-experiments/private/engine_constants.json`, because NGED has asked that these values stay
+out of the repository. The file is not committed, so a rerun needs a copy of it.
 
 ## What to try next
 

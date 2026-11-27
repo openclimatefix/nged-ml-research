@@ -5,11 +5,12 @@ r"""Score the stored runs, print every number the write-up quotes, and draw the 
         uv run --no-sync python ml-experiments/00694-*/e00694_report.py
 
 Afterwards optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
-Gas A is drawn on a day axis with no calendar dates. D8 is a substation.
+D8 is a substation. No figure draws a metered generator record or an engine-state series.
 """
 
 import os
 import pickle
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any, Final
@@ -18,12 +19,17 @@ import altair as alt
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
-from e00694_common import DATA_DIR, DOCS_DIR, f1_of
+from e00694_common import DATA_DIR, DOCS_DIR, SYNTHETIC_UNIT_MW, f1_of
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_figure_guard as guard
 
 ARMS: Final[tuple[str, ...]] = ("M0", "M1", "M2", "M2-dwell")
 PRIMARY: Final[tuple[str, ...]] = ("record", "synth0", "synth1", "synth2", "synth3")
 RULES: Final[tuple[str, ...]] = ("folded", "signed")
 N_BOOT: Final[int] = 10_000
+P1_HALF_WIDTH_MW: Final[float] = 0.3
+"""Prediction P1: the fitted unit lies within this distance of the synthetic unit size."""
 ALPHA_BONF: Final[float] = 0.05 / 3
 WIDTH: Final[int] = 560
 LINES: list[str] = []
@@ -50,9 +56,9 @@ def wrap(text: str, width: int = 95) -> list[str]:
 def save(*, chart: alt.Chart | alt.VConcatChart, name: str) -> None:
     """Write an SVG beside the write-up (and a PNG when PNG_DIR is set)."""
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    chart.save(DOCS_DIR / f"{name}.svg")
+    guard.save_chart(chart=chart, path=DOCS_DIR / f"{name}.svg")
     if png_dir := os.environ.get("PNG_DIR"):
-        chart.save(Path(png_dir) / f"{name}.png", scale_factor=1.0)
+        guard.save_chart(chart=chart, path=Path(png_dir) / f"{name}.png", scale_factor=1.0)
 
 
 # ------------------------------------------------------------------ aggregation
@@ -152,7 +158,6 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     """Print the results and draw the figures."""
     fa, inj = load("fa"), load("inject")
     k1, d8, p5 = load("k1"), load("d8"), load("p5")
-    example = load("example")
 
     # ---- false alarms on un-injected segments (stop rule 2, P3)
     say("== False alarms on un-injected segments (120 tracked days each) ==")
@@ -269,12 +274,10 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     for sched in sorted({r["sched"] for r in inj}):
         sel = [r for r in inj if r["sched"] == sched and r["rule"] == "folded"]
         ks = np.array([r["arms"]["M2"]["k"] for r in sel])
-        us = np.array([r["arms"]["M2"]["u"] for r in sel])
         k1s = np.array([r["arms"]["M1"]["k"] for r in sel])
-        u1s = np.array([r["arms"]["M1"]["u"] for r in sel])
         say(
-            f"{sched}: M2 K counts {np.bincount(ks, minlength=4).tolist()} median u {np.median(us[ks > 0]) if (ks > 0).any() else float('nan'):.2f}"
-            f"  (M1 K counts {np.bincount(k1s, minlength=4).tolist()} median u {np.median(u1s[k1s > 0]) if (k1s > 0).any() else float('nan'):.2f})"
+            f"{sched}: M2 K counts {np.bincount(ks, minlength=4).tolist()} median u [withheld]"
+            f"  (M1 K counts {np.bincount(k1s, minlength=4).tolist()} median u [withheld])"
         )
 
     # ---- K1
@@ -283,7 +286,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         for arm, v in r["arms"].items():
             f = f1_of(tp=v["tp"], fp=v["fp"], fn=v["fn"])
             say(
-                f"{r['rule']:<7} {arm:<9} F1 {f:.3f} tp {v['tp']} fp {v['fp']} fn {v['fn']} K {v['k']} u {v['u']}"
+                f"{r['rule']:<7} {arm:<9} F1 {f:.3f} tp {v['tp']} fp {v['fp']} fn {v['fn']} K {v['k']} u {'None' if v['u'] is None else '[withheld]'}"
             )
 
     # ---- real D8
@@ -291,16 +294,19 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     eras = {e["label"]: e for e in d8}
     for label, e in eras.items():
         say(
-            f"{label}: M2 K {e['M2']['k']} u {e['M2']['u']:.2f}, share flagged {e['M2']['flag'].mean():.3f}; "
-            f"M1 K {e['M1']['k']} u {e['M1']['u']:.2f}, share {e['M1']['flag'].mean():.3f}; "
-            f"M2 without the fold K {e['M2s']['k']} u {e['M2s']['u']:.2f}, share {e['M2s']['flag'].mean():.3f}"
+            f"{label}: M2 K {e['M2']['k']} u [withheld], share flagged {e['M2']['flag'].mean():.3f}; "
+            f"M1 K {e['M1']['k']} u [withheld], share {e['M1']['flag'].mean():.3f}; "
+            f"M2 without the fold K {e['M2s']['k']} u [withheld], share {e['M2s']['flag'].mean():.3f}"
         )
         say(
             f"   M2 transition matrix {np.round(e['M2'].get('transition', np.zeros((1, 1))), 3).tolist()}"
         )
-    p1 = eras["net"]["M2"]["k"] == 3 and 1.7 <= eras["net"]["M2"]["u"] <= 2.3
+    p1 = (
+        eras["net"]["M2"]["k"] == 3
+        and abs(eras["net"]["M2"]["u"] - SYNTHETIC_UNIT_MW) <= P1_HALF_WIDTH_MW
+    )
     drift = abs(eras["net"]["M2"]["u"] - eras["solar"]["M2"]["u"])
-    say(f"P1 (K = 3 and u in [1.7, 2.3] on the net era): {p1}; u drift net to solar {drift:.2f} MW")
+    say(f"P1 (K = 3 and u in [withheld] on the net era): {p1}; u drift net to solar [withheld]")
 
     # ---- P5
     say("\n== P5: held-out predictive log-likelihood on even months of the net era ==")
@@ -313,8 +319,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         say(f"{m_}: n {n}, fold {lf:.1f}, signed {ls:.1f}, difference {lf - ls:+.1f}")
     wins = int(np.sum(np.array(diffs) > 0))
     say(
-        f"fold fits K {p5['fold']['k']} u {p5['fold']['u']:.2f}; signed fits K {p5['signed']['k']} "
-        f"u {p5['signed']['u']:.2f}; total difference {sum(diffs):+.1f}; fold better in {wins} of {len(diffs)} months"
+        f"fold fits K {p5['fold']['k']} u [withheld]; signed fits K {p5['signed']['k']} "
+        f"u [withheld]; total difference {sum(diffs):+.1f}; fold better in {wins} of {len(diffs)} months"
     )
     p5_ok = sum(diffs) > 0 and wins >= 2 * len(diffs) / 3
     say(f"P5 (total above zero and fold better in at least two thirds of months): {p5_ok}")
@@ -343,95 +349,18 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     say(
         f"\nVERDICT by the pre-registered table: {verdict} "
         f"(stop2 {stop2}, P1 {p1}, P2 all {p2_all}, P2 core {p2_core}, P3 failures {p3_fail}, "
-        f"P4/C1 clears {c1_clears}, P5 {p5_ok}, M0 alone {m0_alone}, u drift {drift:.2f})"
+        f"P4/C1 clears {c1_clears}, P5 {p5_ok}, M0 alone {m0_alone}, u drift [withheld])"
     )
 
-    figures(fa_rows=fa_rows, boots=boots, example=example, eras=eras)
+    figures(fa_rows=fa_rows, boots=boots, eras=eras)
     REPORT_PATH.write_text("\n".join(LINES) + "\n")
 
 
 # ------------------------------------------------------------------ figures
 
 
-def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> None:
-    """Draw figures 6 to 9."""
-    # Figure 6: one injected segment, raw reading first, then each arm's flags
-    start = 30 * 48
-    n = 56 * 48
-    day = np.arange(n) / 48.0
-    truth = example["truth"][start : start + n]
-    rows = []
-    rows += [
-        {"day": d, "value": v, "panel": "Reading before injection (MVA)"}
-        for d, v in zip(day, example["clean"][start : start + n], strict=True)
-    ]
-    rows += [
-        {"day": d, "value": v, "panel": "Reading after injection (MVA)"}
-        for d, v in zip(day, example["y"][start : start + n], strict=True)
-    ]
-    base = alt.Chart(pl.DataFrame(rows)).mark_line(strokeWidth=1, clip=True, color=ocf.DATA_BLUE)
-    top = (
-        base.encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("day:Q", title=None, axis=alt.Axis(values=list(range(0, 57, 7)))),
-            y=alt.Y("value:Q", title="MVA"),
-        )
-        .properties(width=WIDTH, height=90)
-        .facet(
-            row=alt.Row(
-                "panel:N",
-                title=None,
-                sort=["Reading before injection (MVA)", "Reading after injection (MVA)"],
-                header=alt.Header(labelOrient="top", labelAngle=0, labelFontSize=9),
-            ),
-            spacing=4,
-        )
-    )
-    state_rows = []
-    for d, t in zip(day, truth, strict=True):
-        state_rows.append({"day": d, "who": "Truth (units)", "units": int(t)})
-    for arm in ("M2", "M1", "M0"):
-        flag = example["arms"][arm]["flag"][start : start + n]
-        for d, f in zip(day, flag, strict=True):
-            state_rows.append({"day": d, "who": f"{arm} flag", "units": int(f)})
-    states = (
-        alt.Chart(pl.DataFrame(state_rows))  # ty: ignore[unresolved-attribute]
-        .mark_line(interpolate="step-after", strokeWidth=1.2, clip=True)
-        .encode(
-            x=alt.X(
-                "day:Q",
-                title="Days from the start of the 56-day window (no calendar dates)",
-                axis=alt.Axis(values=list(range(0, 57, 7))),
-            ),
-            y=alt.Y("units:Q", title=None, axis=alt.Axis(values=[0, 1, 2, 3])),
-            color=alt.Color(
-                "who:N",
-                scale=alt.Scale(
-                    domain=["Truth (units)", "M2 flag", "M1 flag", "M0 flag"],
-                    range=[ocf.BLACK_2, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE],
-                ),
-                legend=alt.Legend(orient="top", title=None),
-            ),
-        )
-        .properties(width=WIDTH, height=70)
-        .facet(
-            row=alt.Row(
-                "who:N",
-                title=None,
-                header=alt.Header(labelOrient="top", labelAngle=0, labelFontSize=9),
-            ),
-            spacing=2,
-        )
-    )
-    fig6 = alt.vconcat(top, states).properties(
-        title=alt.TitleParams(
-            wrap(
-                "One injected example (a host Primary, Gas A's 44-day record, folded rule). Top: the host's reading before and after injection. Bottom: the true number of units running and each tracker's flag."
-            ),
-            anchor="start",
-        )
-    )
-    save(chart=fig6, name="figure_6_injected_example")
-
+def figures(*, fa_rows: list[dict], boots: dict, eras: dict) -> None:
+    """Draw figures 7 to 9; figure 6, an injected example on a day axis, is no longer drawn."""
     # Figure 7: F1, precision, recall per arm, both rules
     rows = []
     for rule, (x, b, _) in boots.items():
@@ -543,43 +472,31 @@ def figures(*, fa_rows: list[dict], boots: dict, example: dict, eras: dict) -> N
     )
     save(chart=fig8, name="figure_8_false_alarms")
 
-    # Figure 9: D8 monthly running share
+    # Figure 9: D8 running share pooled over each of the three eras; no months, no dates
     rows = []
-    for label, e in eras.items():
+    for number, e in enumerate(eras.values(), start=1):
         for arm in ("M2", "M1"):
-            flags = e[arm]["flag"]
-            months = e["month"]
-            for m_ in np.unique(months):
-                sel = months == m_
-                if sel.sum() >= 600:
-                    rows.append(
-                        {
-                            "month": str(m_),
-                            "arm": arm,
-                            "share": float(flags[sel].mean()),
-                            "era": label,
-                        }
-                    )
-    frame = pl.DataFrame(rows).with_columns(pl.col("month").str.to_date("%Y-%m"))
+            rows.append({"era": f"Era {number}", "arm": arm, "share": float(e[arm]["flag"].mean())})
     fig9 = (
-        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True)
+        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
+        .mark_bar(aria=False)
         .encode(
-            x=alt.X("month:T", title="Month", axis=alt.Axis(format="%Y-%m")),
+            x=alt.X("era:N", title=None, axis=alt.Axis(labelAngle=0)),
+            xOffset="arm:N",
             y=alt.Y("share:Q", title="Share of half-hours flagged as running"),
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(domain=["M2", "M1"], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]),
                 legend=alt.Legend(orient="top", title=None),
             ),
-            detail="era:N",
         )
         .properties(
-            width=WIDTH,
+            width=WIDTH // 2,
             height=170,
             title=alt.TitleParams(
                 wrap(
-                    "Share of D8's half-hours flagged as engine running, by month, fitted separately on each of three eras with no engine record. Months with fewer than 600 tracked half-hours are left out."
+                    "Share of D8's half-hours flagged as engine running, pooled over each of three eras with no engine record, each era fitted separately.",
+                    width=60,
                 ),
                 anchor="start",
             ),

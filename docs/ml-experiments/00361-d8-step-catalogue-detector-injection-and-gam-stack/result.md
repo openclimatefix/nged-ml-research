@@ -20,8 +20,8 @@ size: >-
   experiments 252 and 264 and copy experiment 354's fit code with one change, the training target.
   Asset graph: not touched.
 hypothesis: >-
-  D8 (Marsh Lane) is a Primary substation whose demand carries on/off steps of about 4 MW and
-  multi-day drops of about 2.7 MW that look like a dispatchable generator. A plain, as-of step
+  D8 (Marsh Lane) is a Primary substation whose demand carries on/off steps and
+  multi-day drops that look like a dispatchable generator. A plain, as-of step
   detector finds such components, and a GAM stack fitted on a training target with the detected
   steps removed scores better at D8 than the same stack fitted on the raw target, with the removed
   component returning through the own-residual band as the chance that the generator is running.
@@ -71,7 +71,7 @@ lessons:
     The rule finds 171 rises of at least 1.5 MW for 193 falls, so some of its falls are probably
     ordinary demand swings, though a generator also causes rises when it switches back on.
   - >-
-    The multi-day drops (6 found, median 2.7 MW and 2.5 days) match the earlier reading in
+    The multi-day drops (6 found, median 2.5 days) match the earlier reading in
     experiments 159 and 291 that the drops are generator spells, but
     they cover too few rows to move a monthly fit.
 production_status: not-for-production
@@ -102,19 +102,6 @@ The test does not support building a particle filter on the evidence of this det
 that rejects ordinary demand swings is one option, since the rule flags nearly as many rises as
 falls. The verdict is `not supported`.
 
-**Figure A: the detector's falls and drops at D8 cover the long dips in demand in two winter weeks,
-and nothing in a week with no detected falls.**
-
-![D8 demand with detected steps](figure_4_d8_demand_with_detected_steps.svg)
-
-The three weeks start on 12 January 2026, 26 January 2026, and 22 December 2025. The first two are
-the non-overlapping weeks with the most detected hours (121 and 140) in the 12 months over which the
-forecasts are scored (2025-07-02 to 2026-06-30). The third is the week with no detected hours
-closest to the middle of those 12 months. The residual-median rule for choosing weeks was fixed
-before any chart was drawn. Detection here uses the whole record, including data after each monthly
-refit date. Orange shading marks falls of 6 hours or more. Purple shading marks multi-day drops.
-Where the two overlap, the colour is pink.
-
 **Figure B: with 2 MW and 4 MW spells injected into D2, the detector misses some spells and flags
 some segments that match no injected spell.**
 
@@ -128,21 +115,8 @@ found. Each "false alarm" panel shows the earliest detected segment (purple) tha
 injected spell, on 5 July 2024. In these panels, pink marks an injected spell that was also
 detected.
 
-**Figure C: removing the detected steps from the training target changes D8's median forecast by
-under 1 MW in the weeks shown, and the score does not improve.**
-
-![D8 forecasts with and without the detected steps](figure_6_forecasts_with_and_without_steps.svg)
-
-The lines are the median forecast, made 12 to 36 hours ahead, for the same three weeks as Figure A,
-from three variants of the GAM stack: the control (raw target), the variant with the detected levels
-added back to the training target, and the variant with the detected rows masked. The black line is
-the actual demand. Gaps are half-hours with no stored forecast. The lower panels show each variant's
-forecast minus the control forecast. In the week starting 22 December 2025, all three variants
-forecast negative demand on 25 and 26 December, while the readings stay positive.
-
-Figure A and Figure C show only D8, and Figure B shows only D2. These figures illustrate the result.
-They do not test it. The study is interim: a detector that rejects ordinary demand swings has not
-been tried.
+Figure B shows only D2. The figure illustrates the result. It does not test it. The
+study is interim: a detector that rejects ordinary demand swings has not been tried.
 
 D8 is a primary substation (Primary) whose power seems to include a dispatchable generator that
 switches on and off. We asked whether a simple rule can find such steps in D8's power, and whether
@@ -180,7 +154,7 @@ from [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md), 
   only data before the cut is seen. The drop pass was added after the first catalogue run found only
   4 drops of 2 days or longer with the 6-hour rule, and before any forecast was scored.
 - **Catalogue at D8 since 2023-08-15.** 193 falls of at least 6 hours (median level -3.0 MW, median
-  dwell 0.38 days) and 171 rises of the same size; 6 multi-day drops (median level -2.7 MW, median
+  dwell 0.38 days) and 171 rises of the same size; 6 multi-day drops (median
   dwell 2.5 days). At 1.0 MW the counts are 273 falls and 11 drops; at 2.0 MW, 126 falls and 1 drop.
   Prediction P2 (25 to 40 falls and 20 to 30 drops) failed on both counts: experiment 159 found 29
   drops with a different baseline.
@@ -232,6 +206,12 @@ from [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md), 
   partly ordinary demand swings (171 rises for 193 falls). No Opus audit was run, because the brief
   excludes Opus, and no later experiment depends on this result's sign. Triggers 1, 3, 4, 5, 6, and
   7 did not fire.
+
+**The scripts read the engine's values from a private file.** The scripts import experiment 264's
+common module, which reads the engine's recorded unit size from
+`data/ml-experiments/private/engine_constants.json` through `ml-experiments/engine_constants.py`,
+because NGED has asked that these values stay out of the repository. The file is not committed, so a
+rerun needs a copy of it.
 
 ## What to try next
 

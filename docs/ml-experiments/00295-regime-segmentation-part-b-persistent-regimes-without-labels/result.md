@@ -129,7 +129,7 @@ advice:
 **We asked whether a Primary substation's history can be split into regimes using only the errors of
 a forecast. The answer is partly.** A Primary substation steps 33 kV down to 11 kV for homes and
 businesses. A regime is the whole period, without gaps, in which one configuration holds. For D8,
-a Primary whose meter began including a gas engine in August 2023, the regime is the whole period
+a Primary whose meter includes a gas engine, the regime is the whole period
 that includes the engine, even in the spells when the engine is off. Whether the engine runs, or
 a load shift (an operator moving part of one Primary's demand to another for days) is in force, is
 a state inside a regime.
@@ -256,8 +256,6 @@ with the latest-boundary offset, and with the latest-regime offset.*
   one whose daytime shift is at least twice its night shift.
 - **Real regimes in the controls count as false changes**, so 0.87 per Primary-year is an upper
   bound.
-- **Embedded Capacity Register context.** The register lists one connected entry of 8.9 MW at D8,
-  dated 2019 or later, which is probably the engine. We did not use the register.
 
 ## What the next experiment should answer
 

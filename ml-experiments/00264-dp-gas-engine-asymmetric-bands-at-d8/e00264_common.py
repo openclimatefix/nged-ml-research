@@ -3,12 +3,16 @@
 
 import datetime as dt
 import json
+import sys
 from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import engine_constants as engine
 
 EXPERIMENT_ID: Final[int] = 264
 SLUG: Final[str] = "dp-gas-engine-asymmetric-bands-at-d8"
@@ -30,8 +34,8 @@ LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75
 LOWER_TAILS: Final[tuple[str, ...]] = ("q01", "q05", "q10", "q25")
 UPPER_TAILS: Final[tuple[str, ...]] = ("q75", "q90", "q95", "q99")
 
-UNIT_POINTS: Final[float] = 19.7
-"""One running engine unit (1.97 MW), in points of effective capacity (0.1 MW at D8)."""
+UNIT_POINTS: Final[float] = engine.engine_float(key="d8_engine_unit_points")
+"""One running engine unit, in points of effective capacity (0.1 MW at D8)."""
 DROP_POINTS: Final[float] = -25.0
 """A residual below this (-2.5 MW) counts as a drop."""
 SWITCH_ON_SHARE: Final[float] = 0.05
