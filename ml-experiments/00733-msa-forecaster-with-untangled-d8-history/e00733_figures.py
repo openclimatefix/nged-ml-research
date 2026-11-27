@@ -385,10 +385,21 @@ def pick_loss_groups(*, root: Path) -> dict[str, list[dict]]:
     return groups
 
 
-def loss_grid_chart(*, groups: Mapping[str, Sequence[Mapping[str, object]]]) -> alt.VConcatChart:
+def not_fitted_note(*, arms: Sequence[str]) -> str:
+    """Return the caption that names the arms a figure does not draw ("" when none is absent)."""
+    if not arms:
+        return ""
+    names = " and ".join(arms)
+    return f"{names} {'was' if len(arms) == 1 else 'were'} not fitted: the timing gate dropped {'it' if len(arms) == 1 else 'them'}"
+
+
+def loss_grid_chart(
+    *, groups: Mapping[str, Sequence[Mapping[str, object]]], absent: Sequence[str] = ()
+) -> alt.VConcatChart:
     """Return the loss figure: one row per arm, one panel per fold (real) or seed (synthetic).
 
     Each panel draws the training loss and the validation loss against the pass and marks the stored pass.
+    The caption names each arm in `absent`, the arms that the timing gate dropped.
     """
     rows = []
     for arm, records in groups.items():
@@ -401,13 +412,22 @@ def loss_grid_chart(*, groups: Mapping[str, Sequence[Mapping[str, object]]]) -> 
             for r in records
         ]
         rows.append(alt.hconcat(*panels))
-    return alt.vconcat(*rows)
+    chart = alt.vconcat(*rows)
+    note = not_fitted_note(arms=absent)
+    return chart.properties(title=alt.TitleParams(note, anchor="start")) if note else chart
 
 
 def write_loss_grid(*, root: Path, out: Path) -> dict[str, int]:
     """Write the loss-curve figure of every fitted arm and return the number of panels by arm."""
+    import e00733_stages as st
+
     groups = pick_loss_groups(root=root)
-    save_svg(chart=loss_grid_chart(groups=groups), path=out)
+    absent = [
+        a
+        for a in st.dropped_arms(root=root)
+        if a in (*REAL_LOSS_ARMS, *SYNTHETIC_LOSS_ARMS) and a not in groups
+    ]
+    save_svg(chart=loss_grid_chart(groups=groups, absent=absent), path=out)
     return {arm: len(records) for arm, records in groups.items()}
 
 
@@ -445,6 +465,8 @@ def coverage_chart(*, r9: Mapping[str, Any]) -> alt.LayerChart:
     The share is drawn against the nominal level, one dot per arm and quantile, with the diagonal
     of perfect coverage.
 
+    The title names each arm that the timing gate dropped (`r9["dropped"]`), which is not drawn.
+
     Args:
         r9: The R9 reading.
 
@@ -452,13 +474,23 @@ def coverage_chart(*, r9: Mapping[str, Any]) -> alt.LayerChart:
         The chart.
 
     Raises:
-        HistoryError: When R9 holds no coverage.
+        HistoryError: When R9 holds no coverage, or an arm that was not dropped has none.
     """
     data = coverage_rows(r9=r9)
     if data.is_empty():
         msg = "R9 holds no coverage to draw"
         raise HistoryError(msg)
     arms = list(dict.fromkeys(data["arm"].to_list()))
+    dropped = list(r9.get("dropped") or [])
+    required = [a for a in ("FU", "FS") if a not in dropped]
+    if "M*" not in dropped and not {"M*", "F0r"} & set(arms):
+        required.append("M*")
+    lacking = [a for a in required if a not in arms]
+    if lacking:
+        msg = f"R9 holds no coverage of {lacking}, and the timing gate did not drop them"
+        raise HistoryError(msg)
+    note = not_fitted_note(arms=dropped)
+    title = "Coverage of D8's tail quantiles" + (f" ({note})" if note else "")
     line = (
         alt.Chart(pl.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0]}))  # ty: ignore[unresolved-attribute]
         .mark_line(color="#555555", strokeDash=[4, 3])
@@ -486,7 +518,7 @@ def coverage_chart(*, r9: Mapping[str, Any]) -> alt.LayerChart:
     return (line + dots).properties(
         width=WIDTH_PX // 2,
         height=WIDTH_PX // 2,
-        title=alt.TitleParams("Coverage of D8's tail quantiles", anchor="start"),
+        title=alt.TitleParams(title, anchor="start"),
     )
 
 

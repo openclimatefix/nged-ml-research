@@ -569,6 +569,27 @@ def protocol_flags(*, rows: pl.DataFrame, names: Sequence[str]) -> pl.DataFrame 
 FEATURE_CACHE: Final = "00106-differentiable-physics-4-all-years-drift-and-recent-level/cache"
 """The feature cache of experiment 106, under the experiments' data folder (experiment 668 reads it)."""
 R9_ARMS: Final = (("FU", None), ("FS", None), ("M*", None))
+"""The arms of R9 and R10 before the timing gate; `report_arms` removes the dropped ones."""
+
+
+def report_arms(*, root: Path, rows: str) -> tuple[list[Arm], list[str]]:
+    """Return the arms that R9 and R10 read, and the arms the timing gate dropped from them.
+
+    An arm that the timing gate dropped (or that is not fitted) is left out, so the readings
+    describe the arms that were fitted. The caller records the dropped arms beside the reading.
+
+    Args:
+        root: This experiment's data folder.
+        rows: "test" or "validation" (M* stands in as F0r on validation rows).
+
+    Returns:
+        The arms to read, in `R9_ARMS` order, and the names of the dropped arms among `R9_ARMS`.
+    """
+    from e00733_stages import dropped_arms
+
+    gone = set(dropped_arms(root=root))
+    kept = [swap_reference(arm=a, rows=rows) for a in R9_ARMS if a[0] not in gone]
+    return kept, [a[0] for a in R9_ARMS if a[0] in gone]
 
 
 def tail_table(*, frame: pl.DataFrame) -> dict[str, Any]:
@@ -589,17 +610,26 @@ def reading_r9(
 ) -> dict[str, Any]:  # fmt: skip
     """Return R9: the tail pinball losses and coverages of FU, FS, and M* at D8, and the curtailment cost.
 
+    An arm that the timing gate dropped is not read: `arms_used` names the arms read and `dropped`
+    the arms left out.
+
     The avoidable-curtailment cost is defined only for the signed-MW Primaries, so D8 (an MVA-only
     Primary) carries the protocol's status instead of a cost.
     """
     from studies.eval_protocol import metrics
 
     del truth
-    arms = [swap_reference(arm=a, rows=rows) for a in R9_ARMS]
+    arms, dropped = report_arms(root=root, rows=rows)
+    names = [a[0] for a in arms]
     plan = choose_plan(root=root, arms=arms, wanted_seeds=core.PLACEBO_SEEDS, rows=rows)
     if plan is None:
-        return {"status": "void", "reason": "FU, FS, and M* share no fold and seed"}
-    out: dict[str, Any] = {"plan": plan.as_dict(), "arms": {}}
+        return {
+            "status": "void", "reason": f"{', '.join(names)} share no fold and seed",
+            "arms_used": names, "dropped": dropped,
+        }  # fmt: skip
+    out: dict[str, Any] = {
+        "plan": plan.as_dict(), "arms": {}, "arms_used": names, "dropped": dropped,
+    }  # fmt: skip
     for arm in arms:
         out["arms"][arm[0]] = tail_table(frame=restrict(frame=losses(arm, plan), ids=[d8]))
     out["avoidable_curtailment_cost"] = {
@@ -615,15 +645,22 @@ def reading_r10(
 ) -> dict[str, Any]:  # fmt: skip
     """Return R10: the four load-shift scenarios at D8 for FU, FS, and M*.
 
+    An arm that the timing gate dropped is not read: `arms_used` names the arms read and `dropped`
+    the arms left out.
+
     The scenarios are all rows, rows outside logged events and at least 7 days after one, rows inside
     logged events, and the 7 days after an event ends. NGED's logs may miss load transfers, so the
     rows outside events may hold events that no label covers, and the slices inside events undercount.
     """
     del truth
-    arms = [swap_reference(arm=a, rows=rows) for a in R9_ARMS]
+    arms, dropped = report_arms(root=root, rows=rows)
+    names = [a[0] for a in arms]
     plan = choose_plan(root=root, arms=arms, wanted_seeds=core.PLACEBO_SEEDS, rows=rows)
     if plan is None:
-        return {"status": "void", "reason": "FU, FS, and M* share no fold and seed"}
+        return {
+            "status": "void", "reason": f"{', '.join(names)} share no fold and seed",
+            "arms_used": names, "dropped": dropped,
+        }  # fmt: skip
     base = restrict(frame=losses(arms[0], plan), ids=[d8])
     flags = slice_flags(rows=base.select(*KEYS), names=("event_rows", "event_following_7_days"))
     if flags is None:
@@ -632,7 +669,9 @@ def reading_r10(
         all=pl.lit(True),
         outside_events=~pl.col("event_rows") & ~pl.col("event_following_7_days"),
     )
-    out: dict[str, Any] = {"plan": plan.as_dict(), "scenarios": {}}
+    out: dict[str, Any] = {
+        "plan": plan.as_dict(), "scenarios": {}, "arms_used": names, "dropped": dropped,
+    }  # fmt: skip
     for scenario, column in SCENARIOS.items():
         keep = flags.filter(pl.col(column)).select(*KEYS)
         entry: dict[str, Any] = {"n": keep.height}

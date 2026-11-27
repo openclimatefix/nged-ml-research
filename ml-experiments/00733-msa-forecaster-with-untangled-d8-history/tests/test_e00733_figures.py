@@ -5,6 +5,7 @@ device branches, and the attention shapes."""
 import json
 from pathlib import Path
 
+import altair as alt
 import e00733_attention as att
 import e00733_figures as figs
 import e00733_model as model
@@ -217,18 +218,15 @@ def test_contrast_rows_include_every_lead_band_of_r8() -> None:
 
 def test_coverage_chart_reads_r9_and_refuses_an_empty_reading() -> None:
     """Each arm and tail quantile gives a dot at its nominal level; no coverage is an error."""
-    r9 = {
-        "arms": {
-            "FU": {
-                "n": 10,
-                "coverage_q01": 0.0,
-                "coverage_q05": 0.04,
-                "coverage_q95": 0.9,
-                "coverage_q99": 0.99,
-            }
-        }
+    table = {
+        "n": 10,
+        "coverage_q01": 0.0,
+        "coverage_q05": 0.04,
+        "coverage_q95": 0.9,
+        "coverage_q99": 0.99,
     }
-    assert figs.coverage_rows(r9=r9).height == 4
+    r9 = {"arms": {"FU": table, "FS": table, "M*": table}}
+    assert figs.coverage_rows(r9=r9).height == 12
     figs.coverage_chart(r9=r9)
     with pytest.raises(figs.HistoryError):
         figs.coverage_chart(r9={"status": "void"})
@@ -271,3 +269,32 @@ def test_the_synthetic_attention_case_is_an_s2_segment_with_reverse_flow_on_lead
     }
     with pytest.raises(att.AttentionError):
         att.pick_synthetic_case(segments=[quiet, seg], sources=["S2", "S1"], index=index)
+
+
+def test_coverage_chart_with_a_dropped_arm_draws_two_arms_and_names_the_absent_one() -> None:
+    """R9 with FS dropped draws FU and M* and titles the chart; an undropped missing arm raises."""
+    table = {
+        "n": 10,
+        "coverage_q01": 0.0,
+        "coverage_q05": 0.04,
+        "coverage_q95": 0.9,
+        "coverage_q99": 0.99,
+    }
+    r9 = {"arms": {"FU": table, "M*": table}, "arms_used": ["FU", "M*"], "dropped": ["FS"]}
+    assert figs.coverage_rows(r9=r9).height == 8
+    chart = figs.coverage_chart(r9=r9)
+    assert "FS was not fitted: the timing gate dropped it" in chart.title.text
+    with pytest.raises(figs.HistoryError):
+        figs.coverage_chart(r9={"arms": {"FU": table, "M*": table}})
+    with pytest.raises(figs.HistoryError):
+        figs.coverage_chart(r9={**r9, "dropped": [], "arms": {"FU": table, "FS": table}})
+
+
+def test_loss_grid_chart_captions_a_dropped_arm(tmp_path: Path) -> None:
+    """The loss figure draws the fitted arms and carries a caption naming the dropped one."""
+    _write_records(tmp_path)
+    groups = figs.pick_loss_groups(root=tmp_path)
+    assert "FS" not in groups
+    chart = figs.loss_grid_chart(groups=groups, absent=["FS", "YT"])
+    assert "FS and YT were not fitted" in chart.title.text
+    assert figs.loss_grid_chart(groups=groups).title is alt.Undefined

@@ -45,6 +45,16 @@ MAX_EVENT_PANELS: Final = 8
 N_SIGN_REVERSE_PANELS: Final = 3
 REAL_ARMS: Final = (("FU", None), ("FS", None), ("M*", None))
 """The arms of the winter and summer panels."""
+
+
+REAL_ARMS_NAMES: Final = tuple(name for name, _ in REAL_ARMS)
+
+
+def drawn_arms(*, dropped: Sequence[str]) -> list[str]:
+    """Return the labels of `REAL_ARMS` that the timing gate did not drop, in drawing order."""
+    return [name for name in REAL_ARMS_NAMES if name not in dropped]
+
+
 QUANTILES: Final = ("q10", "q50", "q90")
 SEED: Final = 0
 
@@ -87,7 +97,7 @@ def assert_distinct(*, windows: Sequence[Window]) -> None:
 
 
 def read_real(
-    *, root: Path, rows: str, d8: int, fold: str, seed: int = SEED
+    *, root: Path, rows: str, d8: int, fold: str, seed: int = SEED, dropped: Sequence[str] = ()
 ) -> dict[str, pl.DataFrame]:
     """Return D8's forecasts of FU, FU with the channels masked, FS, and M* in one fold.
 
@@ -101,6 +111,7 @@ def read_real(
         d8: D8's series id.
         fold: The fold month.
         seed: The seed.
+        dropped: The arms that the timing gate dropped, which are not read.
 
     Returns:
         The frames by label ("FU", "FU masked", "FS", "M*").
@@ -116,6 +127,8 @@ def read_real(
     }
     out: dict[str, pl.DataFrame] = {}
     for label, arm in want.items():
+        if label in dropped:
+            continue
         name, variant = scoring.swap_reference(arm=arm, rows=rows)
         if not scoring.has_job(root=root, arm=(name, variant), fold=fold, seed=seed, rows=rows):
             continue
@@ -491,9 +504,26 @@ Folds = dict[str, dict[str, pl.DataFrame]]
 
 
 def season_figure(
-    *, folds: Folds, allow_fallback: bool
+    *, folds: Folds, allow_fallback: bool, dropped: Sequence[str] = ()
 ) -> tuple[alt.VConcatChart, list[Window], list[str]]:
-    """Return the winter and summer panels (day-ahead and 14-day) of a typical origin each."""
+    """Return the winter and summer panels (day-ahead and 14-day) of a typical origin each.
+
+    A panel draws the arms of `REAL_ARMS` that were fitted. An arm in `dropped` is left out, and the
+    title and the notes say so.
+
+    Args:
+        folds: Each fold's frames by arm.
+        allow_fallback: Whether a season may fall back to the nearest month, and whether an arm
+            that is neither dropped nor stored is left out (validation rows) or an error (test
+            rows).
+        dropped: The arms that the timing gate dropped.
+
+    Returns:
+        The chart, the windows drawn, and the notes.
+
+    Raises:
+        SeriesError: When an arm that was not dropped has no forecast in a fold on test rows.
+    """
     fu_all = pl.concat([f["FU"] for f in folds.values()])
     panels, windows, notes = [], [], []
     for season, months in (("winter", WINTER_MONTHS), ("summer", SUMMER_MONTHS)):
@@ -508,12 +538,25 @@ def season_figure(
         fold = next(
             f for f, fr in folds.items() if (fr["FU"]["power_fcst_init_time"] == origin).any()
         )
-        frames = {k: v for k, v in folds[fold].items() if k in ("FU", "FS", "M*")}
+        wanted = drawn_arms(dropped=dropped)
+        frames = {k: v for k, v in folds[fold].items() if k in wanted}
+        missing = [a for a in wanted if a not in frames]
+        if missing and not allow_fallback:
+            msg = f"the {season} panels lack the forecast of {missing} in fold {fold}, and the timing gate did not drop them"
+            raise SeriesError(msg)
+        gone = [a for a in REAL_ARMS_NAMES if a in dropped]
+        parts = []
+        if gone:
+            parts.append(figs.not_fitted_note(arms=gone))
+        if missing:
+            parts.append(f"{', '.join(missing)} not stored in fold {fold}")
+        suffix = f" ({'; '.join(parts)})" if parts else ""
+        notes.extend(f"{season}: {part}, so the panels do not draw it" for part in parts)
         windows.append(Window(f"{season} origin", (fold, origin)))
         d = origin.date()
         for lead, what in ((DAY_AHEAD_LEAD_HOURS, "day-ahead"), (None, "14-day")):
             label = f"{season.capitalize()}{' (fallback month, see notes)' if note else ''}"
-            title = f"{label}: the {what} forecast of the origin of {d}"
+            title = f"{label}: the {what} forecast of the origin of {d}{suffix}"
             panels.append(forecast_chart(frames=frames, origin=origin, lead=lead, title=title))
     return alt.vconcat(*panels), windows, notes
 
@@ -611,10 +654,15 @@ def run_series(*, root: Path, rows: str) -> dict[str, Any]:
     if plan is None:
         msg = "no fold holds a stored forecast of FU at seed 0, so no series can be drawn"
         raise SeriesError(msg)
-    folds = {f: read_real(root=root, rows=rows, d8=d8, fold=f) for f in plan.folds}
+    import e00733_stages as st
+
+    dropped = st.dropped_arms(root=root)
+    folds = {f: read_real(root=root, rows=rows, d8=d8, fold=f, dropped=dropped) for f in plan.folds}
     out = root / "figures"
     out.mkdir(parents=True, exist_ok=True)
-    chart, windows, notes = season_figure(folds=folds, allow_fallback=rows != "test")
+    chart, windows, notes = season_figure(
+        folds=folds, allow_fallback=rows != "test", dropped=dropped
+    )
     figs.save_svg(chart=chart, path=out / "series_real.svg")
     files, scenarios = ["series_real.svg"], {"winter": 2, "summer": 2}
     chart, window = channel_figure(folds=folds, exclude={w.key[1] for w in windows})
@@ -643,4 +691,4 @@ def run_series(*, root: Path, rows: str) -> dict[str, Any]:
     private.mkdir(parents=True, exist_ok=True)
     listing = [{"scenario": w.scenario, "key": [str(k) for k in w.key]} for w in windows]
     (private / "series_windows.json").write_text(json.dumps(listing, indent=1))
-    return {"files": files, "scenarios": scenarios, "notes": notes, "n_events": n_events, "n_windows": len(windows), "folds": list(folds)}  # fmt: skip
+    return {"files": files, "scenarios": scenarios, "notes": notes, "n_events": n_events, "n_windows": len(windows), "folds": list(folds), "dropped": list(dropped)}  # fmt: skip

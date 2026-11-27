@@ -2,6 +2,7 @@
 """Tests of `e00733_scoring`: the plan a contrast reads, the rows it keeps, R8's pieces, R9's tails,
 the validation truth, and the two reads of the chain (F0r gate, screen point)."""
 
+import json
 import sys
 import types
 from datetime import UTC, datetime, timedelta
@@ -211,3 +212,66 @@ def test_f0r_gate_needs_a_job_and_compares_to_m_star(
     with pytest.raises(StoppedError):
         sg.f0r_gate(root=tmp_path, require_all=False)
     assert store.row_set_id(rows="test") == core.ROW_SET_ID_REAL
+
+
+def _stub_losses(arm: tuple[str, str | None], plan: sg.Plan) -> pl.DataFrame:
+    n = 4
+    return pl.DataFrame(
+        {
+            "time_series_id": [1] * n,
+            "lead_hours": [30.0] * n,
+            "crps": [1.0] * n,
+            "abs_err": [0.5] * n,
+            **{c: [1.0] * n for c in sg.TAIL_COLUMNS},
+            "actual": [0.0] * n,
+            "q01": [1.0] * n,
+            "q05": [1.0] * n,
+            "q95": [1.0] * n,
+            "q99": [1.0] * n,
+            **{k: [1] * n for k in sg.KEYS if k not in ("time_series_id", "lead_hours")},
+        }
+    )
+
+
+def _timing(root: Path, *, dropped: list[str]) -> None:
+    (root / "scores").mkdir(parents=True)
+    (root / "scores" / "timing.json").write_text(json.dumps({"dropped": dropped}))
+
+
+def test_r9_and_r10_read_the_arms_that_were_fitted_when_fs_is_dropped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With FS dropped R9 and R10 read FU and M* and record the arms used and the arm dropped."""
+    _timing(tmp_path, dropped=["YT", "FS"])
+    seen: list[str] = []
+
+    def exists(**kw: Any) -> bool:
+        seen.append(kw["arm"][0])
+        return kw["arm"][0] != "FS"
+
+    monkeypatch.setattr(sg, "has_job", exists)
+    r9 = sg.reading_r9(root=tmp_path, rows="test", d8=1, truth=np.zeros(1), losses=_stub_losses)
+    assert r9["arms_used"] == ["FU", "M*"] and r9["dropped"] == ["FS"]
+    assert set(r9["arms"]) == {"FU", "M*"} and "FS" not in seen
+    monkeypatch.setattr(
+        sg,
+        "slice_flags",
+        lambda **kw: kw["rows"].with_columns(
+            event_rows=pl.lit(False), event_following_7_days=pl.lit(False)
+        ),
+    )
+    r10 = sg.reading_r10(root=tmp_path, rows="test", d8=1, truth=np.zeros(1), losses=_stub_losses)
+    assert r10["arms_used"] == ["FU", "M*"] and r10["dropped"] == ["FS"]
+    assert set(r10["scenarios"]["all rows"]) == {"n", "FU", "M*"}
+
+
+def test_r9_keeps_every_arm_before_the_timing_gate_and_voids_when_no_plan_is_shared(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without a timing record all three arms are read; an undropped missing arm voids the reading."""
+    monkeypatch.setattr(sg, "has_job", lambda **kw: True)
+    r9 = sg.reading_r9(root=tmp_path, rows="test", d8=1, truth=np.zeros(1), losses=_stub_losses)
+    assert r9["arms_used"] == ["FU", "FS", "M*"] and r9["dropped"] == []
+    monkeypatch.setattr(sg, "has_job", lambda **kw: kw["arm"][0] != "FS")
+    void = sg.reading_r9(root=tmp_path, rows="test", d8=1, truth=np.zeros(1), losses=_stub_losses)
+    assert void["status"] == "void" and void["dropped"] == []

@@ -915,6 +915,17 @@ published page carries the coverage counts.
   the end. A fit whose validation loss was still falling at the cap is reported, as before. The
   first synthetic fits stop early in practice (the validation loss of YU was lowest after the first
   pass in the gate's fit), so the cap is expected to bind rarely.
+- **Report-only readings and figures read the arms that were fitted (ruling of the design lead,
+  2026-11-27, set after the chain and before any R9 or R10 value was read).** The timing gate
+  dropped the report-only arms YT and FS. R9 (tail pinball losses and coverage), R10 (the four
+  load-shift scenarios), and the series panels had been defined over FU, FS, and M\*, so the
+  `score` stage computed R9 and R10 as void, because FS has no stored forecast. R9 and R10 now read
+  FU and M\*, and each records the arms it read and the arm the timing gate dropped. The coverage
+  figure, the loss curves, the series panels, and the report name the missing arm (FS was not
+  fitted: the timing gate dropped it) and draw the arms that exist. An arm that the timing gate did
+  not drop and that has no stored forecast still raises an error. Nothing in the verdict, the
+  contrasts, the registered bars, or the stop line changes, and the readings about FS itself (R1
+  and R2) and about YT (R5) stay void.
 - **Only a smoke test on the GPU opens the chain (ruling of the design lead, 2026-11-27, set before
   any experiment 733 fit exists).** A smoke test on the CPU had written a passing `scores/smoke.json`
   on the real data folder, which opened the chain. The smoke test now writes `scores/smoke.json`

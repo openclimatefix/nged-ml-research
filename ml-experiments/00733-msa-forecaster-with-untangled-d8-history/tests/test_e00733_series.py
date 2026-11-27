@@ -174,3 +174,39 @@ def test_svg_optimisation_refuses_nothing_to_optimise_a_missing_npx_and_an_overs
         figstages.optimise(folder=tmp_path, names=["a.svg"])
     (tmp_path / "a.svg").write_text("x")
     assert figstages.optimise(folder=tmp_path, names=["a.svg"]) == {"a.svg": 1}
+
+
+def test_real_arms_filtering_leaves_out_a_dropped_arm() -> None:
+    """The drawn arms are FU, FS, and M* less the dropped ones."""
+    assert series.drawn_arms(dropped=()) == ["FU", "FS", "M*"]
+    assert series.drawn_arms(dropped=("YT", "FS")) == ["FU", "M*"]
+
+
+def _folds(*, with_fs: bool) -> dict[str, dict[str, pl.DataFrame]]:
+    fu = _frame(start=datetime(2026, 1, 1), n_origins=5, bias=0.01)
+    frames = {"FU": fu, "M*": fu}
+    if with_fs:
+        frames["FS"] = fu
+    return {"2026-01": frames}
+
+
+def test_season_figure_draws_the_fitted_arms_and_names_a_dropped_one() -> None:
+    """With FS dropped the panels carry FU and M* and say so; an undropped missing arm is an error."""
+    folds = _folds(with_fs=False)
+    chart, _, notes = series.season_figure(folds=folds, allow_fallback=True, dropped=("YT", "FS"))
+    assert any("FS was not fitted: the timing gate dropped it" in n for n in notes)
+    assert "FS was not fitted" in chart.vconcat[0].title.text
+    with pytest.raises(series.SeriesError):
+        series.season_figure(folds=folds, allow_fallback=False, dropped=())
+    _, _, none = series.season_figure(folds=_folds(with_fs=True), allow_fallback=True)
+    assert all("not fitted" not in n for n in none)
+
+
+def test_read_real_skips_a_dropped_arm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dropped arm is never read, even before the stored forecasts are looked up."""
+    frame = _frame(start=datetime(2026, 1, 1), n_origins=1).with_columns(time_series_id=pl.lit(1))
+    monkeypatch.setattr(series.scoring, "has_job", lambda **kw: kw["arm"][0] in ("FU", "FS"))
+    monkeypatch.setattr(series.store, "read_set", lambda **_: frame)
+    monkeypatch.setattr(series.store, "set_name", lambda **_: "x")
+    got = series.read_real(root=tmp_path, rows="test", d8=1, fold="2026-01", dropped=("FS",))
+    assert set(got) == {"FU", "FU masked"}

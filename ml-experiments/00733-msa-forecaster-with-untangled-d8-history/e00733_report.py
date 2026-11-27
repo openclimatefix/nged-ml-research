@@ -100,6 +100,12 @@ def render(
     lines.append(
         f"Dropped or unfitted arms (their readings are void): {verdict.get('dropped_arms') or 'none'}"
     )
+    for name in ("R9", "R10"):
+        entry = readings.get(name)
+        if isinstance(entry, Mapping) and entry.get("dropped"):
+            lines.append(
+                f"{name} reads {', '.join(entry.get('arms_used') or [])}; {', '.join(entry['dropped'])} was not fitted: the timing gate dropped it"
+            )
     cov = verdict.get("synthetic_coverage", {})
     lines.append(
         f"Synthetic world, ensemble-run coverage of the base dates (data, no date printed): {cov}"
