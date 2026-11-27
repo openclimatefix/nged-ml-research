@@ -38,7 +38,9 @@ def is_f9_arm(*, arm: str) -> bool:
 
 
 def fit_path(*, arm: str, month: str, seed: int, data_dir: Path) -> Path:
-    """Return the per-seed forecast file of `arm`: F9's folder for an F9 arm, else the file that experiment 713's scorer reads."""
+    """Return the per-seed forecast file of `arm`: F9's folder for an F9 arm, else the file that
+    experiment 713's scorer reads.
+    """  # noqa: D205
     if is_f9_arm(arm=arm):
         return arms.fit_file(data_dir=data_dir, arm=arm, month=month, seed=seed)
     if arm == "C":
@@ -90,12 +92,13 @@ def per_primary_table(
     *, scored: dict[str, pl.DataFrame], reference: str, labels: dict[int, str],
     band: tuple[float, float] = s713.HEADLINE_BAND_HOURS,
 ) -> pl.DataFrame:  # fmt: skip
-    """Return one row per (arm, Primary): mean CRPS and MAE in the lead band, and the CRPS minus the reference's.
+    """Return one row per (arm, Primary): mean CRPS and MAE in the lead band, and the CRPS minus the
+    reference's.
 
     `scored` holds seed-averaged frames with the `crps`, `abs_err`, and `lead_hours` columns that
-    experiment 713's `add_losses` adds. Every arm must hold the same keys as the reference, and the
-    difference is taken on the joined keys, never by row position.
-    """
+    experiment 713's `add_losses` adds. Every arm must hold the same keys as the reference, and
+    the difference is taken on the joined keys, never by row position.
+    """  # noqa: D205
     rows = []
     ref = scored[reference].filter(
         (pl.col("lead_hours") >= band[0]) & (pl.col("lead_hours") < band[1])

@@ -1,14 +1,15 @@
 # ruff: noqa: E501, PLR0915
 """Experiment 718: the three-stage training loop with row tables (design sections 5 and 6).
 
-The loop is a copy of `e00713_train.train_stage` (the function of experiment 713's `e00713_train.py`
-at commit 5deae9ec8) with five changes: the source is an `F9Source` whose row tables choose the
-history rows; the network is `F9Net`; the batch carries the age buckets; stage 3 applies a second
-schedule of synthetic shifts over the older rows (section 5); and `accumulate` splits an optimiser
-step into half-batches whose losses are normalised by the weight sum of the full batch (the memory
-rule of section 11). Everything else is experiment 713's: the optimiser groups, the learning rates,
-the warm-up, the gradient clip, the early stopping, the lead-day draws, the dropout stream, the
-target cuts, and the recency weights. The functions that need no change are imported.
+The loop is a copy of `e00713_train.train_stage` (the function of experiment 713's
+`e00713_train.py` at commit 5deae9ec8) with five changes: the source is an `F9Source` whose row
+tables choose the history rows; the network is `F9Net`; the batch carries the age buckets; stage
+3 applies a second schedule of synthetic shifts over the older rows (section 5); and `accumulate`
+splits an optimiser step into half-batches whose losses are normalised by the weight sum of the
+full batch (the memory rule of section 11). Everything else is experiment 713's: the optimiser
+groups, the learning rates, the warm-up, the gradient clip, the early stopping, the lead-day
+draws, the dropout stream, the target cuts, and the recency weights. The functions that need no
+change are imported.
 """
 
 import time
@@ -32,13 +33,14 @@ SECOND_SCHEDULE_SALT = 1
 def synthetic_source(
     *, world: tr.World, samples: tr.SampleSet, tables: dict, arm: str
 ) -> fb.F9Source:
-    """Return the stage 3 source: history power with the lag-only shifts of two schedules, targets clean.
+    """Return the stage 3 source: history power with the lag-only shifts of two schedules, targets
+    clean.
 
-    Experiment 713's call is kept unchanged (`first = c.min - 768`), so every row that `M*` read gets
-    `M*`'s shifts. The second schedule adds events on `[c.min - 48 * 380, c.min - 768)`, and on
-    `[0, c.min - 768)` for arm `UX`, from a generator seeded by (month, 1) at the same coverage
-    share. The ranges are disjoint, so the schedules never overlap.
-    """
+    Experiment 713's call is kept unchanged (`first = c.min - 768`), so every row that `M*` read
+    gets `M*`'s shifts. The second schedule adds events on `[c.min - 48 * 380, c.min - 768)`, and
+    on `[0, c.min - 768)` for arm `UX`, from a generator seeded by (month, 1) at the same
+    coverage share. The ranges are disjoint, so the schedules never overlap.
+    """  # noqa: D205
     import e00581_bank as bank  # ty: ignore[unresolved-import]
 
     first_target = int(samples.c_idx.min())
@@ -103,8 +105,9 @@ def train_stage(
     """Train `model` on one stage in place and leave it at the state of the best validation loss.
 
     `accumulate` splits each optimiser step of 256 samples into that many half-batches, each loss
-    divided by the weight sum of the full 256 (the block-dropout draw is per origin day and the same).
-    `max_steps` stops a pass early and exists only for the equality check against experiment 713's loop.
+    divided by the weight sum of the full 256 (the block-dropout draw is per origin day and the
+    same). `max_steps` stops a pass early and exists only for the equality check against
+    experiment 713's loop.
     """
     started = time.monotonic()
     log = log or tr.StageLog(stage=stage)

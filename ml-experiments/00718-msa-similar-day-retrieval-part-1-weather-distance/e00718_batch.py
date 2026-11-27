@@ -1,20 +1,21 @@
 # ruff: noqa: E501
-"""Experiment 718: batch assembly for any number of history rows chosen by a row table (design section 5, 15).
+"""Experiment 718: batch assembly for any number of history rows chosen by a row table (design
+section 5, 15).
 
 `F9Source` wraps experiment 713's `Source` and a row table per target-weather version (`era5` for
-stage 1, `ens` for stages 2 and 3 and prediction). `Source.assemble` of experiment 713 already takes
-the ages of the history rows as an argument of any width, applies the 27 h rule, and sets `row_exists`
-from any visible finite reading (`has_reading`, line 160), so this module calls it unchanged and adds
-three things around it:
+stage 1, `ens` for stages 2 and 3 and prediction). `Source.assemble` of experiment 713 already
+takes the ages of the history rows as an argument of any width, applies the 27 h rule, and sets
+`row_exists` from any visible finite reading (`has_reading`, line 160), so this module calls it
+unchanged and adds three things around it:
 
 - the ages come from the row table, with an absent row marked `row_exists` False;
-- the 4.5% block dropout hides the row of age 2 wherever that row sits, and nothing when the sample
-  holds no such row (experiment 713 hid slot 0);
+- the 4.5% block dropout hides the row of age 2 wherever that row sits, and nothing when the
+  sample holds no such row (experiment 713 hid slot 0);
 - the age-bucket tensor, which an assertion ties to the grid indices of the rows.
 
-`poison_check` is rewritten because experiment 713's negative control is skipped whenever `ages` is
-given (`e00713_batch.py` line 323), and every F9 arm passes `ages`.
-"""
+`poison_check` is rewritten because experiment 713's negative control is skipped whenever `ages`
+is given (`e00713_batch.py` line 323), and every F9 arm passes `ages`.
+"""  # noqa: D205
 
 from dataclasses import dataclass
 from typing import Final
@@ -164,12 +165,13 @@ def poison_check(
 ) -> str:
     """KR2 (a) on the first `limit` samples of `batch`: poisoned copies change no input.
 
-    For each sample, the power of its Primary newer than `c - 54` is replaced by 1e6, and in a second
-    run by NaN, in a private copy. The rebuilt tensors must equal the batch's, bit for bit. The negative
-    control rebuilds the sample from the poisoned copy with a cap of 0 and the ages of the batch, and
-    must change the inputs wherever the sample holds a row that the cap-0 rule makes visible (a row of
-    age 2, whose newest half-hours lie between 27 h and 24.5 h before the contract origin).
-    `need_control` is False for arms whose rows do not always include age 2 (a random or weather-nearest pool).
+    For each sample, the power of its Primary newer than `c - 54` is replaced by 1e6, and in a
+    second run by NaN, in a private copy. The rebuilt tensors must equal the batch's, bit for
+    bit. The negative control rebuilds the sample from the poisoned copy with a cap of 0 and the
+    ages of the batch, and must change the inputs wherever the sample holds a row that the cap-0
+    rule makes visible (a row of age 2, whose newest half-hours lie between 27 h and 24.5 h
+    before the contract origin). `need_control` is False for arms whose rows do not always
+    include age 2 (a random or weather-nearest pool).
     """
     n = min(limit, len(batch.c_idx))
     controls = 0
@@ -244,12 +246,13 @@ def block_dropout_check(
 
 
 def phase_tables_equal(*, predict: ret.RowTable, train: ret.RowTable, fold_start_day: int) -> str:
-    """KR2 (c): entries of origins before the fold month are bit-identical under the two phases of power.
+    """KR2 (c): entries of origins before the fold month are bit-identical under the two phases of
+    power.
 
-    Entries of origins on or after `fold_start_day` may differ, because the train-phase power is NaN
-    from the fold month's start. The function asserts equality before it and counts the differences
-    after it, so that a caller can show the negative control.
-    """
+    Entries of origins on or after `fold_start_day` may differ, because the train-phase power is
+    NaN from the fold month's start. The function asserts equality before it and counts the
+    differences after it, so that a caller can show the negative control.
+    """  # noqa: D205
     before = predict.days < fold_start_day
     assert before.any(), "no origin day before the fold month"
     assert np.array_equal(predict.ages[:, before], train.ages[:, before]), (
@@ -266,7 +269,9 @@ def phase_tables_equal(*, predict: ret.RowTable, train: ret.RowTable, fold_start
 
 
 def newest_block_present(*, table: ret.RowTable, arrays: ret.PoolArrays, days: np.ndarray) -> str:
-    """KR2 (d): the table of `U` holds the block of age 2 wherever that block is eligible (under the prediction-phase power)."""
+    """KR2 (d): the table of `U` holds the block of age 2 wherever that block is eligible (under the
+    prediction-phase power).
+    """  # noqa: D205
     assert table.arm in {"U", "UX", "U27"}
     n = missing = 0
     for pi, p in enumerate(table.primaries):

@@ -1,13 +1,14 @@
 # ruff: noqa: E501, PLR0911, PT018
-"""Experiment 718, WP7b: the thresholds, the group readings, the verdict, and the stop and closure rules (design section 7).
+"""Experiment 718, WP7b: the thresholds, the group readings, the verdict, and the stop and closure
+rules (design section 7).
 
-Every function here is pure, so that `self-test` checks the rules on synthetic contrasts. A contrast is
-the dict that experiment 713's `contrast` returns (point, lower, upper, t_guard, seed_guard, and so on),
-except that the noise-floor guard is recomputed here from the seed count of the part, because experiment
-713's constant is the 5-seed floor. Nothing here changes a threshold or a rule of the design: the numbers
-below are those of section 7.1 to 7.4.
-Usage: e00718_decision.py [self-test | thresholds]
-"""
+Every function here is pure, so that `self-test` checks the rules on synthetic contrasts. A
+contrast is the dict that experiment 713's `contrast` returns (point, lower, upper, t_guard,
+seed_guard, and so on), except that the noise-floor guard is recomputed here from the seed count
+of the part, because experiment 713's constant is the 5-seed floor. Nothing here changes a
+threshold or a rule of the design: the numbers below are those of section 7.1 to 7.4. Usage:
+e00718_decision.py [self-test | thresholds]
+"""  # noqa: D205
 
 import sys
 from typing import Final
@@ -114,7 +115,9 @@ def supported_guards(
 
 
 def stop_rule(*, first_contrast: dict[str, float], monthly: dict[str, np.ndarray]) -> bool:
-    """Return whether a part stops: the first contrast on the screen folds is above +0.15 in both groups, or above +0.10 in both and positive in 3 of 4 folds in both."""
+    """Return whether a part stops: the first contrast on the screen folds is above +0.15 in both
+    groups, or above +0.10 in both and positive in 3 of 4 folds in both.
+    """  # noqa: D205
     big = all(first_contrast[g] > STOP_BIG for g in GROUPS)
     moderate = all(
         first_contrast[g] > STOP_MODERATE and int((monthly[g] > 0).sum()) >= 3 for g in GROUPS
@@ -127,12 +130,16 @@ Z_LIMIT: Final = {"six": 0.076, "eight": 0.20}
 
 
 def z_rule_fires(*, z_minus_star: dict[str, float]) -> bool:
-    """Return whether `Z` minus `M*` exceeds the limit in absolute value in either group, which fires audit trigger 1."""
+    """Return whether `Z` minus `M*` exceeds the limit in absolute value in either group, which
+    fires audit trigger 1.
+    """  # noqa: D205
     return any(abs(z_minus_star[g]) > Z_LIMIT[g] for g in GROUPS)
 
 
 def nested_beats_container(*, nested_minus_container: dict[str, float]) -> bool:
-    """Return whether a nested arm beats its container (`M*` beating `U27`, a placebo beating its treatment) in both groups: audit trigger 5."""
+    """Return whether a nested arm beats its container (`M*` beating `U27`, a placebo beating its
+    treatment) in both groups: audit trigger 5.
+    """  # noqa: D205
     return all(nested_minus_container[g] < 0 for g in GROUPS)
 
 
@@ -142,7 +149,9 @@ def audit_trigger_1(*, placebo_point: dict[str, float]) -> bool:
 
 
 def u27_advances(*, u27_minus_u27a: dict[str, float], u27_minus_star: dict[str, float]) -> bool:
-    """Return whether `U27` advances to the other four folds on its own rule (the manager must also agree to the hours)."""
+    """Return whether `U27` advances to the other four folds on its own rule (the manager must also
+    agree to the hours).
+    """  # noqa: D205
     return all(u27_minus_u27a[g] < 0 and u27_minus_star[g] <= 0 for g in GROUPS)
 
 
@@ -151,9 +160,10 @@ def line_closure(
 ) -> dict:  # fmt: skip
     """Return whether the line closes, and why (section 7.4).
 
-    `verdicts` maps "part1" and "part2" to a verdict word; `first_points` maps them to the point estimates
-    of A1 and B1 by group; `u27_exception` is whether `U27` minus `U27-A` is below zero with its 95%
-    interval, or None where `U27-A` was not fitted and the exception could not be read.
+    `verdicts` maps "part1" and "part2" to a verdict word; `first_points` maps them to the point
+    estimates of A1 and B1 by group; `u27_exception` is whether `U27` minus `U27-A` is below zero
+    with its 95% interval, or None where `U27-A` was not fitted and the exception could not be
+    read.
     """
     both_null = all(v in {"not supported", "refuted"} for v in verdicts.values())
     both_inconclusive = all(v == "inconclusive" for v in verdicts.values())
@@ -181,7 +191,9 @@ def line_closure(
 
 
 def reachable_thresholds(*, n_seeds: int, level: float = LEVEL) -> list[str]:
-    """Return the printed thresholds of section 7.2 from the monthly spread of `M1` minus `P` (0.10 at the six, 0.33 at the eight)."""
+    """Return the printed thresholds of section 7.2 from the monthly spread of `M1` minus `P` (0.10
+    at the six, 0.33 at the eight).
+    """  # noqa: D205
     t = float(stats.t.ppf(1.0 - (1.0 - level / 100.0) / 2.0, N_MONTHS - 1))
     lines = [
         f"Level {level:.2f}%, {N_MONTHS} month blocks, t = {t:.2f} with {N_MONTHS - 1} degrees of freedom, {n_seeds} seeds per arm"

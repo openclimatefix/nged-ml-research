@@ -1,16 +1,19 @@
 # ruff: noqa: E501
-"""Experiment 718, WP2: an independent recomputation of the row tables, written from design section 2 alone (KR3).
+"""Experiment 718, WP2: an independent recomputation of the row tables, written from design section
+2 alone (KR3).
 
-This module imports nothing from the table builder (`e00718_retrieval`, `e00718_tables`, `e00718_layout`).
-It takes the loaded arrays as plain NumPy arrays and picks the rows of one sample with explicit loops
-over the pool blocks, in float64, and sums the 336 squared differences of a distance with `math.fsum`
-(an exactly rounded sum), so that its summation order differs from the builder's `ndarray.sum`.
+This module imports nothing from the table builder (`e00718_retrieval`, `e00718_tables`,
+`e00718_layout`). It takes the loaded arrays as plain NumPy arrays and picks the rows of one
+sample with explicit loops over the pool blocks, in float64, and sums the 336 squared differences
+of a distance with `math.fsum` (an exactly rounded sum), so that its summation order differs from
+the builder's `ndarray.sum`.
 
-Inputs of every function: `finite` (P, G) bool, whether a power reading exists and is unflagged at each
-half-hour of the grid; `weather` (P, G, 7) float64; `day_type` (G,) int; `day_class` (G,) int or None;
-`grid_start` the date of grid index 0; and the target row (48, 7) with its (48,) filled mask. A block of
-age `a` before the contract origin `c = 48 d + 24` covers the grid indices `c - 48 a` to `c - 48 a + 47`.
-"""
+Inputs of every function: `finite` (P, G) bool, whether a power reading exists and is unflagged
+at each half-hour of the grid; `weather` (P, G, 7) float64; `day_type` (G,) int; `day_class` (G,)
+int or None; `grid_start` the date of grid index 0; and the target row (48, 7) with its (48,)
+filled mask. A block of age `a` before the contract origin `c = 48 d + 24` covers the grid
+indices `c - 48 a` to `c - 48 a + 47`.
+"""  # noqa: D205
 
 import math
 from datetime import date, timedelta
@@ -75,7 +78,9 @@ def calendar_distance(
 
 
 def christmas(*, grid_start: date, day: int) -> tuple[float, bool, int]:
-    """Return the offset in days of a block start from the nearest earlier 25 December, whether it starts from 20 December to 5 January, and its winter."""
+    """Return the offset in days of a block start from the nearest earlier 25 December, whether it
+    starts from 20 December to 5 January, and its winter.
+    """  # noqa: D205
     d = grid_start + timedelta(days=int(day))
     winter = d.year if d.month >= 7 else d.year - 1
     offset = float((d - date(winter, 12, 25)).days)
@@ -84,7 +89,9 @@ def christmas(*, grid_start: date, day: int) -> tuple[float, bool, int]:
 
 
 def nearest(*, scores: dict[int, float], allowed: list[int], n: int) -> list[int]:
-    """Return up to `n` ages of `allowed` in the order chosen: the smallest score, with a tie (relative 1e-9) to the younger age."""
+    """Return up to `n` ages of `allowed` in the order chosen: the smallest score, with a tie
+    (relative 1e-9) to the younger age.
+    """  # noqa: D205
     left = sorted(allowed)
     out: list[int] = []
     while left and len(out) < n:
@@ -101,11 +108,13 @@ def reference_rows(
     *, arm: str, finite: np.ndarray, weather: np.ndarray, day_type: np.ndarray, day_class: np.ndarray | None,
     grid_start: date, p: int, day: int, lead: int, target_w: np.ndarray, target_filled: np.ndarray,
 ) -> tuple[list[tuple[int, str]], dict[int, float]]:  # fmt: skip
-    """Return the (age, measure) rows of one sample of `arm` (`R`, `U`, `U27`, or `UX`), sorted by age, and the distances used.
+    """Return the (age, measure) rows of one sample of `arm` (`R`, `U`, `U27`, or `UX`), sorted by
+    age, and the distances used.
 
-    The second result maps each pool age to the distance that ordered it (the weather distance, or the age
-    for a target row with no filled half-hour), so that a caller can tell a tie from a mismatch.
-    """
+    The second result maps each pool age to the distance that ordered it (the weather distance,
+    or the age for a target row with no filled half-hour), so that a caller can tell a tie from a
+    mismatch.
+    """  # noqa: D205
     c = contract(day=day)
     base = "U" if arm == "UX" else arm
     ages = [

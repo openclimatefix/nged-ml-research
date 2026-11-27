@@ -1,9 +1,10 @@
 # ruff: noqa: E501
-"""Experiment 718, WP4: check KR2 (leakage poison, with its negative controls) and the assembly for 14 and 27 rows.
+"""Experiment 718, WP4: check KR2 (leakage poison, with its negative controls) and the assembly for
+14 and 27 rows.
 
-The checks run on the CPU on a synthetic source: 16 Primaries, a grid of 600 days with gaps, random
-weather, and a small ensemble table. Usage: e00718_check_batch.py
-"""
+The checks run on the CPU on a synthetic source: 16 Primaries, a grid of 600 days with gaps,
+random weather, and a small ensemble table. Usage: e00718_check_batch.py
+"""  # noqa: D205
 
 import sys
 from dataclasses import replace
@@ -28,13 +29,14 @@ ARMS = ("Z", "R", "R-A", "P90", "U", "U-A", "U27", "U27-A", "UX")
 
 
 def sparsify_age_2_blocks(*, power: torch.Tensor) -> None:
-    """Give some age-2 blocks 20, 23, 23 plus one hidden, or 24 readings, so that the 27 h rule and the threshold of 24 decide them.
+    """Give some age-2 blocks 20, 23, 23 plus one hidden, or 24 readings, so that the 27 h rule and
+    the threshold of 24 decide them.
 
     By `(Primary + day) % 4`: 0 holds 20 visible readings and 5 in the hidden tail (eligible only
     under a cap of 6 half-hours); 1 holds 23 visible readings (eligible only under a threshold of
-    23); 2 holds 23 visible readings and one at `c - 53` (eligible only under a cap of 53); 3 holds
-    exactly 24 visible readings (eligible).
-    """
+    23); 2 holds 23 visible readings and one at `c - 53` (eligible only under a cap of 53); 3
+    holds exactly 24 visible readings (eligible).
+    """  # noqa: D205
     for p in TABLE_PRIMARIES:
         for day in range(FIRST_ORIGIN_DAY, FIRST_ORIGIN_DAY + N_ORIGIN_DAYS):
             c = int(lay.contract_idx_of_day(day=np.array([day]))[0])
@@ -106,7 +108,9 @@ def samples(*, n: int, seed: int = 3) -> tuple[torch.Tensor, torch.Tensor, torch
 
 
 def check_arm(*, base: bt.Source, arm: str) -> list[str]:
-    """Assemble batches of every arm with both tables, and check the assertions, the model call, and the poison checks."""
+    """Assemble batches of every arm with both tables, and check the assertions, the model call, and
+    the poison checks.
+    """  # noqa: D205
     lines = []
     tables = make_tables(source=base, arm=arm)
     source = fb.F9Source(base=base, tables=tables)
@@ -150,7 +154,9 @@ def check_arm(*, base: bt.Source, arm: str) -> list[str]:
 
 
 def check_cap_changes_tables(*, base: bt.Source) -> list[str]:
-    """A cap of 6 or 53 half-hours instead of 54, or a threshold of 23 instead of 24, must each change the tables of arm `U`."""
+    """A cap of 6 or 53 half-hours instead of 54, or a threshold of 23 instead of 24, must each
+    change the tables of arm `U`.
+    """  # noqa: D205
     real = make_tables(source=base, arm="U")[fb.TABLE_ERA5]
     lines = []
     for name, value, what in (
@@ -173,7 +179,9 @@ def check_cap_changes_tables(*, base: bt.Source) -> list[str]:
 
 
 def check_negative_controls(*, base: bt.Source) -> list[str]:
-    """The three negative controls of KR2: a cap of 0 (in `poison_check`), the next day's ensemble run, and a block that the rule hides."""
+    """The three negative controls of KR2: a cap of 0 (in `poison_check`), the next day's ensemble
+    run, and a block that the rule hides.
+    """  # noqa: D205
     lines = []
     source = fb.F9Source(base=base, tables=make_tables(source=base, arm="U"))
     primary, c_idx, lead = samples(n=32)
@@ -207,7 +215,9 @@ def check_negative_controls(*, base: bt.Source) -> list[str]:
 
 
 def check_phases(*, base: bt.Source) -> list[str]:
-    """KR2 (c) and (d): entries do not depend on the phase of the power for origins before the fold month; the block of age 2 is in `U`."""
+    """KR2 (c) and (d): entries do not depend on the phase of the power for origins before the fold
+    month; the block of age 2 is in `U`.
+    """  # noqa: D205
     arrays = tab.pool_arrays_from_source(source=base, with_calendar=False)
     assert base.ens is not None
     provider = tab.ens_provider(ens=base.ens)
@@ -244,7 +254,9 @@ def check_phases(*, base: bt.Source) -> list[str]:
 
 
 def check_weather_poison() -> str:
-    """KR2 (b), at the table level: weather of other days, and ERA5 at or after the contract origin, leave the ensemble tables unchanged."""
+    """KR2 (b), at the table level: weather of other days, and ERA5 at or after the contract origin,
+    leave the ensemble tables unchanged.
+    """  # noqa: D205
     base = synthetic_source()
     arrays = tab.pool_arrays_from_source(source=base, with_calendar=False)
     assert base.ens is not None

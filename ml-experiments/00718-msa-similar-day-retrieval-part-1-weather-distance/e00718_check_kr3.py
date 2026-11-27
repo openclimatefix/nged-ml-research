@@ -1,14 +1,16 @@
 # ruff: noqa: E501, PT018, FURB171, ANN001
-"""Experiment 718, WP2: check KR3 (the row tables equal an independent recomputation) on a synthetic fold.
+"""Experiment 718, WP2: check KR3 (the row tables equal an independent recomputation) on a synthetic
+fold.
 
-The reference (`e00718_retrieval_reference`) is fed the loaded arrays directly from the source, not
-through the builder's `PoolArrays`. The check builds the tables of arms `R`, `U`, `U27`, and `UX`, picks
-random (Primary, origin day, lead day) samples, and requires the same rows. A rank swap between two blocks
-whose distances tie (relative 1e-9) is allowed and counted. The structural assertions of KR3 follow:
-ages inside the pool, no repeated block, every chosen block eligible, recency rows the youngest eligible
-blocks, weekday rows on the target's weekday, and `UX` equal to `U` outside the window. A table with one
-age moved must fail. Usage: e00718_check_kr3.py [--samples N]
-"""
+The reference (`e00718_retrieval_reference`) is fed the loaded arrays directly from the source,
+not through the builder's `PoolArrays`. The check builds the tables of arms `R`, `U`, `U27`, and
+`UX`, picks random (Primary, origin day, lead day) samples, and requires the same rows. A rank
+swap between two blocks whose distances tie (relative 1e-9) is allowed and counted. The
+structural assertions of KR3 follow: ages inside the pool, no repeated block, every chosen block
+eligible, recency rows the youngest eligible blocks, weekday rows on the target's weekday, and
+`UX` equal to `U` outside the window. A table with one age moved must fail. Usage:
+e00718_check_kr3.py [--samples N]
+"""  # noqa: D205
 
 import argparse
 import sys
@@ -49,7 +51,9 @@ def check_arm(
     *, arm: str, source, days: np.ndarray, provider, n_samples: int, seed: int, mutate=None, primaries: np.ndarray | None = None,
     table: ret.RowTable | None = None, holidays: set | frozenset = frozenset(),
 ) -> tuple[list[str], int]:  # fmt: skip
-    """Compare the builder's table of `arm` with the reference on random samples; return the report lines and the number of tie swaps."""
+    """Compare the builder's table of `arm` with the reference on random samples; return the report
+    lines and the number of tie swaps.
+    """  # noqa: D205
     primaries = cb.TABLE_PRIMARIES if primaries is None else primaries
     if table is None:
         arrays = tab.pool_arrays_from_source(
@@ -132,7 +136,9 @@ def expect_failure(*, what: str, **kwargs) -> str:  # noqa: ANN003
 
 
 def negative_controls(*, source, days: np.ndarray, provider) -> list[str]:
-    """Check that the comparison fails for a table with one age moved and for a table built under a relaxed 27 h rule."""
+    """Check that the comparison fails for a table with one age moved and for a table built under a
+    relaxed 27 h rule.
+    """  # noqa: D205
 
     def move_one_age(table):  # noqa: ANN202
         table.ages[0, 0, 0, 0] += 1
@@ -158,7 +164,9 @@ def negative_controls(*, source, days: np.ndarray, provider) -> list[str]:
 
 
 def joint_equals_single(*, source, days: np.ndarray, provider) -> str:
-    """Check that the tables built together in one pass equal the tables built one arm at a time (the reuse of distances changes nothing)."""
+    """Check that the tables built together in one pass equal the tables built one arm at a time
+    (the reuse of distances changes nothing).
+    """  # noqa: D205
     arms_all = ["R", "R-A", "P90", "U", "U-A", "U27", "U27-A", "UX"]
     arrays = tab.pool_arrays_from_source(source=source, with_calendar=True, holidays=set())
     joint = ret.build_tables(

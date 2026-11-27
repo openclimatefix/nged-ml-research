@@ -1,24 +1,27 @@
 # ruff: noqa: E501, PLR0915
-"""Experiment 718: fit one network (one arm, one fold, one seed) in the training phase (design sections 6 and 11).
+"""Experiment 718: fit one network (one arm, one fold, one seed) in the training phase (design
+sections 6 and 11).
 
-Usage: e00718_fit.py ARM MONTH SEED [--device cuda] [--smoke] [--accumulate N] [--accept-code-change OLD_HASH ...] [--accept-gate-change OLD_HASH]
+Usage: e00718_fit.py ARM MONTH SEED [--device cuda] [--smoke] [--accumulate N]
+[--accept-code-change OLD_HASH ...] [--accept-gate-change OLD_HASH]
 
-Run it through `run.sh`. `load_pipeline(phase="train")` sets `E00667_PHASE=train` before the fold module is imported, under which the fold month's cleaned power is
-NaN, so no code path can read a held-out reading. The row tables are read from
-`work/tables/<arm>/<month>_{era5,ens}.npz`, which `e00718_tables.py` builds in the prediction phase,
-and their hashes go into the log. Every arm is fitted with all three stages from the seed's own
-initialisation (design section 6.1); the encoders of `M*` are loaded from the Candidate chain and
-frozen. A real fit refuses to start without `work/known_answers_passed.json` (part 1's gate). The
-`--smoke` path skips the gate, writes under `work/smoke/`, stops each stage after 2 passes, and its
-outputs are never scored. A stage that ends at the 60-pass cap is rerun from its starting state with
-a cap of 120 passes. After the fit the hashes of experiment 713's selection file and the job's encoder file
-are asserted unchanged.
+Run it through `run.sh`. `load_pipeline(phase="train")` sets `E00667_PHASE=train` before the fold
+module is imported, under which the fold month's cleaned power is NaN, so no code path can read a
+held-out reading. The row tables are read from `work/tables/<arm>/<month>_{era5,ens}.npz`, which
+`e00718_tables.py` builds in the prediction phase, and their hashes go into the log. Every arm is
+fitted with all three stages from the seed's own initialisation (design section 6.1); the
+encoders of `M*` are loaded from the Candidate chain and frozen. A real fit refuses to start
+without `work/known_answers_passed.json` (part 1's gate). The `--smoke` path skips the gate,
+writes under `work/smoke/`, stops each stage after 2 passes, and its outputs are never scored. A
+stage that ends at the 60-pass cap is rerun from its starting state with a cap of 120 passes.
+After the fit the hashes of experiment 713's selection file and the job's encoder file are
+asserted unchanged.
 
-**Code policy.** Every stage log carries the code hash, the git commit, and a dirty flag. A resume, a
-finished-job skip, and the gate file are refused when their hash differs from the current code's,
-unless `--accept-code-change OLD_HASH` (stage states, repeatable) or `--accept-gate-change OLD_HASH`
-(the gate record) names the exact old hash.
-"""
+**Code policy.** Every stage log carries the code hash, the git commit, and a dirty flag. A
+resume, a finished-job skip, and the gate file are refused when their hash differs from the
+current code's, unless `--accept-code-change OLD_HASH` (stage states, repeatable) or
+`--accept-gate-change OLD_HASH` (the gate record) names the exact old hash.
+"""  # noqa: D205
 
 import argparse
 import copy
@@ -103,8 +106,8 @@ def inputs_digest(*, source: object, cutoff_idx: int) -> str:
     """Return a digest of the arrays that decide a table and that do not depend on the phase.
 
     The digest covers the pool weather, the day types, and the ensemble table for the origin days
-    before the fold's cutoff, which the training and prediction phases share. The ensemble table of
-    the fold's own days differs between the phases by design and is left out.
+    before the fold's cutoff, which the training and prediction phases share. The ensemble table
+    of the fold's own days differs between the phases by design and is left out.
     """
     h = hashlib.sha256()
     arrays = [source.dense_weather[..., :7], source.day_type]  # ty: ignore[unresolved-attribute]
@@ -122,9 +125,10 @@ def table_meta(
 ) -> dict[str, str]:  # fmt: skip
     """Return the provenance a row table carries.
 
-    It holds the hash of the builder's code, the phase the builder ran in (`pipe.fold.PHASE`), the arm,
-    the month, the standardiser fingerprint, a digest of the input arrays, and the `--limit-days` value
-    (`none` for a full build), so that a limited table never passes for a full one.
+    It holds the hash of the builder's code, the phase the builder ran in (`pipe.fold.PHASE`),
+    the arm, the month, the standardiser fingerprint, a digest of the input arrays, and the
+    `--limit-days` value (`none` for a full build), so that a limited table never passes for a
+    full one.
     """
     return {
         "builder_hash": table_code_hash(),
@@ -138,7 +142,9 @@ def table_meta(
 
 
 def fit_expectation(*, loaded: Loaded, arm: str, month: str) -> dict[str, str]:
-    """Return the provenance that a fit and a prediction require: a full table built in the prediction phase from these inputs."""
+    """Return the provenance that a fit and a prediction require: a full table built in the
+    prediction phase from these inputs.
+    """  # noqa: D205
     meta = table_meta(
         arm=arm, month=month, fingerprint=loaded.fingerprint, phase="predict", digest=loaded.inputs_digest,
     )  # fmt: skip
@@ -214,7 +220,9 @@ def new_model(
 
 
 def check_fingerprint(*, fingerprint: str, data_dir: Path, month: str) -> None:
-    """Write the fold's standardiser hash (under part 1's folder), or assert it is unchanged; the prediction phase compares it."""
+    """Write the fold's standardiser hash (under part 1's folder), or assert it is unchanged; the
+    prediction phase compares it.
+    """  # noqa: D205
     path = arms.root(data_dir=data_dir, part=1) / "work" / "standardiser" / f"{month}.sha256"
     if path.exists():
         assert path.read_text() == fingerprint, "the standardiser changed between two fits"
@@ -249,7 +257,9 @@ def fit(
     loader: Loader = real_loader, make_samples: Callable = tr.make_samples,
     encoders: str | None = None, tables: dict[str, ret.RowTable] | None = None,
 ) -> dict:  # fmt: skip
-    """Fit the three stages and return the log. `loader`, `make_samples`, `encoders`, and `tables` exist for the checks."""
+    """Fit the three stages and return the log. `loader`, `make_samples`, `encoders`, and `tables`
+    exist for the checks.
+    """  # noqa: D205
     spec = arms.resolve(arm=arm, accumulate=accumulate)
     log: dict = {"arm": arm, "month": month, "seed": seed, "smoke": smoke, "accumulate": accumulate}
     if not smoke:

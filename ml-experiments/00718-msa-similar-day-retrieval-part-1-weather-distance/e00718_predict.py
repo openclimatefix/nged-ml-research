@@ -1,17 +1,19 @@
 # ruff: noqa: E501, PT018
-"""Experiment 718: forecast one fold with a fitted network (prediction phase; design sections 6, 9, and 12).
+"""Experiment 718: forecast one fold with a fitted network (prediction phase; design sections 6, 9,
+and 12).
 
-Usage: e00718_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--tables VERSION] [--smoke] [--accept-code-change OLD_HASH ...]
+Usage: e00718_predict.py ARM MONTH SEED [--device cuda] [--mask-history] [--tables VERSION]
+[--smoke] [--accept-code-change OLD_HASH ...]
 
-Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`, which
-opens the fold month's scored window. It loads the stage 3 state, asserts that the fold's
-standardiser equals the training phase's, forecasts every (Primary, scored origin, lead day) with the
-rows of the arm's `ens` table, drops valid times on or after 2026-07-01, and writes
-`work/fits/<arm>/<month>_s<seed>.parquet` atomically with the columns of experiment 713's forecasts.
-`--mask-history` forecasts with all history power masked, under the name `<arm>-nohist`. `--tables
-swap` reads the rebuilt live-fair tables (the selection swap of design section 9) under the name
-`<arm>-swap`; the tokens still read ERA5.
-"""
+Run it through `run.sh`, in a separate process from the fit: it sets `E00667_PHASE=predict`,
+which opens the fold month's scored window. It loads the stage 3 state, asserts that the fold's
+standardiser equals the training phase's, forecasts every (Primary, scored origin, lead day) with
+the rows of the arm's `ens` table, drops valid times on or after 2026-07-01, and writes
+`work/fits/<arm>/<month>_s<seed>.parquet` atomically with the columns of experiment 713's
+forecasts. `--mask-history` forecasts with all history power masked, under the name
+`<arm>-nohist`. `--tables swap` reads the rebuilt live-fair tables (the selection swap of design
+section 9) under the name `<arm>-swap`; the tokens still read ERA5.
+"""  # noqa: D205
 
 import argparse
 import json
@@ -78,8 +80,9 @@ def forecast_frame(
                 primary=prim[sel], day=cc[sel] // 48, lead_day=lead[sel]
             )
             got = np.where(b.inputs.row_exists.cpu().numpy(), b.ages.cpu().numpy(), -1)
-            # A row of the table that holds no reading at all is reported absent by `row_exists`, as in
-            # experiment 713 (a fixed row of age 2 to 15 can be empty); every row that exists is the table's.
+            # A row of the table that holds no reading at all is reported absent by `row_exists`, as
+            # in experiment 713 (a fixed row of age 2 to 15 can be empty); every row that exists is
+            # the table's.
             assert np.array_equal(got[got >= 0], table_ages[got >= 0]), (
                 "the rows of a scored forecast differ from the row table"
             )

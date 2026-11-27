@@ -1,11 +1,12 @@
 # ruff: noqa: E501
-"""Experiment 718: arm specifications, the file layout, the job list, and the code hash (design sections 4, 6, 11, 15).
+"""Experiment 718: arm specifications, the file layout, the job list, and the code hash (design
+sections 4, 6, 11, 15).
 
 Part 1 owns arms `Z`, `R`, `R-A`, and `P90` (experiment 718), and part 2 owns `U`, `U-A`, `U27`,
 `U27-A`, and `UX` (experiment 719). Both parts run through this module, and each arm writes under
 its own part's data folder. Every arm uses `M*` of experiment 713, which `work/selection.json` of
 experiment 713 names: its encoders are loaded from the Candidate chain and frozen (`M1`).
-"""
+"""  # noqa: D205
 
 import functools
 import hashlib
@@ -262,8 +263,9 @@ def check_code(
     """Refuse a state or a gate written by other code, unless an override names its exact old hash.
 
     `accept` holds the values of `--accept-code-change` (stage states, repeatable) or
-    `--accept-gate-change` (the gate record). An override is appended to `record["code_overrides"]`
-    with both hashes and both git commits. A record without a code hash cannot be overridden.
+    `--accept-gate-change` (the gate record). An override is appended to
+    `record["code_overrides"]` with both hashes and both git commits. A record without a code
+    hash cannot be overridden.
     """
     gate = kind == "gate"
     now, old = (
@@ -312,11 +314,12 @@ def install_own_cache(*, data_dir: Path) -> Path:
 
 
 def watched_713_files(*, data_dir: Path, month: str, seed: int) -> dict[str, str]:
-    """Return the sha256 of the files of experiment 713 that this job reads: the selection file and the job's pre-trained encoders.
+    """Return the sha256 of the files of experiment 713 that this job reads: the selection file and
+    the job's pre-trained encoders.
 
     Experiment 713's own jobs write other files while F9 runs, so only files that F9 opens are
     hashed. A file that does not exist is recorded as `missing`.
-    """
+    """  # noqa: D205
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
 
     paths = [
@@ -337,7 +340,9 @@ def changed_watched_files(*, before: dict[str, str], after: dict[str, str]) -> l
 
 
 def cpu_only_cuda_calls() -> None:
-    """Map `.to("cuda")` calls in experiment 574's loader to the CPU, so that a CPU-only job can load a real fold."""
+    """Map `.to("cuda")` calls in experiment 574's loader to the CPU, so that a CPU-only job can
+    load a real fold.
+    """  # noqa: D205
     import torch  # ty: ignore[unresolved-import]
 
     original = torch.Tensor.to

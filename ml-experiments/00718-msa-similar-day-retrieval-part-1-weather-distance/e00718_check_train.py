@@ -1,12 +1,14 @@
 # ruff: noqa: E501
-"""Experiment 718, WP5a: check KR6 (the copied loop equals experiment 713's, and stage 3's shifts) on the CPU.
+"""Experiment 718, WP5a: check KR6 (the copied loop equals experiment 713's, and stage 3's shifts)
+on the CPU.
 
-KR6 runs experiment 713's `train_stage` and F9's `train_stage` with the rows of ages 2 to 15 (arm `Z`)
-from the same seed and samples for one pass of stage 1 under `torch.use_deterministic_algorithms`,
-and requires bit-identical shared parameters. It then compares the stage 3 history power of F9's
-`synthetic_source` with experiment 713's, which must be bit-identical on every row that `M*` read, and
-checks the half-batch normalisation of the memory rule. Usage: e00718_check_train.py
-"""
+KR6 runs experiment 713's `train_stage` and F9's `train_stage` with the rows of ages 2 to 15 (arm
+`Z`) from the same seed and samples for one pass of stage 1 under
+`torch.use_deterministic_algorithms`, and requires bit-identical shared parameters. It then
+compares the stage 3 history power of F9's `synthetic_source` with experiment 713's, which must
+be bit-identical on every row that `M*` read, and checks the half-batch normalisation of the
+memory rule. Usage: e00718_check_train.py
+"""  # noqa: D205
 
 import sys
 
@@ -112,7 +114,9 @@ def check_loop_equals_713() -> list[str]:
 
 
 def check_stage3_power() -> list[str]:
-    """KR6 (b): stage 3's history power equals experiment 713's wherever `M*` read it, and gains events over the older rows."""
+    """KR6 (b): stage 3's history power equals experiment 713's wherever `M*` read it, and gains
+    events over the older rows.
+    """  # noqa: D205
     source = cb.synthetic_source()
     world = synthetic_world(source=source)
     days = np.arange(cb.FIRST_ORIGIN_DAY, cb.FIRST_ORIGIN_DAY + cb.N_ORIGIN_DAYS)
@@ -142,7 +146,9 @@ def check_stage3_power() -> list[str]:
 
 
 def check_half_batches() -> str:
-    """The half-batch loss, divided by the weight sum of the full batch, gives the full batch's gradient (and the naive average does not)."""
+    """The half-batch loss, divided by the weight sum of the full batch, gives the full batch's
+    gradient (and the naive average does not).
+    """  # noqa: D205
     torch.manual_seed(1)
     net = f9.F9Net(seed=1).eval()
     inp = __import__("e00718_check_model").random_inputs(batch=8, n_history=14, seed=2)

@@ -159,8 +159,8 @@ for the eight's wider spread.
 no refit) raises the error of `R` by 0.30 points at the six [0.19, 0.41] and 0.30 at the eight
 [0.18, 0.45], at 95%.
 
-**The nearest-weather days forecast worse than the mixture of experiment 719.** [Experiment
-719](../00719-msa-similar-day-retrieval-part-2-union-of-measures/result.md) gave the network 5
+**The nearest-weather days forecast worse than the mixture of experiment 719.** Experiment
+719 (part 2) gave the network 5
 weather-nearest days, the 5 most recent days, and 4 days with the target day's weekday (the mixture
 `U`). Report-only at 95%, `R` minus `U` is +0.043 at the six [+0.005, +0.080] and +0.110 at the
 eight [+0.028, +0.193]. `R` minus the placebo neural network `P` (14 random days of the past year)

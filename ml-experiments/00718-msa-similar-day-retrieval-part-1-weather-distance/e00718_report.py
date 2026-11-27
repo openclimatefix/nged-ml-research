@@ -2,8 +2,10 @@
 """Experiment 718, WP8: print the tables of a part's `result.md` from the stored score files.
 
 Usage:
-    e00718_report.py PART        # contrast tables, verdict, guards, thresholds, closure, and departures, as markdown
-    e00718_report.py self-test   # renders the tables from the synthetic contrasts of `e00718_contrasts.py self-test`
+    e00718_report.py PART        # contrast tables, verdict, guards, thresholds, closure, and
+    departures, as markdown
+    e00718_report.py self-test   # renders the tables from the synthetic contrasts of
+    `e00718_contrasts.py self-test`
 
 Every number comes from `score/screen.json`, `score/headline.json`, `score/clean_folds.json`, and
 `score/report_only.json` of the part (written by `e00718_contrasts.py`). The script prints and never
@@ -33,7 +35,9 @@ def fmt(c: dict) -> str:
 
 
 def contrast_table(*, title: str, results: dict[str, dict], names: list[str]) -> list[str]:
-    """Return a markdown table of the counted contrasts: the point estimate and interval by group, the guards, and the reading."""
+    """Return a markdown table of the counted contrasts: the point estimate and interval by group,
+    the guards, and the reading.
+    """  # noqa: D205
     lines = [
         f"**{title}**",
         "",
@@ -50,7 +54,9 @@ def contrast_table(*, title: str, results: dict[str, dict], names: list[str]) ->
 
 
 def headline_block(*, h: dict, level_note: str = "98.75%") -> list[str]:
-    """Return the markdown of one part's headline: the counted contrasts, the verdict, the guards, and the sensitivity reading."""
+    """Return the markdown of one part's headline: the counted contrasts, the verdict, the guards,
+    and the sensitivity reading.
+    """  # noqa: D205
     a, b = [k for k in h if k[0] in {"A", "B"} and k[1:] in {"1", "2"}]
     lines = contrast_table(
         title=f"Counted contrasts at {level_note} ({h['n_seeds']} seeds per arm)",

@@ -9,7 +9,8 @@ tables of some arms for the last `--limit-days` origin days in memory (nothing i
 - KR2 (a): the batch assertions and the leakage poison on real samples, for both tables;
 - KR7: a real batch of arm `U` reads the age buckets that the table names;
 - KR2 (a) at table level: tables rebuilt for one origin day from power that is set to 1e6 or to NaN at
-  every half-hour newer than the contract origin minus 54 half-hours equal the tables built from the real
+  every half-hour newer than the contract origin minus 54 half-hours equal the tables built from the
+  real
   power, and power set to NaN just before that bound changes them (the negative control);
 - the CPU seconds of the build, per arm and in one pass, for the CPU budget of the full build.
 
@@ -53,7 +54,9 @@ def _same_tables(a: dict, b: dict) -> bool:
 
 
 def poisoned_rebuild(*, source, days: np.ndarray, wanted: list[str], holidays) -> list[str]:  # noqa: ANN001
-    """Rebuild the tables of the last two origin days from poisoned power, and compare (B1, KR2 (a) at table level)."""
+    """Rebuild the tables of the last two origin days from poisoned power, and compare (B1, KR2 (a)
+    at table level).
+    """  # noqa: D205
     lines = []
     for day in days[-2:]:
         one = np.array([day])

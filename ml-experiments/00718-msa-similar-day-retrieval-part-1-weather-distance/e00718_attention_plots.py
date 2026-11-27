@@ -1,15 +1,19 @@
 # ruff: noqa: E501
-"""Experiments 718 and 719: the read-out weights and the across-day attention of fitted networks, from stored states (no refit).
+"""Experiments 718 and 719: the read-out weights and the across-day attention of fitted networks,
+from stored states (no refit).
 
 Usage: e00718_attention_plots.py OUT_DIR PART [--month 2026-01] [--seed 0] [--device cuda]
 
-Loads each arm's stage 3 state of the fold and seed, builds the arm's batch for one test origin at two Primaries (D5 of the six,
-D8 of the eight) and lead day 1 (the day after the origin day), and uses `e00718_readouts.internals_for_case`. Writes two kinds of
-chart: `attention_part<P>_<arm>_<Primary>.svg` (left, the read-out weight alpha of each history row at each half-hour of the target
-day; right, the across-day attention of the last block's target-row query, averaged over heads and half-hours, per history row) and
-`alpha_by_age_part<P>.svg` (the mean total read-out weight by row age over 120 random (Primary, origin) cases, the same for every arm, counting only the cases that hold a row of that age). Rows are
-ordered by age, so a sorted order reads as recency. Plots only; the scores come from the contrast scripts.
-"""
+Loads each arm's stage 3 state of the fold and seed, builds the arm's batch for one test origin
+at two Primaries (D5 of the six, D8 of the eight) and lead day 1 (the day after the origin day),
+and uses `e00718_readouts.internals_for_case`. Writes two kinds of chart:
+`attention_part<P>_<arm>_<Primary>.svg` (left, the read-out weight alpha of each history row at
+each half-hour of the target day; right, the across-day attention of the last block's target-row
+query, averaged over heads and half-hours, per history row) and `alpha_by_age_part<P>.svg` (the
+mean total read-out weight by row age over 120 random (Primary, origin) cases, the same for every
+arm, counting only the cases that hold a row of that age). Rows are ordered by age, so a sorted
+order reads as recency. Plots only; the scores come from the contrast scripts.
+"""  # noqa: D205
 
 import argparse
 import sys
@@ -69,7 +73,9 @@ def load(*, arm: str, month: str, seed: int, device: str) -> tuple[f9.F9Net, fb.
 def case(
     *, model: f9.F9Net, source: fb.F9Source, primary: int, c_idx: int, lead_day: int
 ) -> dict[str, np.ndarray]:
-    """Return the read-out weights, across-day attention, and present rows of one case, built as `e00718_predict.py` builds a scored sample (ensemble inputs, no target cut)."""
+    """Return the read-out weights, across-day attention, and present rows of one case, built as
+    `e00718_predict.py` builds a scored sample (ensemble inputs, no target cut).
+    """  # noqa: D205
     dev = source.device
     one = lambda v: torch.tensor([v], dtype=torch.long, device=dev)  # noqa: E731
     batch = source.assemble(

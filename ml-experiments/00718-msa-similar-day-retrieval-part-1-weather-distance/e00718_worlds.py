@@ -1,21 +1,23 @@
 # ruff: noqa: E501
-"""Experiment 718, WP5b: the known-answer worlds WS and WN, their references, and the checks of the weather path (design section 10.2).
+"""Experiment 718, WP5b: the known-answer worlds WS and WN, their references, and the checks of the
+weather path (design section 10.2).
 
-World WS replaces the power with `y = 0.5 + c[p, era, regime of the block] + noise`, where the regime is a
-synthetic weather level written into six of the seven weather columns (every column except the 2 m
-temperature), so that only a past block of the same regime reveals the target's level. World WN is
-experiment 713's world W0 with the same regimes, with `c` equal to zero, and with a per-block level `e`
-that nothing at the origin reveals. This module builds the arrays and the NumPy references. The fits are
-in `e00718_known_answer.py`.
+World WS replaces the power with `y = 0.5 + c[p, era, regime of the block] + noise`, where the
+regime is a synthetic weather level written into six of the seven weather columns (every column
+except the 2 m temperature), so that only a past block of the same regime reveals the target's
+level. World WN is experiment 713's world W0 with the same regimes, with `c` equal to zero, and
+with a per-block level `e` that nothing at the origin reveals. This module builds the arrays and
+the NumPy references. The fits are in `e00718_known_answer.py`.
 
-The 21 date-time columns are the columns 14 to 34 of experiment 397's summary scheme. By name they are
-`cos_zenith`, `sin_azimuth`, `cos_azimuth`, `sin_hour`, `cos_hour`, `sin_hour_2`, `cos_hour_2`, `dow_1`
-to `dow_7`, `covid`, `christmas_inside`, `christmas_days`, `christmas_tent`, `bank_holiday`,
-`nearest_days`, and `nearest_inside`. None of them increases with the year, but `covid` is a flag that is
-1 in a fixed span of 2020 and 2021 and tells the network which era a training day lies in. The worlds set
-`covid` to zero, and `trending_columns` names any column whose correlation with the year exceeds 0.3, so that
-a run on real data can show the list.
-"""
+The 21 date-time columns are the columns 14 to 34 of experiment 397's summary scheme. By name
+they are `cos_zenith`, `sin_azimuth`, `cos_azimuth`, `sin_hour`, `cos_hour`, `sin_hour_2`,
+`cos_hour_2`, `dow_1` to `dow_7`, `covid`, `christmas_inside`, `christmas_days`,
+`christmas_tent`, `bank_holiday`, `nearest_days`, and `nearest_inside`. None of them increases
+with the year, but `covid` is a flag that is 1 in a fixed span of 2020 and 2021 and tells the
+network which era a training day lies in. The worlds set `covid` to zero, and `trending_columns`
+names any column whose correlation with the year exceeds 0.3, so that a run on real data can show
+the list.
+"""  # noqa: D205
 
 from dataclasses import dataclass
 from typing import Final
@@ -60,7 +62,9 @@ def datetime_names_match_prep() -> bool:
 def trending_columns(
     *, dense_datetime: torch.Tensor, year: np.ndarray, threshold: float = 0.3
 ) -> list[str]:
-    """Return the names of date-time columns whose correlation with `year` (per grid index) exceeds `threshold` in absolute value."""
+    """Return the names of date-time columns whose correlation with `year` (per grid index) exceeds
+    `threshold` in absolute value.
+    """  # noqa: D205
     x = dense_datetime[:, :, :].float().mean(dim=0).cpu().numpy()
     out = []
     for k, name in enumerate(DATETIME_NAMES):
@@ -78,7 +82,9 @@ def trending_columns(
 def neutralised_datetime(
     *, dense_datetime: torch.Tensor, extra: list[str] | None = None
 ) -> torch.Tensor:
-    """Return a copy of the date-time array with the columns of `ZEROED_COLUMNS` and `extra` set to zero (the standardised mean)."""
+    """Return a copy of the date-time array with the columns of `ZEROED_COLUMNS` and `extra` set to
+    zero (the standardised mean).
+    """  # noqa: D205
     out = dense_datetime.clone()
     for name in (*ZEROED_COLUMNS, *(extra or [])):
         out[..., DATETIME_NAMES.index(name)] = 0.0
@@ -105,14 +111,18 @@ class WorldArrays:
 
 
 def draw_regimes(*, n_blocks: int, seed: int = SEED) -> np.ndarray:
-    """Return (16, n_blocks) regimes, one of 32 levels, drawn independently and uniformly for each block and Primary."""
+    """Return (16, n_blocks) regimes, one of 32 levels, drawn independently and uniformly for each
+    block and Primary.
+    """  # noqa: D205
     return np.random.default_rng([seed, 11]).integers(
         0, N_REGIMES, size=(mdl.N_PRIMARIES, n_blocks)
     )
 
 
 def write_regimes(*, weather: torch.Tensor, regime: np.ndarray) -> torch.Tensor:
-    """Return `weather` with six of the seven weather columns set to `regime - 15.5` for every half-hour of the block; temperature and the B1 columns stay real."""
+    """Return `weather` with six of the seven weather columns set to `regime - 15.5` for every
+    half-hour of the block; temperature and the B1 columns stay real.
+    """  # noqa: D205
     out = weather.clone()
     n_grid = weather.shape[1]
     q = torch.from_numpy(
@@ -125,7 +135,9 @@ def write_regimes(*, weather: torch.Tensor, regime: np.ndarray) -> torch.Tensor:
 
 
 def era_of(*, n_grid: int, boundary: int) -> np.ndarray:
-    """Return the era of each grid index: 0 from `boundary` on (the last era), then 1, 2, ... backward in blocks of 730 days."""
+    """Return the era of each grid index: 0 from `boundary` on (the last era), then 1, 2, ...
+    backward in blocks of 730 days.
+    """  # noqa: D205
     t = np.arange(n_grid)
     return np.where(t >= boundary, 0, (boundary - 1 - t) // (ERA_DAYS * lay713.STEPS_PER_DAY) + 1)
 
@@ -163,7 +175,9 @@ def build_wn(
     cutoff: int,
     seed: int = SEED,
 ) -> WorldArrays:  # ty: ignore[unresolved-attribute]
-    """Return world WN: experiment 713's `W0`, the same regimes in the weather columns, `c = 0`, and a block level `e` (sd 0.05) that nothing at the origin reveals."""
+    """Return world WN: experiment 713's `W0`, the same regimes in the weather columns, `c = 0`, and
+    a block level `e` (sd 0.05) that nothing at the origin reveals.
+    """  # noqa: D205
     n_grid = template.n_grid
     n_blocks = int(block_of(t=np.array([n_grid - 1]))[0]) + 1
     regime = draw_regimes(n_blocks=n_blocks, seed=seed)
@@ -186,7 +200,9 @@ def build_wn(
 def to_world(
     *, arrays: WorldArrays, template: tr.bt.Source, device: str | torch.device
 ) -> tuple[tr.World, np.ndarray, np.ndarray]:  # ty: ignore[unresolved-attribute]
-    """Return the training `World` of a world: its targets end at the last era's start for WS (the era is never a training target), and at the cutoff for WN."""
+    """Return the training `World` of a world: its targets end at the last era's start for WS (the
+    era is never a training target), and at the cutoff for WN.
+    """  # noqa: D205
     shell = tr.bt.Source(  # ty: ignore[unresolved-attribute]
         power_z=template.power_z, dense_weather=arrays.weather.to(device), dense_datetime=arrays.datetime.to(device),
         day_type=template.day_type, ens=None,
@@ -203,7 +219,9 @@ def to_world(
 
 
 def held_out_samples(*, arrays: WorldArrays) -> tr.SampleSet:
-    """Return the held-out origins: the 60 days from the fold's cutoff, for the world's Primaries, with all 14 lead days read at prediction."""
+    """Return the held-out origins: the 60 days from the fold's cutoff, for the world's Primaries,
+    with all 14 lead days read at prediction.
+    """  # noqa: D205
     days = np.arange(
         arrays.cutoff // lay713.STEPS_PER_DAY, arrays.cutoff // lay713.STEPS_PER_DAY + HELD_OUT_DAYS
     )
@@ -214,10 +232,12 @@ def held_out_samples(*, arrays: WorldArrays) -> tr.SampleSet:
 
 
 def held_out_floor(*, arrays: WorldArrays) -> float:
-    """Return the mean absolute `e` over the held-out targets: each (origin day, lead day) pair counts once, so a block counts as often as pairs reach it.
+    """Return the mean absolute `e` over the held-out targets: each (origin day, lead day) pair
+    counts once, so a block counts as often as pairs reach it.
 
-    The origin on day `d` has contract index `48 d + 24`, whose lead-day-`L` target is block `d + 1 + L`.
-    """
+    The origin on day `d` has contract index `48 d + 24`, whose lead-day-`L` target is block `d +
+    1 + L`.
+    """  # noqa: D205
     first = arrays.cutoff // lay713.STEPS_PER_DAY
     weights = np.zeros(first + HELD_OUT_DAYS + lay713.N_LEAD_DAYS + 1)
     for d in range(first, first + HELD_OUT_DAYS):
@@ -237,11 +257,11 @@ def reference_gap(
 ) -> tuple[float, float]:  # fmt: skip
     """Return the reference MAE of two row sets, and so their gap (`mae_a - mae_b`) is `a - b`.
 
-    `rows_a` and `rows_b` are (S, 14, n_rows) age arrays for the held-out samples and lead days, with
-    -1 for an absent row. For a target block the reference estimates the level as the mean, over the
-    rows whose regime equals the target's, of each row's mean power minus 0.5, with weights
-    `max(0, 1 - age / 730)`, and estimates zero where no row matches. Its MAE is taken against the
-    target block's true level `y - 0.5` over every half-hour of the 14 target blocks.
+    `rows_a` and `rows_b` are (S, 14, n_rows) age arrays for the held-out samples and lead days,
+    with -1 for an absent row. For a target block the reference estimates the level as the mean,
+    over the rows whose regime equals the target's, of each row's mean power minus 0.5, with
+    weights `max(0, 1 - age / 730)`, and estimates zero where no row matches. Its MAE is taken
+    against the target block's true level `y - 0.5` over every half-hour of the 14 target blocks.
     """
     maes = []
     for rows in (rows_a, rows_b):
@@ -291,7 +311,9 @@ def world_tables(
     days: np.ndarray,
     device: str | torch.device = "cpu",
 ) -> ret.RowTable:  # ty: ignore[unresolved-attribute]
-    """Return the stage 1 (`era5`) row table of `arm` in a world: the pool reads the world's regimes and `y` as the finite flags."""
+    """Return the stage 1 (`era5`) row table of `arm` in a world: the pool reads the world's regimes
+    and `y` as the finite flags.
+    """  # noqa: D205
     z = torch.from_numpy(np.where(np.isfinite(arrays.y), 0.0, np.nan).astype(np.float32)).to(device)
     src = tr.bt.Source(
         power_z=z,

@@ -1,15 +1,17 @@
 # ruff: noqa: E501, PLR0911
-"""Experiment 718: retrieval of history rows, the placebo draws, and the row tables (design section 2).
+"""Experiment 718: retrieval of history rows, the placebo draws, and the row tables (design section
+2).
 
-A row table holds, for each (Primary, origin day, lead day), the ages of the history rows of one arm,
-newest first, and what chose each row. Training and prediction read the same table. The builders read
-only inputs that exist at the origin (design section 5): the target row's weather, the calendar, each
-pool block's age, whether the block holds power that the 27 h rule makes visible, and the pool
-blocks' own weather. No measure reads a power value, and eligibility reads whether a reading exists.
+A row table holds, for each (Primary, origin day, lead day), the ages of the history rows of one
+arm, newest first, and what chose each row. Training and prediction read the same table. The
+builders read only inputs that exist at the origin (design section 5): the target row's weather,
+the calendar, each pool block's age, whether the block holds power that the 27 h rule makes
+visible, and the pool blocks' own weather. No measure reads a power value, and eligibility reads
+whether a reading exists.
 
-All arrays are NumPy. The distance is computed in float64, and two blocks tie when their distances
-differ by less than 1e-9 relative, in which case the younger block wins.
-"""
+All arrays are NumPy. The distance is computed in float64, and two blocks tie when their
+distances differ by less than 1e-9 relative, in which case the younger block wins.
+"""  # noqa: D205
 
 import hashlib
 from collections.abc import Callable, Sequence
@@ -153,12 +155,13 @@ class RowTable:
 
 
 def day_class_for_grid(*, grid_start_us: int, n_grid: int, holidays: set[date]) -> np.ndarray:
-    """Return the calendar day class of every grid index, from the local date of the stamp minus 30 minutes.
+    """Return the calendar day class of every grid index, from the local date of the stamp minus 30
+    minutes.
 
     The classes are those of the exploration: 0 working weekday, 1 Saturday, 2 Sunday, 3 bank
     holiday in England, 4 bridge day from 27 to 31 December, 5 Christmas Eve weekday, and 6 first
     working days from 2 to 5 January. The order of tests is the exploration's.
-    """
+    """  # noqa: D205
     import e00713_layout as lay713  # ty: ignore[unresolved-import]
 
     local_s = lay713._local_seconds(grid_start_us=grid_start_us, n_grid=n_grid)
@@ -193,7 +196,10 @@ def _class_of_date(*, d: date, holidays: set[date]) -> int:
 
 
 def christmas_arrays(*, n_days: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return, per day number, the block start's offset in days from the nearest earlier 25 December, whether it lies from 20 December to 5 January, and its winter (the year of that 25 December)."""
+    """Return, per day number, the block start's offset in days from the nearest earlier 25
+    December, whether it lies from 20 December to 5 January, and its winter (the year of that 25
+    December).
+    """  # noqa: D205
     offsets = np.empty(n_days, dtype=np.float64)
     window = np.empty(n_days, dtype=bool)
     winter = np.empty(n_days, dtype=np.int64)
@@ -227,7 +233,8 @@ def eligible_ages(
     """Return which of `ages` hold at least 24 visible, finite half-hours (the exploration's rule).
 
     A reading is visible when its grid index is at most `contract_idx - 54`. A block that begins
-    before the grid start is not eligible. Only whether a reading exists is read, never its value.
+    before the grid start is not eligible. Only whether a reading exists is read, never its
+    value.
     """
     lo = contract_idx - lay.STEPS_PER_DAY * ages
     hi = np.minimum(lo + lay.STEPS_PER_DAY, contract_idx - NEWEST_VISIBLE_BEFORE_CONTRACT + 1)
@@ -275,8 +282,8 @@ def weather_distance(
 
     `pool_weather` is (A, 48, 7) float64 and `pool_day_type` (A, 48). The distance is the square
     root of the summed squared differences over the filled half-hours, scaled by 48 over their
-    number, plus 1.0 times the share of the 48 columns whose day type differs. A target row with no
-    filled half-hour has no distance, and the caller takes the youngest blocks.
+    number, plus 1.0 times the share of the 48 columns whose day type differs. A target row with
+    no filled half-hour has no distance, and the caller takes the youngest blocks.
     """
     n_filled = int(target.filled.sum())
     assert n_filled > 0, "a target row without weather has no distance"
@@ -289,7 +296,9 @@ def weather_distance(
 def calendar_distance(
     *, target: TargetRow, pool_day_class: np.ndarray, pool_offset: np.ndarray
 ) -> np.ndarray:
-    """Return the calendar distance of arm `UX`: the share of half-hours whose day class differs, plus the offset difference over 3."""
+    """Return the calendar distance of arm `UX`: the share of half-hours whose day class differs,
+    plus the offset difference over 3.
+    """  # noqa: D205
     assert target.day_class is not None
     share = (pool_day_class != target.day_class[None, :]).mean(axis=1)
     return share + np.abs(pool_offset - target.christmas_offset) / CALENDAR_OFFSET_DIVISOR
@@ -298,9 +307,9 @@ def calendar_distance(
 def same_weekday(*, ages: np.ndarray, lead_day: int) -> np.ndarray:
     """Return which block ages start on the same weekday as the target block.
 
-    The target block starts `lead_day` days after the origin day and a pool block `age` days before
-    it, so the two start weekdays agree when `lead_day + age` is a multiple of 7. Bank holidays are
-    ignored, as in the exploration.
+    The target block starts `lead_day` days after the origin day and a pool block `age` days
+    before it, so the two start weekdays agree when `lead_day + age` is a multiple of 7. Bank
+    holidays are ignored, as in the exploration.
     """
     return (ages + lead_day) % 7 == 0
 
@@ -309,12 +318,13 @@ def fill_union(
     *, weather_rows: np.ndarray, ages: np.ndarray, ok: np.ndarray, lead_day: int, n_weather: int,
     n_recent: int, n_weekday: int,
 ) -> tuple[list[int], list[int]]:  # fmt: skip
-    """Return the ages and measure codes of the union: weather rows, then recency rows, then weekday rows.
+    """Return the ages and measure codes of the union: weather rows, then recency rows, then weekday
+    rows.
 
     `weather_rows` holds the weather-nearest ages already ordered by the caller's measure, so the
-    first `n_weather` are used. A later measure that meets an age already chosen takes its next best
-    block, so no age repeats.
-    """
+    first `n_weather` are used. A later measure that meets an age already chosen takes its next
+    best block, so no age repeats.
+    """  # noqa: D205
     chosen = [int(a) for a in weather_rows[:n_weather]]
     measures = [lay.MEASURE_WEATHER] * len(chosen)
     taken = np.isin(ages, chosen)
@@ -339,10 +349,10 @@ def draw_matched(
 ) -> np.ndarray:  # fmt: skip
     """Return ages that replace `treatment_ages` one for one by drawing from the same age class.
 
-    Each replaced row is drawn uniformly, without repeats, from the eligible blocks of its age class
-    that are not in `exclude`. A class with too few blocks passes its shortfall to the next older
-    class, and a shortfall at the oldest class leaves fewer rows than were replaced, which the caller
-    pads with `ABSENT`. The result is sorted ascending.
+    Each replaced row is drawn uniformly, without repeats, from the eligible blocks of its age
+    class that are not in `exclude`. A class with too few blocks passes its shortfall to the next
+    older class, and a shortfall at the oldest class leaves fewer rows than were replaced, which
+    the caller pads with `ABSENT`. The result is sorted ascending.
     """
     bounds = lay.class_bounds(max_age=max_age)
     cls = lay.age_class(ages=treatment_ages)

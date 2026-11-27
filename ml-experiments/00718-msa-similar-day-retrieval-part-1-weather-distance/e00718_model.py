@@ -1,19 +1,20 @@
 # ruff: noqa: E501, PLR1714
 """Experiment 718: the axial-attention demand network with age-bucketed tables (design section 3).
 
-`F9Net` subclasses experiment 713's `MsaNet`. Experiment 713 indexes three parameter tables by the
-slot of a history row: `age_emb` (added to every token of a row), `beta_age` (added to the read-out
-logit), and the across-day `key_bias` (one entry per key row and head). Here the three tables are
-indexed by the age bucket of the row (`e00718_layout.age_bucket`), so a row keeps its meaning wherever
-it sits in the tensor, and the network reads the history rows as a set. The history may hold 14 or
-27 rows.
+`F9Net` subclasses experiment 713's `MsaNet`. Experiment 713 indexes three parameter tables by
+the slot of a history row: `age_emb` (added to every token of a row), `beta_age` (added to the
+read-out logit), and the across-day `key_bias` (one entry per key row and head). Here the three
+tables are indexed by the age bucket of the row (`e00718_layout.age_bucket`), so a row keeps its
+meaning wherever it sits in the tensor, and the network reads the history rows as a set. The
+history may hold 14 or 27 rows.
 
-The first 14 buckets (ages 2 to 15) are experiment 713's slots. The 14-row tables are built inside
-`MsaNet.__init__`, in experiment 713's random-number order, and extended afterwards: the 10 new
-rows of `age_emb` come from a generator of their own that is seeded by the network seed, and the new
-`beta_age` and key-bias entries start at zero. A fresh F9 network of seed `s` therefore equals a fresh
-`MsaNet` of seed `s` on every shared parameter, and every F9 arm of one seed starts from the same
-values. An F9 network with rows of ages 2 to 15 is experiment 713's network exactly.
+The first 14 buckets (ages 2 to 15) are experiment 713's slots. The 14-row tables are built
+inside `MsaNet.__init__`, in experiment 713's random-number order, and extended afterwards: the
+10 new rows of `age_emb` come from a generator of their own that is seeded by the network seed,
+and the new `beta_age` and key-bias entries start at zero. A fresh F9 network of seed `s`
+therefore equals a fresh `MsaNet` of seed `s` on every shared parameter, and every F9 arm of one
+seed starts from the same values. An F9 network with rows of ages 2 to 15 is experiment 713's
+network exactly.
 """
 
 import copy
@@ -75,11 +76,12 @@ class F9Attention(mdl.Attention):
         key_ok: torch.Tensor | None = None,
         key_ids: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Attend over the length-L axis of `x` (N, L, 64); `key_ids` (N, L) selects each key's bias.
+        """Attend over the length-L axis of `x` (N, L, 64); `key_ids` (N, L) selects each key's
+        bias.
 
-        `key_ids` None means that the keys are the target row and the buckets 0 to `L - 2` in order,
-        which is experiment 713's layout of ages 2 to 15 newest first.
-        """
+        `key_ids` None means that the keys are the target row and the buckets 0 to `L - 2` in
+        order, which is experiment 713's layout of ages 2 to 15 newest first.
+        """  # noqa: D205
         assert self.key_bias is not None
         n, length, _ = x.shape
         q, k, v = (
@@ -161,11 +163,12 @@ class F9Net(mdl.MsaNet):
     # ------------------------------------------------------------------ state of experiment 713
 
     def load_mstar_state(self, state: dict[str, torch.Tensor]) -> None:
-        """Load a state of experiment 713's `MsaNet` (arm `M`): the 14-row tables fill the first buckets.
+        """Load a state of experiment 713's `MsaNet` (arm `M`): the 14-row tables fill the first
+        buckets.
 
-        The shared parameters are copied, `age_emb` and `beta_age` fill their first 14 rows, and each
-        key bias fills its first 15 entries. The new rows and entries keep their values.
-        """
+        The shared parameters are copied, `age_emb` and `beta_age` fill their first 14 rows, and
+        each key bias fills its first 15 entries. The new rows and entries keep their values.
+        """  # noqa: D205
         mine = self.state_dict()
         for key, value in state.items():
             assert key in mine, f"{key} is not a parameter of F9Net"
@@ -183,10 +186,10 @@ class F9Net(mdl.MsaNet):
 
     # ------------------------------------------------------------------ forward
 
-    # In the standard layout (the history rows are the buckets 0 to H - 1 in order, which is the layout of
-    # experiment 713) the three tables are read with experiment 713's slices, so that their gradients are
-    # summed in experiment 713's order and an F9 fit of arm `Z` is bit-identical to experiment 713's loop.
-    # Any other layout reads the tables by bucket.
+    # In the standard layout (the history rows are the buckets 0 to H - 1 in order, which is the
+    # layout of experiment 713) the three tables are read with experiment 713's slices, so that
+    # their gradients are summed in experiment 713's order and an F9 fit of arm `Z` is bit-identical
+    # to experiment 713's loop. Any other layout reads the tables by bucket.
 
     def _tokens_f9(
         self, inp: F9Inputs, *, standard: bool
@@ -264,8 +267,8 @@ class F9Net(mdl.MsaNet):
     def forward(self, inp: F9Inputs, *, return_attention: bool = False) -> mdl.MsaOutput:  # ty: ignore[invalid-method-override]
         """Return the raw mixture outputs of the 48 target tokens of each sample.
 
-        With `return_attention` the output also holds the attention weights of every block and the
-        64-number vector that enters the head; the flag only records.
+        With `return_attention` the output also holds the attention weights of every block and
+        the 64-number vector that enters the head; the flag only records.
         """
         assert inp.age_bucket is not None
         h = inp.n_history

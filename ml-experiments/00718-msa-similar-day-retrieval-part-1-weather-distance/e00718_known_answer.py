@@ -1,18 +1,24 @@
 # ruff: noqa: PT017, E501, PLR0915, PT018
-"""Experiment 718, WP5b: the known-answer gate (design section 10.2): checks KS1 to KS3 on worlds WS and WN.
+"""Experiment 718, WP5b: the known-answer gate (design section 10.2): checks KS1 to KS3 on worlds WS
+and WN.
 
-Usage: e00718_known_answer.py MONTH [--device cuda]   # the real gate: needs the fold's stored data and the GPU
-       e00718_known_answer.py --selftest              # CPU only: the checks' logic, and a two-pass fit in a tiny world
+Usage: e00718_known_answer.py MONTH [--device cuda]   # the real gate: needs the fold's stored data
+and the GPU
+       e00718_known_answer.py --selftest              # CPU only: the checks' logic, and a two-pass
+       fit in a tiny world
 
-Each gating fit is stage 1 alone on a world's samples, for a fixed 120 passes with no early stopping. The
+Each gating fit is stage 1 alone on a world's samples, for a fixed 120 passes with no early
+stopping. The
 metric is the MAE of the median on the 60 held-out origin days after the fold's cutoff (all 14 lead days).
-For each seed the metric is the median over the evaluations after passes 80, 90, 100, 110, and 120, and a
-check reads the median over seeds 0, 1, and 2. The pre-check computes the NumPy references' gaps under the
+For each seed the metric is the median over the evaluations after passes 80, 90, 100, 110, and 120,
+and a
+check reads the median over seeds 0, 1, and 2. The pre-check computes the NumPy references' gaps
+under the
 era layout before any fit, and stops with no fit if one gap is below 0.010. The script writes
 `work/known_answers_passed.json` only if every check that it can read passes. A KS3 precondition that
 fails leaves the two difference tests unread and sends them to the manager; the floor test stays
 unconditional. WS+, `U27` in WS, and the frozen-encoder fit are not part of this script.
-"""
+"""  # noqa: D205
 
 import argparse
 import hashlib
@@ -109,7 +115,9 @@ def fit_world_arm(
     seed: int, passes: int = PASSES, eval_passes: Sequence[int] = EVAL_PASSES, device: str = "cpu", max_steps: int | None = None,
     samples: tr.SampleSet | None = None,
 ) -> dict:  # fmt: skip
-    """Fit stage 1 of `arm` for a fixed number of passes with no early stopping and return the MAE trajectory and the metric."""
+    """Fit stage 1 of `arm` for a fixed number of passes with no early stopping and return the MAE
+    trajectory and the metric.
+    """  # noqa: D205
     torch.manual_seed(seed)
     if samples is None:
         samples = tr.make_samples(world=world, stage=1, placebo=False, primaries=worlds.PRIMARIES)
@@ -174,7 +182,9 @@ def arm_score(*, fits: dict[str, list[dict]], arm: str) -> float:
 def evaluate_checks(
     *, ws: dict[str, float], wn: dict[str, float], gaps: dict[str, float], floor: float
 ) -> dict:
-    """Return KS1 to KS3 from the scores of the arms in worlds WS and WN (`Z` is `M`), the references' gaps, and WN's floor."""
+    """Return KS1 to KS3 from the scores of the arms in worlds WS and WN (`Z` is `M`), the
+    references' gaps, and WN's floor.
+    """  # noqa: D205
     t = THRESHOLDS
     out: dict = {}
     ks1_a, ks1_b = ws["P90"] - ws["R"], ws["Z"] - ws["R"]
@@ -225,12 +235,13 @@ def write_gate(*, data_dir: Path, result: dict) -> Path:
 
 
 def finish(*, data_dir: Path, result: dict, manager_note: Path | None = None) -> int:
-    """Write the result record in every case, and the gate file only when every check passes and KS3 was read.
+    """Write the result record in every case, and the gate file only when every check passes and KS3
+    was read.
 
-    A passing run whose KS3 precondition failed writes the gate file only when
-    `manager_note` names the manager's written decision; the note's path and sha256 go into the result
-    record, the gate file, and every fit log.
-    """
+    A passing run whose KS3 precondition failed writes the gate file only when `manager_note`
+    names the manager's written decision; the note's path and sha256 go into the result record,
+    the gate file, and every fit log.
+    """  # noqa: D205
     checks = result.get("checks")
     ok = bool(checks and checks["all_pass"])
     read = bool(checks and not checks["ks3_unread"])
@@ -260,7 +271,9 @@ def finish(*, data_dir: Path, result: dict, manager_note: Path | None = None) ->
 def tables_for(
     *, arm_list: Sequence[str], template: object, arrays: worlds.WorldArrays, days: np.ndarray
 ) -> dict[str, ret.RowTable]:
-    """Return the stage 1 row table of every F9 arm in `arm_list` for a world (the placebo `U-A` needs the table of its own arm)."""
+    """Return the stage 1 row table of every F9 arm in `arm_list` for a world (the placebo `U-A`
+    needs the table of its own arm).
+    """  # noqa: D205
     return {
         a: worlds.world_tables(arm=a, template=template, arrays=arrays, days=days)
         for a in arm_list
@@ -329,7 +342,9 @@ def _check_finish(*, good: dict, bad_wn: dict, good_ws: dict, gaps: dict) -> Non
 
 
 def selftest() -> int:
-    """Check the checks' logic, the real-budget rule, and a two-pass fit of arms `Z`, `R`, and `N` in a tiny world on the CPU."""
+    """Check the checks' logic, the real-budget rule, and a two-pass fit of arms `Z`, `R`, and `N`
+    in a tiny world on the CPU.
+    """  # noqa: D205
     good_ws = {"Z": 0.12, "R": 0.03, "P90": 0.10, "U": 0.03, "U-A": 0.09, "N": 0.2}
     good_wn = {"Z": 0.045, "R": 0.047, "U": 0.046, "N": 0.05}
     gaps = {"gap_R": 0.033, "gap_RM": 0.023, "gap_U": 0.05}
@@ -436,7 +451,9 @@ def selftest() -> int:
 
 
 def precheck(*, month: str, last_era_days: int) -> int:
-    """Run the pre-check of world WS on the real grid on the CPU (no fit): print the three gaps and the gap of `U` with its rows older than 91 days hidden."""
+    """Run the pre-check of world WS on the real grid on the CPU (no fit): print the three gaps and
+    the gap of `U` with its rows older than 91 days hidden.
+    """  # noqa: D205
     import e00422_prep as prep422  # ty: ignore[unresolved-import]  # noqa: F401
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
     import e00718_check_real as cr
@@ -472,7 +489,9 @@ def precheck(*, month: str, last_era_days: int) -> int:
 
 
 def run(*, month: str, device: str, manager_note: Path | None = None) -> int:
-    """Run the pre-check and the gating fits for the fold `month` and write the gate file (needs the stored data and the GPU)."""
+    """Run the pre-check and the gating fits for the fold `month` and write the gate file (needs the
+    stored data and the GPU).
+    """  # noqa: D205
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
 

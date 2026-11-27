@@ -1,8 +1,10 @@
 # ruff: noqa: E501
-"""Experiment 718, B1: the checks that need a built fold's tables (design sections 10.1 and 11), on the CPU.
+"""Experiment 718, B1: the checks that need a built fold's tables (design sections 10.1 and 11), on
+the CPU.
 
 Usage:
-    run.sh e00718_check_built.py MONTH [--samples 1000]         # prediction phase: KR8, KR3, KR7, KR1 (a)
+    run.sh e00718_check_built.py MONTH [--samples 1000]         # prediction phase: KR8, KR3, KR7,
+    KR1 (a)
     run.sh e00718_check_built.py MONTH --kr2c [--days 12]       # training phase: KR2 (c)
 
 The default mode loads the fold in the prediction phase and every table that `e00718_build_tables.py`
@@ -19,7 +21,7 @@ wrote for it, with the provenance asserted, and checks them against the loaded a
 `--kr2c` loads the fold in the training phase and rebuilds the tables of the arms present for random
 training days, which must equal the stored tables (built in the prediction phase) bit for bit. It
 writes nothing under the data folder.
-"""
+"""  # noqa: D205
 
 import argparse
 import sys
@@ -82,11 +84,12 @@ def kr1a(
     source,  # noqa: ANN001
     device: str = "cpu",
 ) -> str:
-    """KR1 (a): arm `Z` with `M*`'s stage 3 state reproduces experiment 713's stored forecast of the first scored origins.
+    """KR1 (a): arm `Z` with `M*`'s stage 3 state reproduces experiment 713's stored forecast of the
+    first scored origins.
 
-    On the CPU this is a smoke reading at 1e-5. On `cuda` it is the required check, at the pre-registered
-    1e-6.
-    """
+    On the CPU this is a smoke reading at 1e-5. On `cuda` it is the required check, at the
+    pre-registered 1e-6.
+    """  # noqa: D205
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
     import e00713_arms as a713  # ty: ignore[unresolved-import]
@@ -139,13 +142,15 @@ def kr1a(
 
 
 def kr7(*, source, tables: dict[str, dict], arm: str, n: int = 256) -> str:  # noqa: ANN001
-    """KR7: the assembled age buckets are the layout's function of the assembled ages, and the ages are the table's."""
+    """KR7: the assembled age buckets are the layout's function of the assembled ages, and the ages
+    are the table's.
+    """  # noqa: D205
     f9 = fb.F9Source(base=source, tables=tables[arm])
     rng = np.random.default_rng(7)
     table = tables[arm][fb.TABLE_ENS]
     primary = rng.choice(table.primaries, size=n)
-    # The ensemble table covers fewer days than the row tables of a full fold, and a batch assembles only
-    # origin days inside it.
+    # The ensemble table covers fewer days than the row tables of a full fold, and a batch assembles
+    # only origin days inside it.
     ens = source.ens
     c_all = lay.contract_idx_of_day(day=table.days)
     inside = table.days[
@@ -160,8 +165,9 @@ def kr7(*, source, tables: dict[str, dict], arm: str, n: int = 256) -> str:  # n
         lead_day=torch.from_numpy(lead), ensemble=True,
     )  # fmt: skip
     ages = batch.ages.cpu().numpy()
-    # A fixed row (arms Z and U27) is in the table but can hold no visible power, so `row_exists` is not
-    # the table's presence, and the absent filler age is a valid age. The table's own ages are the reference.
+    # A fixed row (arms Z and U27) is in the table but can hold no visible power, so `row_exists` is
+    # not the table's presence, and the absent filler age is a valid age. The table's own ages are
+    # the reference.
     c_idx = lay.contract_idx_of_day(day=day)
     table_ages, _ = f9.rows_of(primary=primary, c_idx=c_idx, lead_day=lead, ensemble=True)
     exists = table_ages >= 0

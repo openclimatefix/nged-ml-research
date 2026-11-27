@@ -1,14 +1,15 @@
 # ruff: noqa: E501
-"""Experiment 718: the arms' row counts, the age buckets, and the age classes (design sections 2 and 3).
+"""Experiment 718: the arms' row counts, the age buckets, and the age classes (design sections 2 and
+3).
 
 A block is a 24-hour row of 48 half-hours that starts at 12:00 UTC, and its age is the number of
 days from its start to the contract origin. Experiment 713 indexes three parameter tables by the
-slot of a history row. This experiment indexes them by an age bucket: ages 2 to 15 keep one bucket
-each (buckets 0 to 13), and ten further buckets (14 to 23) cover older ages. The placebos draw from
-age classes, which are the single class of ages 2 to 15 and each older bucket.
+slot of a history row. This experiment indexes them by an age bucket: ages 2 to 15 keep one
+bucket each (buckets 0 to 13), and ten further buckets (14 to 23) cover older ages. The placebos
+draw from age classes, which are the single class of ages 2 to 15 and each older bucket.
 
 This module is pure index arithmetic, with no data access and no torch.
-"""
+"""  # noqa: D205
 
 from typing import Final
 
@@ -90,5 +91,7 @@ def block_index(*, contract_idx: np.ndarray | int, ages: np.ndarray) -> np.ndarr
 
 
 def contract_idx_of_day(*, day: np.ndarray | int) -> np.ndarray:
-    """Return the grid index of 12:00 UTC on day number `day` (the grid index of 00:00 divided by 48), `48 day + 24`."""
+    """Return the grid index of 12:00 UTC on day number `day` (the grid index of 00:00 divided by
+    48), `48 day + 24`.
+    """  # noqa: D205
     return np.asarray(day, dtype=np.int64) * STEPS_PER_DAY + 24

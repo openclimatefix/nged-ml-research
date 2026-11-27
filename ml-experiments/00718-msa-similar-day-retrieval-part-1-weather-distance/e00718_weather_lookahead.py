@@ -1,22 +1,25 @@
 # ruff: noqa: E501
-"""Experiment 718: print the retrieval's weather look-ahead statement (KR8), and check a row table against it.
+"""Experiment 718: print the retrieval's weather look-ahead statement (KR8), and check a row table
+against it.
 
 Usage: e00718_weather_lookahead.py [--origin 2026-03-10] [--primary D5] [--arm U] [--self-test]
 
 The statement is experiment 713's statement for the 14 fixed rows, followed by one line for each
 retrieval measure of the arm: what the measure reads, the issue time or valid time of each input
 against the forecast origin, and the oldest and newest age it can choose. The retrieval reads two
-kinds of weather. The target row's 14 days come from the ensemble mean of the 00Z run of the origin
-day, which was issued before the native origin, and the pool's weather is the analysis valid at each
-history block's own times, so a block of age 2 or more is valid before the contract origin.
+kinds of weather. The target row's 14 days come from the ensemble mean of the 00Z run of the
+origin day, which was issued before the native origin, and the pool's weather is the analysis
+valid at each history block's own times, so a block of age 2 or more is valid before the contract
+origin.
 
 `check_table` reads a row table and the retrieval arrays, and returns one PASS or FAIL line per
 table. It passes when every chosen age is at least 2 (no block valid at or after the contract
 origin), at most the pool's oldest age, and eligible under the visibility rule at its contract
-origin, which is the rule that no power reading newer than 54 half-hours before the contract origin
-is read. `--self-test` builds a tiny synthetic table and prints the statement and the PASS line.
-`check_table` takes the finite power flags, not the builder's arrays, so that it stays independent of the builder.
-"""
+origin, which is the rule that no power reading newer than 54 half-hours before the contract
+origin is read. `--self-test` builds a tiny synthetic table and prints the statement and the PASS
+line. `check_table` takes the finite power flags, not the builder's arrays, so that it stays
+independent of the builder.
+"""  # noqa: D205
 
 import argparse
 import sys
@@ -83,15 +86,16 @@ def statement(*, contract: datetime, primary: str, arm: str, lead_day: int = 0) 
 
 
 def check_table(*, table: ret.RowTable, finite: np.ndarray) -> str:
-    """Return the PASS or FAIL line for `table`, read against `finite` (P, G) bool, the grid's finite power flags.
+    """Return the PASS or FAIL line for `table`, read against `finite` (P, G) bool, the grid's
+    finite power flags.
 
-    The check does not call the builder's eligibility function. It builds its own cumulative count of
-    the flags and applies the rule of design section 2 with the constants of the independent
-    recomputation: a row's age is at least 2 and at most the pool's oldest age, and every row that is
-    not one of the fixed rows holds at least 24 readings at grid indices up to 54 half-hours before
-    the contract origin. The fixed rows (ages 2 to 15 of `Z`, `U27`, and `U27-A`) are exempt from
-    eligibility, as in design section 2.1.
-    """
+    The check does not call the builder's eligibility function. It builds its own cumulative
+    count of the flags and applies the rule of design section 2 with the constants of the
+    independent recomputation: a row's age is at least 2 and at most the pool's oldest age, and
+    every row that is not one of the fixed rows holds at least 24 readings at grid indices up to
+    54 half-hours before the contract origin. The fixed rows (ages 2 to 15 of `Z`, `U27`, and
+    `U27-A`) are exempt from eligibility, as in design section 2.1.
+    """  # noqa: D205
     import e00718_retrieval_reference as ref
 
     cs = np.concatenate(
@@ -127,7 +131,9 @@ def check_table(*, table: ret.RowTable, finite: np.ndarray) -> str:
 
 
 def self_test() -> list[str]:
-    """Build the synthetic table of arm `U`, and return its statement and PASS line; a corrupted table must FAIL."""
+    """Build the synthetic table of arm `U`, and return its statement and PASS line; a corrupted
+    table must FAIL.
+    """  # noqa: D205
     import e00718_check_batch as cb
 
     source = cb.synthetic_source()

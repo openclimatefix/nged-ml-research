@@ -1,12 +1,13 @@
 # ruff: noqa: E501, PLR0915, E731, PT017
-"""Experiment 718, WP5a: check the fit's resume and refusal rules on the CPU with a tiny synthetic fold.
+"""Experiment 718, WP5a: check the fit's resume and refusal rules on the CPU with a tiny synthetic
+fold.
 
-The checks run `fit` with `smoke=True` (two passes per stage), random encoders, and the row tables of
-arm `U` on a synthetic source. They cover a crash during stage 2 followed by a resume that reuses the
-stage 1 state file, the refusal of a stage log written by other code and its named override, the
-refusal of a missing known-answer gate file, and the assertion that experiment 713's files are
-untouched. Usage: e00718_check_fit.py
-"""
+The checks run `fit` with `smoke=True` (two passes per stage), random encoders, and the row
+tables of arm `U` on a synthetic source. They cover a crash during stage 2 followed by a resume
+that reuses the stage 1 state file, the refusal of a stage log written by other code and its
+named override, the refusal of a missing known-answer gate file, and the assertion that
+experiment 713's files are untouched. Usage: e00718_check_fit.py
+"""  # noqa: D205
 
 import json
 import sys

@@ -1,18 +1,20 @@
 # ruff: noqa: E501, PT018
-"""Experiment 718, WP6: the report-only read-outs of stored states, with no refit (design section 12).
+"""Experiment 718, WP6: the report-only read-outs of stored states, with no refit (design section
+12).
 
-This module holds four read-outs. (1) `swap_table` rebuilds a row table with the live-fair rule of
-section 9: blocks of ages 2 to 5 read the stored ensemble forecast in the distance, and blocks of age 6
-or more read the analysis; `share_changed` counts the rows that the swap changes. (2) `alpha_by_bucket`
-and `alpha_by_measure` sum the read-out weights `alpha` over the age bucket and over the measure that
-chose each row. (3) `extract` runs a network with `return_attention=True` and returns the attention of
-every block, `alpha`, and the 64-number vector that enters the head. (4) The masked-history and
-swapped-table predictions are options of `e00718_predict.py` (`--mask-history`, `--tables swap`).
+This module holds four read-outs. (1) `swap_table` rebuilds a row table with the live-fair rule
+of section 9: blocks of ages 2 to 5 read the stored ensemble forecast in the distance, and blocks
+of age 6 or more read the analysis; `share_changed` counts the rows that the swap changes. (2)
+`alpha_by_bucket` and `alpha_by_measure` sum the read-out weights `alpha` over the age bucket and
+over the measure that chose each row. (3) `extract` runs a network with `return_attention=True`
+and returns the attention of every block, `alpha`, and the 64-number vector that enters the head.
+(4) The masked-history and swapped-table predictions are options of `e00718_predict.py`
+(`--mask-history`, `--tables swap`).
 
-The functions take their inputs as arguments, so that the checks run on synthetic batches. The reader of
-the stored ensemble forecast (`e00560_data.raw_table(source="ft")`) is passed in as `ft_weather`; it is
-not called here. Usage: e00718_readouts.py self-test
-"""
+The functions take their inputs as arguments, so that the checks run on synthetic batches. The
+reader of the stored ensemble forecast (`e00560_data.raw_table(source="ft")`) is passed in as
+`ft_weather`; it is not called here. Usage: e00718_readouts.py self-test
+"""  # noqa: D205
 
 import argparse
 import sys
@@ -44,7 +46,9 @@ def swap_table(
 
 
 def share_changed(*, base: ret.RowTable, swapped: ret.RowTable) -> dict[str, float]:
-    """Return the share of history rows that the swap changes, and the share of (sample, lead day) rows with any change."""
+    """Return the share of history rows that the swap changes, and the share of (sample, lead day)
+    rows with any change.
+    """  # noqa: D205
     assert base.ages.shape == swapped.ages.shape
     rows = base.ages != swapped.ages
     return {
@@ -56,12 +60,13 @@ def share_changed(*, base: ret.RowTable, swapped: ret.RowTable) -> dict[str, flo
 def mean_distance_by_lead(
     *, table: ret.RowTable, measure: int | None = lay.MEASURE_WEATHER
 ) -> np.ndarray:
-    """Return the mean selected weather distance of each lead day (14,), over the rows chosen by `measure` (None: every row).
+    """Return the mean selected weather distance of each lead day (14,), over the rows chosen by
+    `measure` (None: every row).
 
-    The `era5` table gives stage 1's value and the `ens` table gives stages 2 and 3's, which is the
-    comparison that section 12 asks for. Rows with no distance (absent rows, targets with no weather)
-    are left out.
-    """
+    The `era5` table gives stage 1's value and the `ens` table gives stages 2 and 3's, which is
+    the comparison that section 12 asks for. Rows with no distance (absent rows, targets with no
+    weather) are left out.
+    """  # noqa: D205
     assert table.distance is not None, "the table holds no distances: rebuild it"
     d = table.distance.astype(np.float64)
     d = np.where(np.isfinite(d), d, np.nan)  # calendar rows carry an infinite distance
@@ -75,9 +80,9 @@ def mean_distance_by_lead(
 def alpha_by_bucket(*, alpha: torch.Tensor, age_bucket: torch.Tensor) -> np.ndarray:
     """Return the mean total read-out weight of each of the 24 age buckets.
 
-    `alpha` is (B, H, 48) with weights that sum to 1 over the rows H of a (sample, half-hour), or to 0
-    where nothing is visible; `age_bucket` is (B, H). The result is (24,) and sums to the share of
-    (sample, half-hour) cells that have a visible row.
+    `alpha` is (B, H, 48) with weights that sum to 1 over the rows H of a (sample, half-hour), or
+    to 0 where nothing is visible; `age_bucket` is (B, H). The result is (24,) and sums to the
+    share of (sample, half-hour) cells that have a visible row.
     """
     mass = alpha.sum(dim=2) / alpha.shape[2]
     out = torch.zeros(lay.N_BUCKETS, dtype=mass.dtype)
@@ -86,7 +91,9 @@ def alpha_by_bucket(*, alpha: torch.Tensor, age_bucket: torch.Tensor) -> np.ndar
 
 
 def alpha_by_measure(*, alpha: torch.Tensor, measure: torch.Tensor) -> np.ndarray:
-    """Return the mean total read-out weight of each measure code (weather, recency, weekday, fixed, calendar, random)."""
+    """Return the mean total read-out weight of each measure code (weather, recency, weekday, fixed,
+    calendar, random).
+    """  # noqa: D205
     mass = alpha.sum(dim=2) / alpha.shape[2]
     out = torch.zeros(len(lay.MEASURE_NAMES), dtype=mass.dtype)
     out.index_add_(0, measure.reshape(-1), mass.reshape(-1))
@@ -94,7 +101,9 @@ def alpha_by_measure(*, alpha: torch.Tensor, measure: torch.Tensor) -> np.ndarra
 
 
 def extract(*, model: f9.F9Net, inputs: f9.F9Inputs) -> dict[str, torch.Tensor]:
-    """Return the attention of every block, `alpha`, and the head's input vector, with the network in evaluation mode."""
+    """Return the attention of every block, `alpha`, and the head's input vector, with the network
+    in evaluation mode.
+    """  # noqa: D205
     model.eval()
     with torch.no_grad():
         out = model(inputs, return_attention=True)
@@ -105,11 +114,13 @@ def extract(*, model: f9.F9Net, inputs: f9.F9Inputs) -> dict[str, torch.Tensor]:
 def internals_for_case(
     *, model: f9.F9Net, source: fb.F9Source, primary: int, c_idx: int, lead_day: int
 ) -> dict[str, np.ndarray]:
-    """Return the read-out weights, the across-day attention, and the rows of one (Primary, contract origin, lead day) case.
+    """Return the read-out weights, the across-day attention, and the rows of one (Primary, contract
+    origin, lead day) case.
 
-    The arrays are `alpha` (H, 48), `across` (48, heads, 1 + H) of the last block (the target row's
-    query), `ages` (H,), `measure` (H,), `hist_power` (H, 48) in standardised units, and `hist_idx` (H,).
-    """
+    The arrays are `alpha` (H, 48), `across` (48, heads, 1 + H) of the last block (the target
+    row's query), `ages` (H,), `measure` (H,), `hist_power` (H, 48) in standardised units, and
+    `hist_idx` (H,).
+    """  # noqa: D205
     dev = source.device
     one = lambda v: torch.tensor([v], dtype=torch.long, device=dev)  # noqa: E731
     batch = source.assemble(

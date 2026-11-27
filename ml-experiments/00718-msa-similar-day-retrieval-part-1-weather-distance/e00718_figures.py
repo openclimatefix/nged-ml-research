@@ -2,14 +2,21 @@
 """Experiment 718, WP8: the figures of both parts, from stored row tables, forecasts, and read-outs.
 
 Usage:
-    e00718_figures.py ages OUT_DIR PART           # ages of the retrieved rows per arm (R, R-A, P90 side by side in part 1)
-    e00718_figures.py distance OUT_DIR PART       # mean selected distance by lead day, stage 1 against stages 2 and 3
-    e00718_figures.py contrasts OUT_DIR PART      # each counted contrast at every one of the 16 Primaries, with the group's reading
-    e00718_figures.py series OUT_DIR PART         # day-ahead and 14-day forecasts of M*, R (or U), their placebo, and C beside the actual
-    e00718_figures.py weights OUT_DIR PART        # the read-out weights alpha by age bucket and by measure, and the across-day attention maps
-    e00718_figures.py self-test                   # builds every chart from synthetic data and checks its specification
+    e00718_figures.py ages OUT_DIR PART           # ages of the retrieved rows per arm (R, R-A, P90
+    side by side in part 1)
+    e00718_figures.py distance OUT_DIR PART       # mean selected distance by lead day, stage 1
+    against stages 2 and 3
+    e00718_figures.py contrasts OUT_DIR PART      # each counted contrast at every one of the 16
+    Primaries, with the group's reading
+    e00718_figures.py series OUT_DIR PART         # day-ahead and 14-day forecasts of M*, R (or U),
+    their placebo, and C beside the actual
+    e00718_figures.py weights OUT_DIR PART        # the read-out weights alpha by age bucket and by
+    measure, and the across-day attention maps
+    e00718_figures.py self-test                   # builds every chart from synthetic data and
+    checks its specification
 
-The charts read stored files and fit nothing. The series charts count hours or days from the origin, and
+The charts read stored files and fit nothing. The series charts count hours or days from the origin,
+and
 every substation here is a Primary, so the anonymisation rule for metered generators does not apply.
 Colour is by arm (`COLOUR`); each chart states what is plotted, which direction is better, and what zero
 means. Charts are written as SVG and optimised with svgo by `e00713_figures.save`.
@@ -103,7 +110,9 @@ def ages_chart(*, hist: pl.DataFrame, title: list[str]) -> alt.Chart:
 
 
 def distance_chart(*, data: pl.DataFrame, title: list[str]) -> alt.Chart:
-    """`data` has the columns `arm`, `stage` (`stage 1 (ERA5 target)` or `stages 2 and 3 (ENS target)`), `lead_day`, `distance`."""
+    """`data` has the columns `arm`, `stage` (`stage 1 (ERA5 target)` or `stages 2 and 3 (ENS
+    target)`), `lead_day`, `distance`.
+    """  # noqa: D205
     arms = data["arm"].unique(maintain_order=True).to_list()
     return (
         alt.Chart(data, width=WIDTH, height=170)  # ty: ignore[unresolved-attribute]
@@ -129,7 +138,9 @@ def distance_chart(*, data: pl.DataFrame, title: list[str]) -> alt.Chart:
 def contrast_primary_chart(
     *, rows: pl.DataFrame, reference: str, title: list[str]
 ) -> alt.LayerChart:
-    """`rows` is the per-Primary table: `arm`, `primary`, `crps_minus_reference`. One dot per arm at each of the 16 Primaries."""
+    """`rows` is the per-Primary table: `arm`, `primary`, `crps_minus_reference`. One dot per arm at
+    each of the 16 Primaries.
+    """  # noqa: D205
     shown = rows.filter(pl.col("arm") != reference)
     arms = shown["arm"].unique(maintain_order=True).to_list()
     order = sorted(shown["primary"].unique().to_list(), key=lambda s: int(s[1:]))
@@ -155,7 +166,9 @@ def contrast_primary_chart(
 def series_chart(
     *, data: pl.DataFrame, arms: tuple[str, ...], horizon_hours: float, title: list[str]
 ) -> alt.VConcatChart:
-    """One panel per arm: the 90% and 50% bands, the median, and the actual; `data` has `arm`, `hours`, `actual`, and the quantiles."""
+    """One panel per arm: the 90% and 50% bands, the median, and the actual; `data` has `arm`,
+    `hours`, `actual`, and the quantiles.
+    """  # noqa: D205
     d = data.filter(pl.col("hours") <= horizon_hours).with_columns(
         x=pl.col("hours") if horizon_hours <= 36 else pl.col("hours") / 24.0
     )
@@ -219,7 +232,9 @@ def alpha_chart(*, by_bucket: dict[str, np.ndarray], title: list[str]) -> alt.Ch
 
 
 def attention_heat(*, maps: dict[str, np.ndarray], title: str) -> alt.Chart:
-    """Heat maps of the weights `alpha` (rows by half-hours), one panel per arm (the weights of experiment 713's attention figure)."""
+    """Heat maps of the weights `alpha` (rows by half-hours), one panel per arm (the weights of
+    experiment 713's attention figure).
+    """  # noqa: D205
     import e00713_attention as att713  # ty: ignore[unresolved-import]
 
     return att713.heat_chart(
@@ -240,7 +255,9 @@ def series_frame(
     seeds: tuple[int, ...],
     truth: np.ndarray,
 ) -> pl.DataFrame:
-    """Return the quantiles (points of capacity) and the actual of one Primary and origin from the stored forecasts of `arm` (F9's folder or experiment 713's)."""
+    """Return the quantiles (points of capacity) and the actual of one Primary and origin from the
+    stored forecasts of `arm` (F9's folder or experiment 713's).
+    """  # noqa: D205
     import e00422_prep as prep422  # ty: ignore[unresolved-import]
     import e00578_common as k578  # ty: ignore[unresolved-import]
     import e00718_score as sc
@@ -357,7 +374,9 @@ def cmd_series(*, out_dir: Path, part: int) -> None:
 
 
 def self_test() -> int:
-    """Build every chart from synthetic data and check its specification (colours, axis values, titles, and counts)."""
+    """Build every chart from synthetic data and check its specification (colours, axis values,
+    titles, and counts).
+    """  # noqa: D205
     import e00718_check_batch as cb
     import e00718_tables as tab
 

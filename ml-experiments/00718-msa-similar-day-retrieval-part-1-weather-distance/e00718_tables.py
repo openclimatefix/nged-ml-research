@@ -1,14 +1,15 @@
-# ruff: noqa: E501
-"""Experiment 718: the retrieval arrays of a fold, the target-weather providers, and the table builder (WP1, WP5a).
+"""Experiment 718: the retrieval arrays of a fold, the target-weather providers, and the table
+builder (WP1, WP5a).
 
-`pool_arrays_from_source` reads the arrays of experiment 713's `Source` (power finite flags, the 7
-weather columns of the ERA5 and CAMS array, and the day type), and the providers read the target row's
-weather: ERA5 at the target half-hours for stage 1, and the ensemble-mean columns of the origin day's
-00Z run for stages 2 and 3 and prediction. Both are the arrays that the network reads, converted to
-float64 before the distance. The standardised weather of experiment 713 is stored as float16, and the
-design asks for float64 from the source rows before the cast: a departure, recorded on the page, that
-leaves the builder and the independent recomputation of KR3 on one array.
-"""
+`pool_arrays_from_source` reads the arrays of experiment 713's `Source` (power finite flags, the
+7 weather columns of the ERA5 and CAMS array, and the day type), and the providers read the
+target row's weather: ERA5 at the target half-hours for stage 1, and the ensemble-mean columns of
+the origin day's 00Z run for stages 2 and 3 and prediction. Both are the arrays that the network
+reads, converted to float64 before the distance. The standardised weather of experiment 713 is
+stored as float16, and the design asks for float64 from the source rows before the cast: a
+departure, recorded on the page, that leaves the builder and the independent recomputation of KR3
+on one array.
+"""  # noqa: D205
 
 import e00718_layout as lay
 import e00718_retrieval as ret
@@ -22,9 +23,9 @@ def pool_arrays_from_source(
 ) -> ret.PoolArrays:
     """Return the retrieval arrays of the fold from experiment 713's source.
 
-    `power_z` is NaN where the reading is flagged, missing, or hidden, so its finite flags are the
-    eligibility rule's input. In the training phase the fold month's power is NaN, and the tables must
-    be built in the prediction phase (design section 2.4).
+    `power_z` is NaN where the reading is flagged, missing, or hidden, so its finite flags are
+    the eligibility rule's input. In the training phase the fold month's power is NaN, and the
+    tables must be built in the prediction phase (design section 2.4).
     """
     finite = torch.isfinite(source.power_z).cpu().numpy().astype(np.int64)
     cumsum = np.concatenate(
@@ -48,7 +49,9 @@ def pool_arrays_from_source(
 
 
 def era5_provider(*, arrays: ret.PoolArrays) -> ret.TargetProvider:
-    """Return the stage 1 provider: the target row's weather is ERA5 and CAMS at the target half-hours, all filled."""
+    """Return the stage 1 provider: the target row's weather is ERA5 and CAMS at the target
+    half-hours, all filled.
+    """  # noqa: D205
 
     def provide(primary: int, day: int) -> tuple[np.ndarray, np.ndarray]:
         c = int(lay.contract_idx_of_day(day=day))
@@ -62,7 +65,9 @@ def era5_provider(*, arrays: ret.PoolArrays) -> ret.TargetProvider:
 
 
 def ens_provider(*, ens: EnsTensors) -> ret.TargetProvider:
-    """Return the stage 2, stage 3, and prediction provider: the 7 ensemble-mean columns of the origin day's 00Z run."""
+    """Return the stage 2, stage 3, and prediction provider: the 7 ensemble-mean columns of the
+    origin day's 00Z run.
+    """  # noqa: D205
     weather = ens.weather[..., : ret.N_WEATHER]
     filled = ens.filled
     n_days = filled.shape[1]

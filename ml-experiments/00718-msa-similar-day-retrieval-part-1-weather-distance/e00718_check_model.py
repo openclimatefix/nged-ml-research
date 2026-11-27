@@ -1,9 +1,11 @@
 # ruff: noqa: E501, PT018
-"""Experiment 718, WP3: checks KR1 (nesting), KR5 (rows as a set), and KR7 (counts and buckets) of the network.
+"""Experiment 718, WP3: checks KR1 (nesting), KR5 (rows as a set), and KR7 (counts and buckets) of
+the network.
 
-Every check runs on the CPU with random inputs. Usage: e00718_check_model.py [--stored-state PATH]
-`--stored-state` loads a stored stage 3 state of experiment 713's `M*` and checks that every key fits.
-"""
+Every check runs on the CPU with random inputs. Usage: e00718_check_model.py [--stored-state
+PATH] `--stored-state` loads a stored stage 3 state of experiment 713's `M*` and checks that
+every key fits.
+"""  # noqa: D205
 
 import argparse
 import sys

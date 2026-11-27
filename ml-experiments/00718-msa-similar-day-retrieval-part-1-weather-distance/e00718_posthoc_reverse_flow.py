@@ -1,13 +1,14 @@
-# ruff: noqa: E501
-"""Experiments 718 and 719: post hoc, report-only read-outs on reverse flow, from stored forecasts (CPU only, no fit).
+"""Experiments 718 and 719: post hoc, report-only read-outs on reverse flow, from stored forecasts
+(CPU only, no fit).
 
 Usage: e00718_posthoc_reverse_flow.py PART
 
-Prints, in points of CRPS on the headline band (seed-averaged, all 8 folds): the two counted contrasts of the part at every Primary;
-the eight with D8 left out and with D8 only; the six, the eight, and D8 on half-hours where the observed power is negative
-(reverse flow) against other half-hours, where the observed power carries a sign; and the monthly means of the first contrast by
-group. Nothing here changes a verdict.
-"""
+Prints, in points of CRPS on the headline band (seed-averaged, all 8 folds): the two counted
+contrasts of the part at every Primary; the eight with D8 left out and with D8 only; the six, the
+eight, and D8 on half-hours where the observed power is negative (reverse flow) against other
+half-hours, where the observed power carries a sign; and the monthly means of the first contrast
+by group. Nothing here changes a verdict.
+"""  # noqa: D205
 
 import json
 import sys

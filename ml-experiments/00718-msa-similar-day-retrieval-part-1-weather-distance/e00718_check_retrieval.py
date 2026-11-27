@@ -1,10 +1,11 @@
 # ruff: noqa: E501, PT018
-"""Experiment 718, WP1: checks of the retrieval measures, the placebo draws (KR4), and the row tables.
+"""Experiment 718, WP1: checks of the retrieval measures, the placebo draws (KR4), and the row
+tables.
 
-Every check runs on synthetic arrays on the CPU: a grid of 600 days, 3 Primaries with gaps, random
-standardised weather, and a weekly day type. The independent recomputation of KR3 is WP2's.
-Usage: e00718_check_retrieval.py
-"""
+Every check runs on synthetic arrays on the CPU: a grid of 600 days, 3 Primaries with gaps,
+random standardised weather, and a weekly day type. The independent recomputation of KR3 is
+WP2's. Usage: e00718_check_retrieval.py
+"""  # noqa: D205
 
 import sys
 from dataclasses import replace
@@ -196,7 +197,9 @@ def check_placebos(*, tables: dict[str, ret.RowTable], arrays: ret.PoolArrays) -
 
 
 def check_class_counts(*, arrays: ret.PoolArrays) -> list[str]:
-    """KR4: each placebo's count of rows per age class equals its treatment's, where no class is exhausted, and its rows are farther in weather than the treatment's."""
+    """KR4: each placebo's count of rows per age class equals its treatment's, where no class is
+    exhausted, and its rows are farther in weather than the treatment's.
+    """  # noqa: D205
     lines = []
     for treatment, placebo in (("R", "R-A"), ("U", "U-A"), ("U27", "U27-A")):
         r, ra = build(arm=treatment, arrays=arrays), build(arm=placebo, arrays=arrays)
@@ -257,7 +260,9 @@ def check_distance(*, arrays: ret.PoolArrays) -> str:
 
 
 def check_no_weather_and_poison(*, arrays: ret.PoolArrays, power: np.ndarray) -> list[str]:
-    """A target row with no weather takes the youngest blocks, and the tables ignore power after the origin (KR2 (a) on the tables)."""
+    """A target row with no weather takes the youngest blocks, and the tables ignore power after the
+    origin (KR2 (a) on the tables).
+    """  # noqa: D205
     lines = []
     empty = build(arm="R", arrays=arrays, provider=provider_for(arrays=arrays, filled_share=0.0))
     assert empty.no_weather.all()

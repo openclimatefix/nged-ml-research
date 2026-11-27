@@ -1,16 +1,21 @@
 # ruff: noqa: E501, PT018
-"""Experiment 718, WP7b: the counted contrasts, the report-only readings, the screen rules, and the verdict of each part.
+"""Experiment 718, WP7b: the counted contrasts, the report-only readings, the screen rules, and the
+verdict of each part.
 
 Usage (each command reads stored forecasts, so none is run before the fits exist):
-    e00718_contrasts.py screen PART      # the 4 screen folds, seeds 0 and 1, at 95%: stop rule, audit trigger 1, the rule on Z
-    e00718_contrasts.py headline PART    # the 8 folds: the two counted contrasts at 98.75%, guards, verdict, sensitivity, clean-fold reading
-    e00718_contrasts.py report-only PART # the report-only contrasts of section 4 and 7.3 at 95%, by group, lead band, and Primary
+    e00718_contrasts.py screen PART      # the 4 screen folds, seeds 0 and 1, at 95%: stop rule,
+    audit trigger 1, the rule on Z
+    e00718_contrasts.py headline PART    # the 8 folds: the two counted contrasts at 98.75%, guards,
+    verdict, sensitivity, clean-fold reading
+    e00718_contrasts.py report-only PART # the report-only contrasts of section 4 and 7.3 at 95%, by
+    group, lead band, and Primary
     e00718_contrasts.py self-test        # the whole chain on synthetic forecasts
 
-PART is 1 (A1 = R - M*, A2 = R - R-A) or 2 (B1 = U - M*, B2 = U - U-A). Every contrast is experiment 713's
+PART is 1 (A1 = R - M*, A2 = R - R-A) or 2 (B1 = U - M*, B2 = U - U-A). Every contrast is experiment
+713's
 `contrast` (bootstrap, t guard, seed guard), imported unchanged; the group reading and the verdict are
 `e00718_decision`'s. The contrasts are treatment minus reference in points of CRPS, on the headline band.
-"""
+"""  # noqa: D205
 
 import argparse
 import json
@@ -142,7 +147,8 @@ def guards(
 ) -> dict:  # fmt: skip
     """Return the guards of `supported` for the treatment against `M*` in each group (section 7.3).
 
-    A guard that needs an input that has not been read (the cold-night slice, the selection swap) fails.
+    A guard that needs an input that has not been read (the cold-night slice, the selection swap)
+    fails.
     """
     out: dict = {}
     for g in dec.GROUPS:
@@ -233,7 +239,9 @@ def headline(
 def screen(
     *, part: int, per_seed: dict, averaged: dict, groups: dict, star: str, z_present: bool = True,
 ) -> dict:  # fmt: skip
-    """Return the screen's stop rule, audit trigger 1, and the rule on `Z`, from the first and second contrasts at 95%."""
+    """Return the screen's stop rule, audit trigger 1, and the rule on `Z`, from the first and
+    second contrasts at 95%.
+    """  # noqa: D205
     spec = COUNTED[part]
     (n1, t1, r1), (n2, t2, r2) = spec["first"], spec["second"]
     args = {
@@ -273,7 +281,9 @@ def screen(
 
 
 def nested_and_u27(*, averaged: dict, per_seed: dict, groups: dict, star: str, args: dict) -> dict:
-    """Return audit trigger 5 (a nested arm beats its container) and the `U27` advance rule, for the arms that are stored."""
+    """Return audit trigger 5 (a nested arm beats its container) and the `U27` advance rule, for the
+    arms that are stored.
+    """  # noqa: D205
     out: dict = {}
 
     def points(treatment: str, reference: str) -> dict[str, float] | None:
@@ -297,7 +307,9 @@ def nested_and_u27(*, averaged: dict, per_seed: dict, groups: dict, star: str, a
 
 
 def u27_exception(*, per_seed: dict, averaged: dict, groups: dict) -> bool | None:
-    """Return whether `U27` minus `U27-A` is below zero in both groups with its 95% interval; None where `U27-A` is not stored."""
+    """Return whether `U27` minus `U27-A` is below zero in both groups with its 95% interval; None
+    where `U27-A` is not stored.
+    """  # noqa: D205
     if "U27" not in averaged or "U27-A" not in averaged:
         return None
     c = counted_contrast(
@@ -314,10 +326,11 @@ CHRISTMAS_WINDOWS: Final = {
 
 
 def christmas_reading(*, averaged: dict, star: str, boot: int = 5000) -> dict:
-    """Return the report-only Christmas readings: `UX` minus `U` and `UX` minus `M*` on the windows' targets, all 16 Primaries, with a day-block 95% interval.
+    """Return the report-only Christmas readings: `UX` minus `U` and `UX` minus `M*` on the windows'
+    targets, all 16 Primaries, with a day-block 95% interval.
 
     One winter: a pointer for a follow-up, not a decision (design section 8).
-    """
+    """  # noqa: D205
     out: dict = {
         "label": "report-only, one winter, targets by valid day; an interval from resampling days"
     }
@@ -359,7 +372,9 @@ def christmas_reading(*, averaged: dict, star: str, boot: int = 5000) -> dict:
 def clean_fold_reading(
     *, part: int, per_seed: dict, averaged: dict, groups: dict, star: str
 ) -> dict:
-    """Return the first and second contrasts on the four folds clean of the exploration's selection, at 95%, labelled report-only."""
+    """Return the first and second contrasts on the four folds clean of the exploration's selection,
+    at 95%, labelled report-only.
+    """  # noqa: D205
 
     def keep(f: pl.DataFrame) -> pl.DataFrame:
         return f.filter(pl.col("power_fcst_init_time").dt.strftime("%Y-%m").is_in(a713.OTHER_FOLDS))
@@ -387,7 +402,9 @@ def clean_fold_reading(
 def report_only(
     *, part: int, per_seed: dict, averaged: dict, groups: dict, star: str, labels: dict[int, str] | None = None,
 ) -> dict:  # fmt: skip
-    """Return the report-only contrasts at 95%: by group (six, eight, all 16, D15 with D18), by lead band, and by Primary."""
+    """Return the report-only contrasts at 95%: by group (six, eight, all 16, D15 with D18), by lead
+    band, and by Primary.
+    """  # noqa: D205
     wide = with_all_group(groups=groups)
     out: dict = {"level": dec.REPORT_LEVEL, "contrasts": {}, "bands": {}, "per_primary": None}
     for t_raw, r_raw in REPORT_ONLY_PAIRS[part]:
@@ -489,7 +506,9 @@ LAST: dict = {}
 
 
 def self_test() -> int:  # noqa: PLR0915
-    """Run the screen, the headline, the clean-fold reading, and the report-only readings on synthetic scored forecasts."""
+    """Run the screen, the headline, the clean-fold reading, and the report-only readings on
+    synthetic scored forecasts.
+    """  # noqa: D205
     rng = np.random.default_rng(0)
     months = [f"2025-{m:02d}" for m in (11, 12)] + [f"2026-{m:02d}" for m in range(1, 7)]
     ids = {"six": np.arange(0, 6), "eight": np.arange(6, 14), "other": np.arange(14, 16)}

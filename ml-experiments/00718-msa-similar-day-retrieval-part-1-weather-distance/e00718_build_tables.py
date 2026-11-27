@@ -1,14 +1,16 @@
 # ruff: noqa: E501
-"""Experiment 718: build the row tables of one arm and fold (WP5a). About 1.4 CPU hours for the arms with a weather measure.
+"""Experiment 718: build the row tables of one arm and fold (WP5a). About 1.4 CPU hours for the arms
+with a weather measure.
 
-The tables are built from the prediction-phase power array of the fold, because the training phase
-blanks the fold month's power (design section 2.4). Each build writes the `era5` table (stage 1) and the
-`ens` table (stages 2 and 3, and prediction) under `data/ml-experiments/00718-.../work/tables`. A
-table covers all 16 Primaries and every origin day from the first with a full history to the last
-scored origin. `--limit-days N` keeps the last N days only, and exists for tests.
+The tables are built from the prediction-phase power array of the fold, because the training
+phase blanks the fold month's power (design section 2.4). Each build writes the `era5` table
+(stage 1) and the `ens` table (stages 2 and 3, and prediction) under
+`data/ml-experiments/00718-.../work/tables`. A table covers all 16 Primaries and every origin day
+from the first with a full history to the last scored origin. `--limit-days N` keeps the last N
+days only, and exists for tests.
 
 Usage: run.sh e00718_build_tables.py ARMS MONTH [--seed 0] [--limit-days N]
-"""
+"""  # noqa: D205
 
 import argparse
 import resource
@@ -33,7 +35,9 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 def build_tables(
     *, source: Source, arms_to_build: Sequence[str], days: np.ndarray, holidays: set | frozenset
 ) -> dict[str, dict[str, ret.RowTable]]:
-    """Return the `era5` and `ens` tables of every arm in `arms_to_build` for all Primaries and `days`, built in one pass from `source`."""
+    """Return the `era5` and `ens` tables of every arm in `arms_to_build` for all Primaries and
+    `days`, built in one pass from `source`.
+    """  # noqa: D205
     assert source.ens is not None
     arrays = tab.pool_arrays_from_source(
         source=source, with_calendar="UX" in arms_to_build, holidays=set(holidays)
@@ -57,12 +61,13 @@ def build(
     *, arms_to_build: Sequence[str], month: str, seed: int, data_dir: Path, limit: int | None,
     device: str = "cpu",
 ) -> None:  # fmt: skip
-    """Build and save the two tables of every arm in `arms_to_build` for the fold `month`, in one pass over the fold.
+    """Build and save the two tables of every arm in `arms_to_build` for the fold `month`, in one
+    pass over the fold.
 
     A table that exists is kept only when its provenance (builder code, phase, arm, month, and
-    standardiser fingerprint, input digest, and `--limit-days`) matches. A table that differs only in
-    `--limit-days` is rebuilt; any other difference stops the build.
-    """
+    standardiser fingerprint, input digest, and `--limit-days`) matches. A table that differs
+    only in `--limit-days` is rebuilt; any other difference stops the build.
+    """  # noqa: D205
     pipe = inp.load_pipeline(
         month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
     )

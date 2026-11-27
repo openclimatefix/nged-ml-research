@@ -1,12 +1,14 @@
 # ruff: noqa: E501
-"""Experiments 718 and 719: the validation loss of every fit, by pass and stage, from the stored fit logs (plots only, no fit).
+"""Experiments 718 and 719: the validation loss of every fit, by pass and stage, from the stored fit
+logs (plots only, no fit).
 
 Usage: e00718_loss_plots.py OUT_DIR PART
 
-One chart per part: three panels (stages 1, 2, 3), one line per arm, each line the mean over the folds and seeds that
-the arm was fitted on at that pass. Lower is better. A line shortens where fits stop early, and the mean at a late pass
-then rests on fewer fits, so the chart prints the number of fits in each arm's legend label.
-"""
+One chart per part: three panels (stages 1, 2, 3), one line per arm, each line the mean over the
+folds and seeds that the arm was fitted on at that pass. Lower is better. A line shortens where
+fits stop early, and the mean at a late pass then rests on fewer fits, so the chart prints the
+number of fits in each arm's legend label.
+"""  # noqa: D205
 
 import json
 import sys
