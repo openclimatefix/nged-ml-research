@@ -809,7 +809,8 @@ overcast days.
 
 **Ten decisions belong to the maintainer or the manager, and neither the amendment nor its erratum
 takes any of them. The manager has since decided the count in row 1 and the rule in row 7, and the
-rows that carry no marker stay open.** The design amendment is
+rows that carry no marker are closed by the `invalid` verdict, because no job beyond job W0
+runs.** The design amendment is
 `data/ml-experiments/briefs/msa_architecture/mva_untangling_design_v3_amendment_v2.md`, its Opus
 design review is
 `data/ml-experiments/briefs/msa_architecture/mva_untangling_v3_amendment_review.md`, the ruling on
@@ -834,14 +835,15 @@ of the amendment itself has had no Opus review.
 | 9 | [Maintainer] Whether the build of the first buildable untangler may follow its known-answer test directly, because the hint rung has no hint to test with the BSP factor off and `a` = 0 | Yes. Version 2 gates the build on a rung that is `supported` or `partly supported`, where `partly supported` means that no hint is kept and the model passes alone, and the known-answer test is that case with an empty list of hints. If this experiment later admits the within-day hint, the rung runs then as a paired contrast |
 | 10 | The switching-log repair: `engine="openpyxl"` in this experiment's own code, with no change to `pyproject.toml` | Adopt the repair |
 
-**Two further points are decided, and four decisions stay open.** The verdict word `not built`
+**Two further points are decided, and four decisions are closed by the `invalid` verdict.** The
+verdict word `not built`
 **[Decided by the manager]** applies to experiment 724 where its job 5 stops, and experiment 723
-never uses it: the verdict words of this page are the six of the decision rule. The four open
+never uses it: the verdict words of this page are the six of the decision rule. The four closed
 decisions below are shared with experiment 724, and the wording of each follows that page. Where a
 decision belongs to experiment 724's build alone, the line says so and takes no position for this
 experiment.
 
-- **11. The power-factor alternatives [Maintainer; open].** Version 2 allows a reported alternative
+- **11. The power-factor alternatives [Maintainer; closed].** Version 2 allows a reported alternative
   to the assumed reactive floor. Experiment 723 folds with a reactive floor of 2 points and reads no
   power-factor alternative.
     - *Design lead's recommendation:* report the alternatives of experiment 724 (the positive-flow
@@ -850,7 +852,7 @@ experiment.
     - *Opus reviewer's view:* the code review of this experiment records no position on the
       power-factor alternatives, and the review of experiment 724 asks only that the page list the
       two alternatives with no bar. This agrees with the recommendation.
-- **12. The compute cap [Manager; open].** Experiment 723's estimate is under 0.1 core-hours in
+- **12. The compute cap [Manager; closed].** Experiment 723's estimate is under 0.1 core-hours in
   total, and each job has a cap of 1 core-hour. The cap of 5 core-hours for the series is experiment
   724's.
     - *Design lead's recommendation:* the erratum recommends 5 core-hours for the series in place of
@@ -860,7 +862,7 @@ experiment.
       bootstraps of the read-outs. The gate now projects the whole job, and the review judged a real
       overrun of the cap of 1 core-hour against an estimate of 0.05 unlikely. This agrees with the
       recommendation.
-- **13. The rows of the scored worlds [Manager; open].** Experiment 723 scores the later span of 413
+- **13. The rows of the scored worlds [Manager; closed].** Experiment 723 scores the later span of 413
   calendar days, from the first day on which both transformers of 2025 have readings, and not the
   whole fitted span of experiment 724.
     - *Design lead's recommendation:* take the erratum's whole-span rows for experiment 724, which
@@ -868,7 +870,7 @@ experiment.
     - *Opus reviewer's view:* the review of experiment 724 finds the whole-span scoring "sound" and
       asks for the span to be defined, which this page does through the later span's day count of
       413. This agrees with the recommendation.
-- **14. The placebo bar [Manager; open].** Experiment 723's bar is the real sensor's area minus the
+- **14. The placebo bar [Manager; closed].** Experiment 723's bar is the real sensor's area minus the
   area of the sensor shifted by 28 days, at least 0.15, with the placebo read on exactly the
   stretches and pairs of the area.
     - *Design lead's recommendation:* the erratum states the placebo of experiment 724 as a paired
