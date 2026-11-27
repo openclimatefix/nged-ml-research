@@ -36,7 +36,10 @@ def _frame(
 
 
 def test_the_typical_origin_is_the_median_error_of_the_season_and_never_repeats() -> None:
-    """The origin with the median error is taken; an excluded origin is skipped; an absent season is an error without a fallback."""
+    """The origin with the median error is taken.
+
+    An excluded origin is skipped, and an absent season is an error without a fallback.
+    """
     frame = _frame(start=datetime(2026, 1, 1), n_origins=5, bias=0.01)
     origin, note = series.pick_typical_origin(frame=frame, months=(1,), allow_fallback=False)
     assert origin == datetime(2026, 1, 3, tzinfo=UTC) and note == ""
@@ -71,7 +74,10 @@ def test_the_channel_origin_is_where_the_channels_move_the_forecast_most() -> No
 
 
 def test_event_windows_keep_events_with_forecasts_at_both_ends_and_thin_a_long_list() -> None:
-    """An event outside the forecast span is left out; more than the cap gives an evenly spaced subset; none gives an empty list and a count of 0."""
+    """An event outside the forecast span is left out.
+
+    More than the cap gives an evenly spaced subset, and none gives an empty list and a count of 0.
+    """
     times = pl.Series([datetime(2026, 1, 1, tzinfo=UTC) + timedelta(hours=h) for h in range(2000)])
     events = pl.DataFrame(
         {
@@ -98,7 +104,10 @@ def test_a_repeated_window_is_an_error() -> None:
 
 
 def _sign_data(*, sources: list[str], flow: dict[int, int]) -> SimpleNamespace:
-    """Samples of 6 segments, 2 origins each, 9 lead days each; `flow` gives the reverse-flow half-hours of each segment's first origin."""
+    """Samples of 6 segments, 2 origins each, 9 lead days each.
+
+    `flow` gives the reverse-flow half-hours of each segment's first origin.
+    """
     seg, day, lead = [], [], []
     for s in range(len(sources)):
         for d in (0, 20):

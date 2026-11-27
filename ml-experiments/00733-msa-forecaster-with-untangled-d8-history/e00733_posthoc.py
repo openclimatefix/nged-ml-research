@@ -17,8 +17,8 @@ folder, which this module never writes.
 - P4: YUb minus Y0b, Brier score of the sign on the synthetic world, single seed.
 
 P3 and P4 are point differences only: one seed gives no interval.
-Beside them, the report lists each synthetic arm's stored pass, its validation sign cross-entropy at that
-pass, and its Brier score on the scored test half-hours, for Y0b, YUb, and YOb and for seed 0 of Y0
+Beside them, the report lists each synthetic arm's stored pass, its validation sign cross-entropy at
+that pass, and its Brier score on the scored test half-hours, for Y0b, YUb, and YOb and for seed 0 of Y0
 and YU of the main run.
 
 The stage `posthoc_score` writes `posthoc/readings.json`, `posthoc/report.md`, and
