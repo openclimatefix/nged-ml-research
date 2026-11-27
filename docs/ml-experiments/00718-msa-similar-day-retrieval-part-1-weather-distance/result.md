@@ -64,43 +64,50 @@ headline: >-
   cold-night and selection-swap guards are unread, and the scores are ceilings for a live forecast.
 lessons: >-
   A plain mean of the nearest-weather rows was no better than a plain mean of the last 14 days in
-  the exploration, and the attention network is no better either. The nearest-weather rows lose to
-  the union of three measures of part 2 by 0.04 to 0.11 points. Masking the history rows costs
-  0.3 points, so the network relies on them. Reverse flow at D8 does not explain the eight's wider
-  spread. The attention-over-history stop-rule count was exceeded, so both parts printed every
-  Primary.
+  the exploration, and the attention neural network is no better either. The nearest-weather rows
+  forecast worse than the mixture of experiment 719 by 0.04 to 0.11 points. Masking the history rows
+  raises the error by 0.3 points, so the network relies on them. The stored data do not show reverse
+  flow explaining the eight's wider spread, because D8's contribution is small. The attention-over-
+  history stop-rule count was exceeded, so both parts printed every Primary.
 take_home_message: >-
   Picking the demand network's history days by how closely their weather matches the forecast for
   the target day did not improve the forecast over simply using the last 14 days, at either group
   of substations. The nearest-weather days also forecast worse than the mixture of recent,
-  same-weekday, and weather-matched days of the companion experiment. Weather similarity alone is
-  therefore not a useful way to choose history rows, and the cold-night and selection-swap checks
-  remain unread.
+  same-weekday, and weather-matched days of experiment 719. In this experiment, weather distance
+  alone selected history rows that forecast no better than the last 14 days. The cold-night and
+  selection-swap checks remain unread.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Do not choose history rows by weather distance alone: the 14 nearest-weather days of the past
-    91 did not forecast better than the last 14 days (A1, A2).
+    In this experiment, the 14 nearest-weather days of the past 91 did not forecast better than the
+    last 14 days at 16 Primaries, so do not expect a gain from weather distance alone (A1, A2).
   - >-
     Check which Primary drives a group's point estimate before reading it: D5 alone moves the six's
     A1 (leave-one-Primary-out guard).
 ---
 
-**We asked whether the axial-attention demand network of experiment 713 forecasts a Primary
-substation better when its 14 history rows are the 14 past days with the weather nearest to the
-target day's forecast weather, instead of the last 14 days.** The network reads a matrix of past
-days by 48 half-hours and attends over the days. For each target day we ranked the past 91 days by
-the distance between each day's weather and the target day's ensemble weather forecast, and gave the
-network the nearest 14. We compared the forecasts with two references: the network with the last 14
-days, and the network with 14 random days of the same ages as the nearest 14. We scored 8 months of
-forecasts at 16 Primaries. The nearest-weather rows forecast no better than the last 14 days at
-either group of Primaries: the difference was 0.01 points of capacity better at the 6 Primaries that
-meter signed power and 0.07 worse at the 8 Primaries that meter only apparent power (MVA), and both
-intervals include zero.
+**We asked whether a neural network that forecasts a primary substation's electricity demand does
+better when the past days it is shown are the days whose weather was nearest to the target day's
+forecast weather.** The network is the axial-attention neural network of [experiment
+713](../00713-msa-axial-attention-demand-network-part-1/result.md). It forecasts the demand of 16
+primary substations (the substations between NGED's 33 kV and 11 kV networks, called Primaries
+below) for days 1 to 10 ahead. As input it reads a matrix of 14 past days (the history rows) by 48
+half-hours of the substation's own power, and it learns how much weight each past day deserves.
+Experiment 713 gave the network the last 14 days. Here, for each target day, we ranked the past 91
+days by the distance between each day's weather and the target day's ensemble weather forecast, and
+gave the network the nearest 14. We compared the forecasts with two references: the network given
+the last 14 days, and the network given 14 random days of the same ages as the nearest 14.
 
-**Verdict: not supported.** Every interval below is at 98.75% (month-block bootstrap, 8 monthly
-folds, seeds 0 and 1, CRPS in points of capacity, negative favours the nearest-weather rows).
+**The nearest-weather days forecast no better than the last 14 days at either group of Primaries.**
+We scored 8 months of forecasts (2025-11 to 2026-06), with seeds 0 and 1. The score is the
+continuous ranked probability score (CRPS) in percentage points of each Primary's capacity, and
+lower is better. At the 6 Primaries that meter signed power (the six), the nearest-weather days
+scored 0.013 points below the last 14 days, and at the 8 Primaries that meter only apparent power in
+megavolt-amperes (MVA, the eight), they scored 0.069 points above. Both intervals include zero.
+
+**Verdict: not supported.** Every interval below is at 98.75% (month-block bootstrap over 8 monthly
+folds), in CRPS points of capacity, and a negative number favours the nearest-weather days.
 
 | Contrast | Group | Point and interval | Reading |
 |---|---|---|---|
@@ -109,65 +116,83 @@ folds, seeds 0 and 1, CRPS in points of capacity, negative favours the nearest-w
 | A2: `R` minus the same-age random placebo `R-A` | six | -0.034 [-0.095, +0.050] | cannot tell |
 | A2 | eight | -0.045 [-0.195, +0.059] | no detectable difference |
 
-**An audit is due before this page merges, because two audit triggers fire at the six.** The
-leave-one-Primary-out guard and the guard that the mean absolute error moves with CRPS both fail at
-the six. One Primary drives the six's A1: D5 is -0.283, and the other five signed-MW Primaries are
-between -0.059 and +0.129. The cold-night and selection-swap guards are unread, so the `all guards
-hold` field is false by rule. All scores are ceilings for a live forecast, because the rows were
-retrieved with the stored ensemble forecast and the lab shortcut that experiment 713 documents.
-Experiment 713's known-answer gate was waived by the maintainer on 2026-11-24, and F9's own gate
-passed (checks KS1, KS2, and KS3 on the synthetic worlds).
+**Two audit triggers fire at the six.** The leave-one-Primary-out guard fails: D5 alone is -0.283
+for A1, and the other five signed-power Primaries lie between -0.059 and +0.129. The guard that the
+mean absolute error of the median forecast moves with CRPS also fails, and the leave-one-month-out
+guard fails too. The cold-night guard (the score on cold winter nights) and the selection-swap guard
+(the sign survives choosing rows with live-fair weather) were not scored, so the decision rule's
+`all guards hold` field is false. The scores are ceilings for a live forecast, because the weather
+distance reads ERA5 and CAMS weather for the past days and the stored ensemble forecast for the
+target day, as experiment 713 documents. The maintainer waived experiment 713's known-answer gate on
+2026-11-24, and this experiment's own gate passed (checks KS1, KS2, and KS3 on synthetic worlds).
 
-## What the post hoc readings show
+**A fresh Sonnet audit of the verdict found that `not supported` stands, and the risk that it flips
+is low.** The auditor re-derived A1 and A2 from the stored forecasts and matched the printed values
+to within 0.001. Without D5, the six's A1 is +0.040 [-0.023, +0.095], so the sign flips to the
+nearest-weather days being worse, and the reading moves from "no detectable difference" to "cannot
+tell" because the upper limit of 0.095 just exceeds δ (0.094). Leaving out D9, D10, D11, or D14 at
+the six also gives "cannot tell", because the interval widens while the point barely moves. At the
+eight, only the version without D22 has an interval that excludes zero (+0.084 [+0.023, +0.140]),
+and it fails the t-interval and noise-floor guards, so the reading stays "no detectable difference".
+No single deletion reaches "gain", "small gain", "loss", or "clear loss", so the only other verdict
+reachable by leaving one Primary out is `inconclusive`, at the six. The mean absolute error of the
+median forecast and CRPS disagree at the six because D5 supplies the CRPS gain at the 5% to 25% and
+90% to 95% quantiles while the median is flat; without D5 both are positive (+0.075 and +0.040). We
+report "inconclusive without D5" as a sensitivity reading, and the pre-registered verdict stays `not
+supported`. The audit did not rerun the leakage check or the retrieval-correctness check. The full
+audit is in `briefs/msa_architecture/f9_718_audit.md`.
 
-**The nearest-weather rows are worse than the last 14 days at 9 of the 16 Primaries and better at 7
-(post hoc, report-only).** The largest losses are at D12 (+0.207) and D4 (+0.140), and D15 (the
-short-history Primary, outside both groups) is -1.957. The eight's monthly A1 ranges from -0.211 to
-+0.335 (standard deviation 0.174) against 0.083 at the six. Reverse flow does not explain the
-eight's wider spread: D8, the Primary the maintainer named as the reverse-flow case, is +0.010, and
-the eight without D8 are +0.078.
+## Further results, computed after the main scoring
 
-**The network uses its history rows.** Masking all history power at prediction raises the error of
-`R` by 0.30 points at the six [0.19, 0.41] and 0.30 at the eight [0.18, 0.45], at 95% (a read-out
-with no refit).
+**The nearest-weather days are worse than the last 14 days at 9 of the 16 Primaries and better at
+7.** These readings are post hoc and report-only. The largest losses are at D12 (+0.207) and D4
+(+0.140), and D15 (the short-history Primary, outside both groups) is -1.957.
 
-**Retrieval picks rows the network reads no better than a mixture.** Report-only at 95%, `R` minus
-the mixture `U` of part 2 is +0.043 at the six [+0.005, +0.080] and +0.110 at the eight [+0.028,
-+0.193], so the nearest-weather rows forecast worse than the mixture. `R` minus the placebo network
-`P` (14 random days of the past year) is -0.163 at the six [-0.256, -0.068] and -0.093 at the eight
-[-0.220, +0.022], so the nearest-weather rows forecast better than 14 random days of the past year
-at the six.
+**The eight's monthly A1 swings about twice as much as the six's, and reverse flow is not visible at
+the eight.** The eight are stored as apparent power, which has no sign, so the data cannot show
+reverse flow there. The standard deviation of the 8 monthly means is 0.174 at the eight (range
+-0.211 to +0.335) against 0.083 at the six. D8, the Primary the maintainer named as the reverse-flow
+case, is +0.010, and the eight without D8 are +0.078. D8's contribution is therefore not the reason
+for the eight's wider spread.
+
+**The network relies on its history rows.** Masking all history power at prediction (a read-out with
+no refit) raises the error of `R` by 0.30 points at the six [0.19, 0.41] and 0.30 at the eight
+[0.18, 0.45], at 95%.
+
+**The nearest-weather days forecast worse than the mixture of experiment 719.** [Experiment
+719](../00719-msa-similar-day-retrieval-part-2-union-of-measures/result.md) gave the network 5
+weather-nearest days, the 5 most recent days, and 4 days with the target day's weekday (the mixture
+`U`). Report-only at 95%, `R` minus `U` is +0.043 at the six [+0.005, +0.080] and +0.110 at the
+eight [+0.028, +0.193]. `R` minus the placebo neural network `P` (14 random days of the past year)
+is -0.163 at the six [-0.256, -0.068] and -0.093 at the eight [-0.220, +0.022]. The nearest-weather
+days therefore forecast better than 14 random days of the past year at the six.
 
 ## Plots
 
 - **Contrasts by Primary.** ![A1 and A2 at each of the 16 Primaries](contrasts_primary_part1.svg)
 - **Ages of the retrieved rows,** fold 2026-01. ![Ages of the retrieved
   rows](ages_part1_2026-01.svg)
-- **Read-out weight by row age** (unreviewed plot). ![Read-out weight by
-  age](alpha_by_age_part1.svg)
-- **Attention maps** of `R` at D5 and D8 (unreviewed plots). ![Attention of R at
+- **Read-out weight by row age,** from one review. ![Read-out weight by age](alpha_by_age_part1.svg)
+- **Attention maps** of `R` at D5 and D8, from one review. ![Attention of R at
   D5](attention_part1_R_D5.svg) ![Attention of R at D8](attention_part1_R_D8.svg)
-- **Training and validation loss by pass** (unreviewed plot). ![Validation loss](loss_part1.svg)
+- **Training and validation loss by pass,** from one review. ![Validation loss](loss_part1.svg)
 - **Day-ahead and 14-day forecasts** of `M*`, `R`, `R-A`, and the Candidate at D5 and D8 in winter
   and summer. ![Day-ahead forecast, D5, winter](series_part1_day_winter_D5.svg) ![14-day forecast,
   D8, summer](series_part1_fourteen_summer_D8.svg)
 
 ## Checks
 
-- **Triggers.** Audit trigger 3 (error of the median moves against CRPS) and trigger 4
-  (leave-one-Primary-out) fire at the six, so an audit is due. Triggers 1 and 5 did not fire on the
-  screen.
+- **Triggers.** Audit trigger 3 (the error of the median moves against CRPS) and trigger 4
+  (leave-one-Primary-out flips the reading) fire at the six. Triggers 1 (placebo and `Z` rule) and 5
+  (nested arm beating its container) did not fire on the screen.
 - **Review of the new analysis code.** One Opus review
   (`briefs/msa_architecture/f9_result_code_review.md`) covered the post hoc, masked-history,
-  loss-plot, attention-plot, and `secondary` code. It reproduced the printed B1 numbers, the D8-only
-  value, and the 792 negative rows exactly. It found two must-fix faults in the attention plots (the
-  batch used ERA5 weather, and absent rows were drawn as real rows of age 2), and the charts were
-  redrawn after the fix. The remaining findings were fixed or reworded. The review did not recompute
-  the masked-history scores, the `secondary` contrasts, B2, or the part 1 numbers, and the redrawn
-  attention charts have not had a second look. A Sonnet check confirmed that the `secondary` command
-  changes no line of the headline path (file hash `3706cc64757a1bfa`).
-- **Not done.** The selection-swap read-out was not built, so the cold-night and selection-swap
-  guards are unread.
+  loss-plot, attention-plot, and `secondary` code of both parts. It reproduced the printed A1
+  numbers and the D8-only value of +0.010. It found two faults in the attention plots (ERA5 weather
+  in the batch, and absent rows drawn as real rows of age 2), and the charts were redrawn and viewed
+  after the fix. The review did not recompute the masked-history scores or A2.
+- **Not done.** The selection-swap read-out was not built, so the cold-night guard and the
+  selection-swap guard are unread.
 - **Unlogged events.** NGED's load-shift logs may miss events, so the clean-lag rows may hold events
   no label covers.
 
@@ -308,9 +333,10 @@ group; `inconclusive` otherwise. The counted placebo is `R-A` and not `P90`, bec
 would credit the weather distance with a recency gain.
 
 **Reachable thresholds.** The monthly spread of `M1` minus `P` is about 0.33 at the eight and 0.10
-at the six. "No detectable difference" at the eight is out of reach, because the 98.75% interval is
-wider than `δ`. A "gain" at the eight needs D below about -0.4. A null part therefore ends
-`inconclusive` and not `not supported`, and the closure rule above settles the line.
+at the six. The plan expected "no detectable difference" at the eight to be out of reach, because
+the 98.75% interval is wider than `δ`. A "gain" at the eight needs D below about -0.4. The plan
+also expected that a null part would end `inconclusive`. The run read "no detectable difference"
+for A1 at both groups, which the decision code maps to `not supported`.
 
 **Screen, audit, and stop rules.** The screen is experiment 713's four folds (2025-11, 2026-01,
 2026-03, and 2026-06) with seeds 0 and 1, and every screen number is labelled interim. If A2 is
@@ -410,8 +436,9 @@ keep a check independent, or to follow the design where experiment 713's code do
 - With 2 seeds, the reading "small gain" needs both seeds to agree in sign, as design section 7.3
   states. Experiment 713's scorer accepts 1 seed of 2 for that reading. This experiment requires
   both, and the manager approved the stricter rule. The rule makes "small gain" harder to reach. A
-  reading that fails that row falls to the next row of the table, so with 2 seeds it falls in
-  practice to "cannot tell", because "no detectable difference" is out of reach at 2 seeds. This
+  reading that fails that row falls to the next row of the table, so the plan expected
+  that with 2 seeds it would fall to "cannot tell". The run reached "no detectable difference" for
+  A1 at both groups. This
   experiment's decision code applies the rule and leaves experiment 713's scorer unedited.
 - Audit trigger 5 (a nested arm beats its container) fires only when the nested arm is better in
   both Primary groups, because the design names no group.
