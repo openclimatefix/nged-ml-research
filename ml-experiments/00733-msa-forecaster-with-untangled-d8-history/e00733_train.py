@@ -677,7 +677,7 @@ def synthetic_validation(
     return tot / n, nll / n, bce / n
 
 
-def train_synthetic(
+def train_synthetic(  # noqa: PLR0912
     *,
     net: model.UntangledNet,
     train_segments: Sequence[sy.SegmentArrays] | sy.PackedBank,
@@ -749,18 +749,20 @@ def train_synthetic(
             )  # fmt: skip
 
         stream = prefetched(items=list(enumerate(sels)), make=cut)
-        for sel, b in zip(sels, stream, strict=False):
-            loss, _, _ = synthetic_loss(net=net, batch=b, device=device)
-            opt.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(net.parameters(), core.SYNTHETIC_CLIP)
-            opt.step()
-            total += float(loss.detach().cpu()) * len(sel)
-            count += len(sel)
-            step += 1
-            if max_steps is not None and step >= max_steps:
-                break
-        stream.close()
+        try:
+            for sel, b in zip(sels, stream, strict=False):
+                loss, _, _ = synthetic_loss(net=net, batch=b, device=device)
+                opt.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(net.parameters(), core.SYNTHETIC_CLIP)
+                opt.step()
+                total += float(loss.detach().cpu()) * len(sel)
+                count += len(sel)
+                step += 1
+                if max_steps is not None and step >= max_steps:
+                    break
+        finally:
+            stream.close()
         hist.train.append(total / max(count, 1))
         val, v_nll, v_bce = synthetic_validation(
             net=net, segments=val_segments, index=val_index, d8_index=d8_index,

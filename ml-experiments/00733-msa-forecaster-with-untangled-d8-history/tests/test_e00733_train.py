@@ -414,3 +414,37 @@ def test_the_example_row_goes_to_the_given_root_and_never_to_the_data_folder(
         written = tmp_path / "root" / "PRIVATE" / "origin_time_example_real.txt"
         assert written.exists() == (root is not None)
     assert _listing(internal) == before
+
+
+def test_the_prefetch_stream_is_closed_when_the_loss_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A `NonFiniteLossError` in the loop closes the prefetch generator, so no worker thread stays alive."""
+    import threading
+
+    streams = []
+    real = tn.prefetched
+
+    def tracking(**kw):  # noqa: ANN003, ANN202
+        gen = real(**kw)
+        streams.append(gen)
+        return gen
+
+    def failing_loss(**_):  # noqa: ANN003, ANN202
+        msg = "loss is not finite"
+        raise tn.NonFiniteLossError(msg)
+
+    monkeypatch.setattr(tn, "prefetched", tracking)
+    monkeypatch.setattr(tn, "PREFETCH_WORKERS", 4)
+    monkeypatch.setattr(tn, "synthetic_loss", failing_loss)
+    segs, idx = _world()
+    net = model.UntangledNet(seed=0, sign_head=True)
+    before = threading.active_count()
+    with pytest.raises(tn.NonFiniteLossError):
+        tn.train_synthetic(
+            net=net, train_segments=segs, train_index=idx, val_segments=make_world_copy(segs), val_index=idx,
+            seed=0, mode="untangled", d8_index=3, target_std=1.0, device="cpu", max_epochs=2, patience=2, batch_size=16,
+        )  # fmt: skip
+    assert len(streams) == 1
+    assert streams[0].gi_frame is None  # a closed (finished) generator holds no frame
+    assert threading.active_count() == before
