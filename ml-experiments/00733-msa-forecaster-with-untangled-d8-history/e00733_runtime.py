@@ -10,7 +10,8 @@ of each bank. The official run on the real data folder refuses that argument.
 
 import argparse
 import json
-from collections.abc import Sequence
+import time
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final
 
@@ -23,6 +24,7 @@ import e00733_stages as st
 import e00733_synth as sy
 import e00733_world as world
 import numpy as np
+from e00733_channels import StoppedError
 
 TRAIN_WINDOW_START: Final = "2024-04-01"
 """The first day of the fold-coverage training window: the first run of experiment 607."""
@@ -705,8 +707,107 @@ def make_run_job(
     return run_job
 
 
+def run_stage_in_new_process(
+    *, stage: str, arm: str, fold: str | None, seed: int, device: str, root: Path,
+    data_root: str | None, max_passes: int | None, rows: str = "test",
+) -> None:  # fmt: skip
+    """Run `stage` (fit or predict) of one job in a new Python process and map its exit code.
+
+    The plan keeps experiment 716's rule that the process that fits never reads the scored rows, so
+    the chain runs each fit and each prediction in a process of its own. The new process inherits the
+    slot's cores, memory scope, and environment, and the parent holds no data while it waits.
+
+    Args:
+        stage: "fit" or "predict".
+        arm: The arm.
+        fold: The fold (None on the synthetic world).
+        seed: The seed.
+        device: "cuda" or "cpu".
+        root: This experiment's data folder (for the messages).
+        data_root: The scratch data root named on the command line, or None.
+        max_passes: The scratch pass cap, or None.
+        rows: The rows a prediction covers.
+
+    Raises:
+        CorrectnessFailureError: When the process exits 4.
+        StoppedError: When the process exits 3.
+        RuntimeError733: When the process exits with any other code.
+    """
+    import subprocess
+    import sys
+
+    command = [
+        sys.executable, str(Path(__file__).with_name("e00733_cli.py")), stage, "--arm", arm,
+        "--seed", str(seed), "--device", device,
+    ]  # fmt: skip
+    if fold is not None:
+        command += ["--fold", fold]
+    if data_root is not None:
+        command += ["--data-root", data_root]
+    if max_passes is not None:
+        command += ["--max-passes", str(max_passes)]
+    if stage == "predict":
+        command += ["--rows", rows]
+    done = subprocess.run(command, check=False)
+    if done.returncode == st.EXIT_OK:
+        return
+    where = f"{stage} of {arm} {fold} seed {seed} under {root.name}"
+    if done.returncode == st.EXIT_INVALID:
+        raise st.CorrectnessFailureError(f"a correctness failure in the {where} (exit 4)")
+    if done.returncode == st.EXIT_STOPPED:
+        raise StoppedError(f"the {where} stopped the line (exit 3)")
+    msg = f"the {where} exited with code {done.returncode}"
+    raise RuntimeError733(msg)
+
+
+def job_record_path(*, root: Path, arm: str, fold: str | None, seed: int) -> Path:
+    """Return the file that holds one job's measured times and memory."""
+    import e00733_fit as fit
+
+    return root / "fits" / f"{fit.job_name(arm=arm, fold=fold, seed=seed)}.job.json"
+
+
+def write_job_record(
+    *, root: Path, arm: str, fold: str | None, seed: int, fit_record: Mapping[str, Any],
+    predict_seconds: float, predict_peak_rss_gb: float,
+) -> dict[str, Any]:  # fmt: skip
+    """Write one job's seconds and peak memory, and stop the line when the memory is too high.
+
+    Args:
+        root: This experiment's data folder.
+        arm: The arm.
+        fold: The fold, or None.
+        seed: The seed.
+        fit_record: The fit's record.
+        predict_seconds: The wall seconds of the prediction (every set, the masked and stored
+            variants, and the target-poison check).
+        predict_peak_rss_gb: The prediction process's peak resident memory.
+
+    Returns:
+        The job record.
+
+    Raises:
+        StoppedError: When a process of the job peaked above `core.RSS_STOP_GB` (verdict row 0).
+    """
+    record = {
+        "fit_seconds": float(fit_record["seconds"]), "predict_seconds": float(predict_seconds),
+        "fit_peak_rss_gb": float(fit_record["peak_rss_gb"]),
+        "predict_peak_rss_gb": float(predict_peak_rss_gb),
+    }  # fmt: skip
+    st.write_json(path=job_record_path(root=root, arm=arm, fold=fold, seed=seed), payload=record)
+    peak = max(record["fit_peak_rss_gb"], record["predict_peak_rss_gb"])
+    if peak > core.RSS_STOP_GB:
+        msg = (
+            f"the job {arm} {fold} seed {seed} peaked at {peak:.1f} GB of resident memory, above "
+            f"the stop line of {core.RSS_STOP_GB} GB (verdict row 0)"
+        )
+        raise StoppedError(msg)
+    return record
+
+
 def make_predicting_job(
-    *, root: Path, device: str, max_passes: int | None, rows: str = "test"
+    *, root: Path, device: str, max_passes: int | None, rows: str = "test",
+    data_root: str | None = None, new_process: bool = True,
 ) -> Any:  # fmt: skip
     """Return `run(arm, fold, seed) -> record`: the fit, then its stored prediction sets.
 
@@ -715,9 +816,13 @@ def make_predicting_job(
         device: "cuda" or "cpu".
         max_passes: Replaces the plan's caps (scratch debug runs only).
         rows: The rows predicted ("test" for the chain).
+        data_root: The scratch data root of the command line, passed on to the new processes.
+        new_process: Whether the fit and the prediction each run in a process of their own (the
+            chain). The timing gate runs both in this process so that it can cap the passes.
 
     Returns:
-        The function. A fit that raised leaves no prediction; a prediction that raised fails the job.
+        The function. A fit that raised leaves no prediction; a prediction that raised fails the
+        job. The record it returns is the fit's, plus `predict_seconds` and `predict_peak_rss_gb`.
     """
     import e00733_fit as fit
     import e00733_leakage as leak
@@ -726,15 +831,51 @@ def make_predicting_job(
     run_job = make_run_job(root=root, device=device, max_passes=max_passes)
 
     def run(arm: str, fold: str | None, seed: int) -> dict[str, Any]:
-        record = run_job(arm, fold, seed)
+        if new_process:
+            run_stage_in_new_process(
+                stage="fit", arm=arm, fold=fold, seed=seed, device=device, root=root,
+                data_root=data_root, max_passes=max_passes,
+            )  # fmt: skip
+            record = json.loads(
+                fit.record_path(root=root, arm=arm, fold=fold, seed=seed).read_text()
+            )
+        else:
+            record = run_job(arm, fold, seed)
         leak.assert_limits_before_fits(
             limits=root / "limits.json",
             fit_records=[fit.record_path(root=root, arm=arm, fold=fold, seed=seed)],
         )
-        pr.predict_job(root=root, arm=arm, fold=fold, seed=seed, device=device, rows=rows)
-        return record
+        started = time.monotonic()
+        if new_process:
+            run_stage_in_new_process(
+                stage="predict", arm=arm, fold=fold, seed=seed, device=device, root=root,
+                data_root=data_root, max_passes=None, rows=rows,
+            )  # fmt: skip
+            predicted = json.loads(
+                predict_record_path(root=root, arm=arm, fold=fold, seed=seed).read_text()
+            )
+            seconds, peak = float(predicted["seconds"]), float(predicted["peak_rss_gb"])
+        else:
+            pr.predict_job(root=root, arm=arm, fold=fold, seed=seed, device=device, rows=rows)
+            seconds, peak = time.monotonic() - started, fit.peak_rss_gb()
+        job = write_job_record(
+            root=root, arm=arm, fold=fold, seed=seed, fit_record=record, predict_seconds=seconds,
+            predict_peak_rss_gb=peak,
+        )  # fmt: skip
+        return {
+            **record,
+            "predict_seconds": job["predict_seconds"],
+            "predict_peak_rss_gb": job["predict_peak_rss_gb"],
+        }
 
     return run
+
+
+def predict_record_path(*, root: Path, arm: str, fold: str | None, seed: int) -> Path:
+    """Return the file in which the predict stage records its seconds and peak memory."""
+    import e00733_fit as fit
+
+    return root / "fits" / f"{fit.job_name(arm=arm, fold=fold, seed=seed)}.predict.json"
 
 
 def stage_predict(args: argparse.Namespace, root: Path) -> dict[str, Any]:
@@ -768,12 +909,20 @@ def stage_predict(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         ]
     done: list[str] = []
     for arm, fold, seed in jobs:
+        started = time.monotonic()
         done += [
             str(p.name)
             for p in pr.predict_job(
                 root=root, arm=arm, fold=fold, seed=seed, device=args.device, rows=rows
             )
         ]
+        st.write_json(
+            path=predict_record_path(root=root, arm=arm, fold=fold, seed=seed),
+            payload={
+                "seconds": round(time.monotonic() - started, 1),
+                "peak_rss_gb": fit.peak_rss_gb(),
+            },
+        )
     if not jobs:
         msg = "no fit exists, so the predict stage would write nothing"
         raise RuntimeError733(msg)
@@ -871,33 +1020,57 @@ def run_chain_stage(*, root: Path, args: argparse.Namespace, run_one: Any) -> di
 def stage_chain(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     """Run the fit families in the plan's order (the dropped arms are skipped)."""
     cap = check_max_passes_allowed(args=args)
-    run_one = make_predicting_job(root=root, device=args.device, max_passes=cap)
+    run_one = make_predicting_job(
+        root=root, device=args.device, max_passes=cap, data_root=getattr(args, "data_root", None)
+    )
     return run_chain_stage(root=root, args=args, run_one=run_one)
 
 
 def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
-    """Measure the timing gate: one fold of FU at seed 0 and 5 passes of YU, in a scratch folder.
+    """Measure the timing gate: one fold of FU at seed 0 and 5 passes of YU, each fit and predicted.
 
-    The fits are written under `scores/timing_fits`, so no chain job reads them.
+    Each measured job is a whole chain job: the fit, then every prediction set (for FU the three
+    stored variants, with the masked and stored forecasts), and the target-poison check, on the
+    held-out validation rows. The jobs run in a scratch folder, `scores/timing_scratch`, that links
+    the inputs, so no chain job reads them and no test row is read.
 
     Args:
         args: The parsed arguments (`--device`, `--max-passes` on a scratch root).
         root: This experiment's data folder.
 
     Returns:
-        The measurements that `timing_decision` reads.
+        The measurements that `timing_decision` reads: seconds of a whole real job, seconds of a
+        whole synthetic job at 80 passes, the peaks, and the seconds of the smoke test and of this
+        measurement.
     """
+    import e00733_smokerun as smokerun
+
+    started = time.monotonic()
     cap = check_max_passes_allowed(args=args)
-    sub = root / "scores" / "timing_fits"
-    run_job = make_run_job(root=root, device=args.device, max_passes=cap, fit_root=sub)
-    real = run_job("FU", core.SCREEN_FOLDS[0], 0)
+    scratch = smokerun.scratch_root(outer=root / "scores" / "timing_scratch", root=root)
+    smokerun.link_inputs(root=root, scratch=scratch)
+    real_job = make_predicting_job(
+        root=scratch, device=args.device, max_passes=cap, rows="validation", new_process=False
+    )
+    real = real_job("FU", core.SCREEN_FOLDS[0], 0)
     passes = 5 if cap is None else cap
-    synthetic_cap = make_run_job(root=root, device=args.device, max_passes=passes, fit_root=sub)
-    syn = synthetic_cap("YU", None, 0)
+    syn_job = make_predicting_job(
+        root=scratch, device=args.device, max_passes=passes, rows="validation", new_process=False
+    )
+    syn = syn_job("YU", None, 0)
     per_pass = float(syn["seconds"]) / passes
+    smoke_path = root / st.SMOKE_FILE
+    smoke_seconds = (
+        float(st.read_json(path=smoke_path).get("seconds", 0.0)) if smoke_path.exists() else 0.0
+    )
     return {
-        "seconds_per_real_fit": float(real["seconds"]),
-        "seconds_per_synthetic_fit": per_pass * 80,
+        "seconds_per_real_fit": float(real["seconds"]) + float(real["predict_seconds"]),
+        "seconds_per_synthetic_fit": per_pass * 80 + float(syn["predict_seconds"]),
         "peak_gpu_gb": max(float(real["peak_gpu_gb"]), float(syn["peak_gpu_gb"])),
-        "peak_rss_gb": max(float(real["peak_rss_gb"]), float(syn["peak_rss_gb"])),
-    }
+        "peak_rss_gb": max(
+            float(real["peak_rss_gb"]), float(syn["peak_rss_gb"]), float(real["predict_peak_rss_gb"]),
+            float(syn["predict_peak_rss_gb"]),
+        ),
+        "smoke_seconds": smoke_seconds,
+        "timing_gate_seconds": time.monotonic() - started,
+    }  # fmt: skip

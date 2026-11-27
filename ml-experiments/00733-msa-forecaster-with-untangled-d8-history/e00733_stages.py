@@ -345,7 +345,7 @@ def family_jobs(*, family: str) -> list[tuple[str, str | None, int]]:
 
 def timing_decision(
     *, seconds_per_real_fit: float, seconds_per_synthetic_fit: float, peak_gpu_gb: float, peak_rss_gb: float,
-    fu_equals_fs: bool = False,
+    fu_equals_fs: bool = False, smoke_seconds: float = 0.0, timing_gate_seconds: float = 0.0,
 ) -> dict[str, Any]:  # fmt: skip
     """Return the timing gate's decision: the projection, the arms dropped from the end.
 
@@ -358,22 +358,29 @@ def timing_decision(
     the projection is at or under the stop line; FS is not fitted when it equals FU.
 
     Args:
-        seconds_per_real_fit: The measured seconds of one real-fold fit (FU, 1 fold, seed 0).
-        seconds_per_synthetic_fit: The measured seconds of one synthetic fit at the cap (5 passes
-            scaled to 80).
+        seconds_per_real_fit: The measured seconds of one whole real-fold job (FU, 1 fold, seed 0):
+            the fit, every prediction set, and the target-poison check.
+        seconds_per_synthetic_fit: The measured seconds of one whole synthetic job (5 passes of the
+            fit scaled to 80, plus the prediction).
         peak_gpu_gb: The measured peak GPU memory.
         peak_rss_gb: The measured peak resident memory.
         fu_equals_fs: Whether FS is the same arm as FU (then FS is not fitted).
+        smoke_seconds: The measured seconds of the smoke test (0 when not measured).
+        timing_gate_seconds: The measured seconds of the timing gate itself (0 when not measured).
 
     Returns:
         A dictionary with `pass`, `projected_hours`, `dropped`, `projected_counted_hours`, and the
         measurements.
 
     Raises:
-        StoppedError: When the counted work alone exceeds the stop line, or the peak GPU memory is
-            above the slot's cap.
+        StoppedError: When the counted work alone exceeds the stop line, the peak GPU memory is
+            above the slot's cap, or the peak resident memory is above `core.RSS_STOP_GB`.
     """
-    fixed = core.planned_hours(names=("smoke", "timing_gate", "reruns"))
+    fixed = (
+        core.planned_hours(names=("reruns",))
+        + max(core.planned_hours(names=("smoke",)), smoke_seconds / 3600.0)
+        + max(core.planned_hours(names=("timing_gate",)), timing_gate_seconds / 3600.0)
+    )
     already = ("FS",) if fu_equals_fs else ()
 
     def hours(dropped: tuple[str, ...]) -> float:
@@ -384,6 +391,9 @@ def timing_decision(
 
     if peak_gpu_gb > core.GPU_GB:
         msg = f"the peak GPU memory {peak_gpu_gb:.1f} GB is above the slot's {core.GPU_GB} GB (verdict row 0)"
+        raise StoppedError(msg)
+    if peak_rss_gb > core.RSS_STOP_GB:
+        msg = f"the peak resident memory {peak_rss_gb:.1f} GB is above the stop line of {core.RSS_STOP_GB} GB (verdict row 0)"
         raise StoppedError(msg)
     dropped = already
     for arm in core.DROP_ORDER:
@@ -401,6 +411,7 @@ def timing_decision(
         "not_fitted": list(already), "seconds_per_real_fit": seconds_per_real_fit,
         "seconds_per_synthetic_fit": seconds_per_synthetic_fit, "peak_gpu_gb": peak_gpu_gb,
         "peak_rss_gb": peak_rss_gb, "stop_line_hours": core.STOP_LINE_HOURS,
+        "smoke_seconds": smoke_seconds, "timing_gate_seconds": timing_gate_seconds,
     }  # fmt: skip
 
 

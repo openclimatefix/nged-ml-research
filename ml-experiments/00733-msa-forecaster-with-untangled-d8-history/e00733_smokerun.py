@@ -12,6 +12,7 @@ import argparse
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Final
 
@@ -220,7 +221,10 @@ def stage_smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         predict=predict, read_stored=read_stored_step(scratch=scratch),
         checks=check_steps(root=root), later=later_steps(scratch=scratch, device=args.device),
     )  # fmt: skip
+    started = time.monotonic()
     record = smoke.run_smoke(root=root, scratch=scratch, steps=steps, device=args.device)
+    record["seconds"] = round(time.monotonic() - started, 1)
+    st.write_json(path=root / st.SMOKE_FILE, payload=record)
     leak.assert_wrote_only_here(written=[root / st.SMOKE_FILE], data_root=root)
     if not record["pass"]:
         failed = [k for k, v in record["steps"].items() if not v["ok"]]

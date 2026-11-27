@@ -176,6 +176,8 @@ WORK_HOURS: Final = {
 }  # fmt: skip
 COUNTED_WORK: Final = ("smoke", "timing_gate", "reruns", "F0r", "FU", "FU-S", "Y0 and YU")
 REPORT_ONLY_WORK: Final = ("FS", "YT")
+RSS_STOP_GB: Final = 13.0
+"""A job whose peak resident memory exceeds this stops the chain (the slot holds 14 GB)."""
 PLANNED_HOURS: Final = 10.56
 """The pre-registered cost, in GPU-process-hours."""
 

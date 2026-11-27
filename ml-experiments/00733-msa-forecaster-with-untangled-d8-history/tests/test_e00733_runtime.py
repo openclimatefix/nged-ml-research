@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import e00733_channels as ch
 import e00733_cli as cli
@@ -370,3 +371,114 @@ def test_bank_origin_time_example_is_written_privately_and_a_bad_run_time_fails(
     seg.top_run_avail_us[10] += 3_600_000_000
     with pytest.raises(rt.st.CorrectnessFailureError):
         rt.write_origin_time_example(root=tmp_path, kind="test", segments=[seg])
+
+
+# --------------------------------------------------------------------------- timing and memory
+
+
+def _timing_kwargs(**over: float) -> dict[str, Any]:
+    base = {
+        "seconds_per_real_fit": 360.0, "seconds_per_synthetic_fit": 100.0, "peak_gpu_gb": 3.0,
+        "peak_rss_gb": 8.0,
+    }  # fmt: skip
+    return {**base, **over}
+
+
+def test_the_projection_includes_the_measured_smoke_test_and_timing_gate() -> None:
+    """A smoke test or timing gate that took longer than planned raises the projection."""
+    plain = st.timing_decision(**_timing_kwargs())
+    longer = st.timing_decision(**_timing_kwargs(smoke_seconds=3 * 3600.0, timing_gate_seconds=0.0))
+    assert longer["projected_counted_hours"] == pytest.approx(
+        plain["projected_counted_hours"] + 3.0 - core.planned_hours(names=("smoke",)), abs=1e-2
+    )
+
+
+def test_a_peak_resident_memory_above_13_gb_stops_the_line() -> None:
+    """The timing gate stops at verdict row 0 above 13 GB of resident memory."""
+    with pytest.raises(StoppedError, match="resident memory"):
+        st.timing_decision(**_timing_kwargs(peak_rss_gb=13.5))
+    assert st.timing_decision(**_timing_kwargs(peak_rss_gb=12.9))["pass"]
+
+
+def test_a_job_that_peaks_above_13_gb_stops_the_chain(tmp_path: Path) -> None:
+    """The job record keeps both peaks, and a prediction above 13 GB raises a stop."""
+    kw = {"root": tmp_path, "arm": "FU", "fold": "2026-01", "seed": 0}
+    ok = rt.write_job_record(
+        **kw,
+        fit_record={"seconds": 10.0, "peak_rss_gb": 7.0},
+        predict_seconds=5.0,
+        predict_peak_rss_gb=6.0,
+    )
+    assert ok["fit_peak_rss_gb"] == 7.0
+    assert (
+        json.loads(rt.job_record_path(root=tmp_path, arm="FU", fold="2026-01", seed=0).read_text())[
+            "predict_seconds"
+        ]
+        == 5.0
+    )
+    with pytest.raises(StoppedError):
+        rt.write_job_record(
+            **kw,
+            fit_record={"seconds": 10.0, "peak_rss_gb": 7.0},
+            predict_seconds=5.0,
+            predict_peak_rss_gb=13.2,
+        )
+
+
+def test_the_chain_job_fits_and_predicts_in_two_new_processes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prediction runs in a process of its own, after the fit's process has ended (the plan's rule)."""
+    import e00733_fit as fit
+
+    calls: list[str] = []
+
+    def fake_process(**kw: object) -> None:
+        calls.append(str(kw["stage"]))
+        if kw["stage"] == "fit":
+            fit.write_json(
+                path=fit.record_path(root=tmp_path, arm="Y0", fold=None, seed=0),
+                payload={"seconds": 3.0, "peak_rss_gb": 2.0},
+            )
+        else:
+            st.write_json(
+                path=rt.predict_record_path(root=tmp_path, arm="Y0", fold=None, seed=0),
+                payload={"seconds": 4.0, "peak_rss_gb": 1.5},
+            )
+
+    monkeypatch.setattr(rt, "run_stage_in_new_process", fake_process)
+    (tmp_path / "limits.json").write_text("{}")
+    import e00733_leakage as leak
+
+    monkeypatch.setattr(leak, "assert_limits_before_fits", lambda **_: None)
+    job = rt.make_predicting_job(root=tmp_path, device="cpu", max_passes=None)
+    got = job("Y0", None, 0)
+    assert calls == ["fit", "predict"] and got["predict_seconds"] == 4.0
+
+
+@pytest.mark.parametrize(
+    ("code", "error"),
+    [
+        (4, CorrectnessFailureError),
+        (3, StoppedError),
+        (5, rt.RuntimeError733),
+        (1, rt.RuntimeError733),
+    ],
+)
+def test_a_new_process_exit_code_maps_to_the_error_of_the_chain(
+    code: int, error: type[Exception], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Exit 4 is a correctness failure, 3 a stop, and anything else a failed job."""
+    import subprocess
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=code))
+    with pytest.raises(error):
+        rt.run_stage_in_new_process(
+            stage="predict", arm="Y0", fold=None, seed=0, device="cpu", root=tmp_path,
+            data_root=None, max_passes=None,
+        )  # fmt: skip
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0))
+    rt.run_stage_in_new_process(
+        stage="fit", arm="Y0", fold=None, seed=0, device="cpu", root=tmp_path, data_root=None, max_passes=None
+    )  # fmt: skip
