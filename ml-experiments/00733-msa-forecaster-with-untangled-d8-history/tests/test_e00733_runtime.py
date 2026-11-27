@@ -355,3 +355,18 @@ def test_fit_stage_on_cuda_without_a_gpu_is_refused_before_any_input_is_read(
             rt.stage_fit(_args(arm=arm, fold=fold, seed=0, device="cuda"), tmp_path)
     with pytest.raises(rt.RuntimeError733):
         rt.stage_fit(_args(arm=None, device="cpu"), tmp_path)
+
+
+def test_bank_origin_time_example_is_written_privately_and_a_bad_run_time_fails(
+    tmp_path: Path,
+) -> None:
+    """The example row goes to PRIVATE, and a run available after the native origin stops the bank."""
+    from synth_fixture import make_segment
+
+    seg = make_segment()
+    example = rt.write_origin_time_example(root=tmp_path, kind="test", segments=[seg])
+    assert (tmp_path / "PRIVATE" / "origin_time_example_test.txt").read_text().strip() == example
+    assert seg.top_run_avail_us is not None
+    seg.top_run_avail_us[10] += 3_600_000_000
+    with pytest.raises(rt.st.CorrectnessFailureError):
+        rt.write_origin_time_example(root=tmp_path, kind="test", segments=[seg])

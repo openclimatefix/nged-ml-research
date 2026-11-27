@@ -29,7 +29,7 @@ import e00733_core as core
 import e00733_inputs as inputs
 import e00733_leakage as leak
 import e00733_model as model
-import e00733_paths as paths  # noqa: F401
+import e00733_paths as paths
 import e00733_synth as sy
 import numpy as np
 
@@ -99,16 +99,8 @@ class UntAssembled:
     c_idx: torch.Tensor
     primary: torch.Tensor
     run_init_us: torch.Tensor | None = None
-
-
-def day_start_us(*, c_idx: np.ndarray) -> np.ndarray:
-    """Return 00:00 UTC of the origin's day in microseconds.
-
-    This is the latest valid time that the plan's example row prints for the other target-row
-    columns.
-    """
-    stamp = lay.GRID_START_US + np.asarray(c_idx, dtype=np.int64) * lay.STEP_US
-    return stamp // lay.DAY_US * lay.DAY_US
+    run_avail_us: torch.Tensor | None = None
+    other_valid_us: torch.Tensor | None = None
 
 
 class UntSource:
@@ -164,20 +156,70 @@ class UntSource:
         batch_inputs = model.UntInputs(
             **out.inputs.__dict__, hist_u=hist.channels, hist_u_ok=hist.ok
         )
-        run = getattr(self.ens, "run_us", None)
-        run_init = None
-        if (
-            run is not None
-        ):  # the issue time of the run behind each (Primary, origin day); 0 where absent
-            day = (c_idx // lay.STEPS_PER_DAY - self.ens.first_day)[:, None]  # ty: ignore[unresolved-attribute]
-            run_init = run[primary[:, None], day][:, 0]
+        run_init, run_avail, other_valid = run_times_of(source=self, primary=primary, c_idx=c_idx)
         batch = UntAssembled(
             inputs=batch_inputs, target=out.target, target_idx=out.target_idx,
             hist_idx=out.hist_idx, c_idx=c_idx, primary=primary, run_init_us=run_init,
+            run_avail_us=run_avail, other_valid_us=other_valid,
         )  # fmt: skip
         if check:
             check_batch(batch=batch)
         return batch
+
+
+def run_times_of(
+    *, source: UntSource, primary: torch.Tensor, c_idx: torch.Tensor
+) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:
+    """Return the run times of each sample's origin day as the run files record them.
+
+    The times are the initialisation time and the availability time of the run, and the valid time of
+    the other target-row columns. Experiment 713's own `run_us` is the origin minus 9 hours by
+    construction, so it is not read. A source with an ensemble table that holds no file times
+    raises.
+
+    Args:
+        source: The source whose ensemble table holds the run times.
+        primary: `(B,)` the Primary of each sample.
+        c_idx: `(B,)` the grid index of each contract origin.
+
+    Returns:
+        The three times as `(B,)` tensors, or three Nones when the source has no run times.
+
+    Raises:
+        CorrectnessFailureError: When the ensemble table has run times but no file times.
+    """
+    ens = source.ens
+    if getattr(ens, "run_us", None) is None:
+        return None, None, None
+    names = ("file_run_init_us", "file_run_avail_us", "file_other_valid_us")
+    tables = [getattr(ens, n, None) for n in names]
+    if any(t is None for t in tables):
+        msg = "the ensemble table has no run times read from the run files, so nothing was checked"
+        raise leak.CorrectnessFailureError(msg)
+    day = to_numpy(tensor=c_idx // lay.STEPS_PER_DAY - ens.first_day)  # ty: ignore[unresolved-attribute]
+    prim = to_numpy(tensor=primary)
+    return tuple(torch.from_numpy(np.asarray(t)[prim, day]) for t in tables)  # ty: ignore[invalid-return-type]
+
+
+_EXAMPLE_PRINTED: list[str] = []
+"""The example row of this process's first checked batch (empty until one is checked)."""
+
+
+def _print_example(*, batch: UntAssembled, c: np.ndarray, filled: np.ndarray) -> None:
+    """Print the plan's example row for the first target token of the batch's first sample.
+
+    The row is read from the batch's own run times and written to `PRIVATE/origin_time_example_real.txt`.
+    """
+    i = int(np.flatnonzero(filled.any(axis=1))[0])
+    target = to_numpy(tensor=batch.target_idx)[i][filled[i]][0]
+    row = leak.example_row(
+        c_idx=int(c[i]), target_idx=int(target), run_init_us=int(to_numpy(tensor=batch.run_init_us)[i]),
+        other_latest_valid_us=int(to_numpy(tensor=batch.other_valid_us)[i]),
+        run_available_us=int(to_numpy(tensor=batch.run_avail_us)[i]),
+    )  # fmt: skip
+    _EXAMPLE_PRINTED.append(row)
+    print(row, flush=True)
+    (paths.private_dir() / "origin_time_example_real.txt").write_text(row + "\n")
 
 
 def check_batch(*, batch: UntAssembled) -> None:
@@ -199,11 +241,14 @@ def check_batch(*, batch: UntAssembled) -> None:
     if batch.run_init_us is not None:
         c = to_numpy(tensor=batch.c_idx)
         filled = to_numpy(tensor=torch.isfinite(batch.target))
-        leak.assert_origin_time_weather(
+        checked = leak.assert_origin_time_weather(
             c_idx=c, run_init_us=to_numpy(tensor=batch.run_init_us),
             target_idx=to_numpy(tensor=batch.target_idx), filled=filled,
-            other_latest_valid_us=day_start_us(c_idx=c),
+            other_latest_valid_us=to_numpy(tensor=batch.other_valid_us),
+            run_available_us=to_numpy(tensor=batch.run_avail_us),
         )  # fmt: skip
+        if checked and not _EXAMPLE_PRINTED:
+            _print_example(batch=batch, c=c, filled=filled)
     ch = batch.inputs.hist_u
     ok = batch.inputs.hist_u_ok
     if not bool(torch.isfinite(ch).all()) or bool((ch[~ok] != 0).any()):

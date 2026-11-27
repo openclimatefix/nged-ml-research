@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Final
 
 import e00733_core as core
+import e00733_leakage as leak
 import e00733_paths as paths  # noqa: F401
 import numpy as np
 from e00733_channels import StoppedError
@@ -244,6 +245,14 @@ class SegmentArrays:
             on
             dense day D (None: the stored outputs are used for every history day).
         u_rerun_ok: `(n_days, 2, 48)` bool, the flag of `u_rerun`.
+        top_run_init_us: `(n_days,)` the initialisation time of the ensemble run that each origin's
+            target rows read, from the run file's date, in microseconds (0 where uncovered).
+        top_run_avail_us: `(n_days,)` the run file's own `power_fcst_init_time` column (0 where
+            uncovered).
+        top_other_valid_us: `(n_days,)` the valid time of the trailing-temperature, solar-gain,
+            and CAMS columns copied into the target rows (0 where uncovered).
+        top_c_grid: `(n_days,)` the real-calendar grid index of each origin's contract origin.
+        top_filled: `(n_days, 14, 48)` bool, whether the ensemble run holds the target half-hour.
     """
 
     present: np.ndarray
@@ -264,6 +273,11 @@ class SegmentArrays:
     top_day_type: np.ndarray
     u_rerun: np.ndarray | None = None
     u_rerun_ok: np.ndarray | None = None
+    top_run_init_us: np.ndarray | None = None
+    top_run_avail_us: np.ndarray | None = None
+    top_other_valid_us: np.ndarray | None = None
+    top_c_grid: np.ndarray | None = None
+    top_filled: np.ndarray | None = None
 
     @property
     def n_days(self) -> int:
@@ -282,8 +296,15 @@ class SegmentArrays:
             "top_datetime": (n, TOP_ROWS, STEPS, N_WEATHER_COLUMNS),
             "top_day_type": (n, TOP_ROWS, STEPS),
         }  # fmt: skip
+        for name in ("top_run_init_us", "top_run_avail_us", "top_other_valid_us", "top_c_grid"):
+            want[name] = (n,)
+        want["top_filled"] = (n, TOP_ROWS, STEPS)
         for name, shape in want.items():
-            if getattr(self, name).shape != shape:
+            if getattr(self, name) is None:
+                if name.startswith("top_") and name.endswith(("_us", "_grid", "_filled")):
+                    msg = f"the segment array {name} is missing, so no origin-time check can run"
+                    raise SynthError(msg)
+            elif getattr(self, name).shape != shape:
                 msg = f"the segment array {name} has shape {getattr(self, name).shape}, not {shape}"
                 raise SynthError(msg)
 
@@ -414,6 +435,80 @@ class SynthBatch:
     history_x_neg: np.ndarray
 
 
+@dataclass
+class OriginTimes:
+    """The run times that the target rows of a batch read, as the run files record them.
+
+    Attributes:
+        c_grid: `(B,)` the real-calendar grid index of each contract origin.
+        target_grid: `(B, 48)` the real-calendar grid index of each target half-hour.
+        filled: `(B, 48)` whether the run holds the half-hour.
+        run_init_us: `(B,)` the run's initialisation time.
+        run_avail_us: `(B,)` the run's availability time, read from the file's own column.
+        other_valid_us: `(B,)` the valid time of the other target-row columns.
+    """
+
+    c_grid: np.ndarray
+    target_grid: np.ndarray
+    filled: np.ndarray
+    run_init_us: np.ndarray
+    run_avail_us: np.ndarray
+    other_valid_us: np.ndarray
+
+    @classmethod
+    def empty(cls, *, b: int) -> OriginTimes:
+        """Return a record of `b` samples with nothing read yet."""
+        return cls(
+            c_grid=np.zeros(b, dtype=np.int64), target_grid=np.zeros((b, STEPS), dtype=np.int64),
+            filled=np.zeros((b, STEPS), dtype=bool), run_init_us=np.zeros(b, dtype=np.int64),
+            run_avail_us=np.zeros(b, dtype=np.int64), other_valid_us=np.zeros(b, dtype=np.int64),
+        )  # fmt: skip
+
+    def take(self, *, n: int, seg: SegmentArrays, d: int, k: int) -> None:
+        """Read sample `n`'s record out of its segment (raises when the segment holds none)."""
+        if seg.top_c_grid is None or seg.top_filled is None:
+            msg = "a segment holds no origin-time record, so its target rows cannot be checked"
+            raise SynthError(msg)
+        self.c_grid[n] = seg.top_c_grid[d]
+        self.target_grid[n] = seg.top_c_grid[d] + STEPS * k + np.arange(STEPS)
+        self.filled[n] = seg.top_filled[d, k]
+        self.run_init_us[n] = seg.top_run_init_us[d]  # ty: ignore[not-subscriptable]
+        self.run_avail_us[n] = seg.top_run_avail_us[d]  # ty: ignore[not-subscriptable]
+        self.other_valid_us[n] = seg.top_other_valid_us[d]  # ty: ignore[not-subscriptable]
+
+    def assert_origin_time_weather(self) -> int:
+        """Check every target token of the batch against the run times that were read.
+
+        Returns:
+            The number of target tokens checked (0 when the batch has no covered origin).
+
+        Raises:
+            CorrectnessFailureError: When a token's run was not initialised at 00:00 UTC of the
+                origin's base date, was available after the native origin, or another target-row
+                column has a valid time at or after the native origin.
+        """
+        if not self.filled.any():
+            return 0
+        return leak.assert_origin_time_weather(
+            c_idx=self.c_grid, run_init_us=self.run_init_us, target_idx=self.target_grid,
+            filled=self.filled, other_latest_valid_us=self.other_valid_us,
+            run_available_us=self.run_avail_us,
+        )  # fmt: skip
+
+    def example(self) -> str | None:
+        """Return the plan's example row for the first sample with a covered origin (or None)."""
+        picked = np.flatnonzero(self.filled.any(axis=1))
+        if len(picked) == 0:
+            return None
+        i = int(picked[0])
+        t = int(self.target_grid[i][self.filled[i]][0])
+        return leak.example_row(
+            c_idx=int(self.c_grid[i]), target_idx=t, run_init_us=int(self.run_init_us[i]),
+            other_latest_valid_us=int(self.other_valid_us[i]),
+            run_available_us=int(self.run_avail_us[i]),
+        )  # fmt: skip
+
+
 def gather_batch(
     *,
     segments: Sequence[SegmentArrays],
@@ -467,9 +562,11 @@ def gather_batch(
     target_z = np.full((b, STEPS), np.nan, dtype=np.float32)
     sign_truth = np.full((b, STEPS), np.nan, dtype=np.float32)
     hist_x = np.full((b, core.N_HISTORY_ROWS, STEPS), np.nan, dtype=np.float32)
+    times = OriginTimes.empty(b=b)
     for n, r in enumerate(rows):
         seg = segments[int(index.seg[r])]
         d, k = int(index.origin_day[r]), int(index.lead_index[r])
+        times.take(n=n, seg=seg, d=d, k=k)
         hs = history_slots(origin_day=np.array([d]))[0]
         inside = (hs >= 0) & (hs < seg.n_days * STEPS)
         hs_c = np.clip(hs, 0, seg.n_days * STEPS - 1)
@@ -497,6 +594,7 @@ def gather_batch(
         out["hist_u"][n], out["hist_u_ok"][n] = _channels(
             seg=seg, slots=hs_c, ok=finite, mode=mode, target_std=target_std, origin_day=d
         )
+    times.assert_origin_time_weather()
     if mask_history is not None:
         _apply_masks(out=out, masks=mask_history)
     out["primary"] = np.full(b, d8_index, dtype=np.int64)

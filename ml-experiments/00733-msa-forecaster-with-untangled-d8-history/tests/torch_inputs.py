@@ -50,6 +50,8 @@ class FakeSource:
         self.steps = torch.arange(48)
         self.power_z = torch.randn(16, 48 * 4100)
         self.run_offset_us = run_offset_us
+        self.avail_extra_us = 0
+        self.other_extra_us = 0
 
     def assemble(
         self,
@@ -76,12 +78,18 @@ class FakeSource:
         target_idx = c_idx[:, None] + 48 * lead_day[:, None] + torch.arange(48)[None, :]
         target = torch.randn(b, 48)
         self.ens.run_us = torch.zeros(16, 4000, dtype=torch.int64)
+        init = np.zeros((16, 4000), dtype=np.int64)
+        avail, other = init.copy(), init.copy()
         day = c_idx // 48
         for i in range(b):
             origin_day = int(day[i])
-            self.ens.run_us[int(primary[i]), origin_day] = (
-                lay.GRID_START_US + origin_day * lay.DAY_US + self.run_offset_us
-            )
+            run = lay.GRID_START_US + origin_day * lay.DAY_US + self.run_offset_us
+            self.ens.run_us[int(primary[i]), origin_day] = run
+            init[int(primary[i]), origin_day] = run
+            avail[int(primary[i]), origin_day] = run + 9 * lay.HOUR_US + self.avail_extra_us
+            other[int(primary[i]), origin_day] = run + self.other_extra_us
+        self.ens.file_run_init_us, self.ens.file_run_avail_us = init, avail
+        self.ens.file_other_valid_us = other
         return SimpleNamespace(
             inputs=MsaInputs(**base), target=target, target_idx=target_idx, hist_idx=hist_idx
         )

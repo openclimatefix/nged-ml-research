@@ -6,6 +6,7 @@ Every guard passes on a clean input, fails on a broken one, and fails on an empt
 
 import json
 from collections.abc import Callable
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import e00733_core as core
@@ -237,3 +238,21 @@ def test_write_guard(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         lk.assert_wrote_only_here(written=[paths.root_732() / "x.json"], data_root=mine)
     with pytest.raises(lk.CorrectnessFailureError):
         lk.assert_wrote_only_here(written=[], data_root=mine)
+
+
+def test_read_run_files_reads_name_and_availability_column(tmp_path: Path) -> None:
+    """A run file gives its date and its availability column; a missing or ambiguous one fails."""
+    import polars as pl
+
+    when = [datetime(2026, 1, 14, 9, tzinfo=UTC)] * 3
+    pl.DataFrame({"power_fcst_init_time": when}).write_parquet(tmp_path / "init=2026-01-14.parquet")
+    day = (date(2026, 1, 14) - date(1970, 1, 1)).days
+    got = lk.read_run_files(summary_dirs=[tmp_path], epoch_days=[day])
+    assert got[day] == (day * lk.DAY_US, day * lk.DAY_US + 9 * lk.HOUR_US)
+    with pytest.raises(lk.CorrectnessFailureError):
+        lk.read_run_files(summary_dirs=[tmp_path], epoch_days=[day + 1])
+    pl.DataFrame({"power_fcst_init_time": [when[0], when[0] + timedelta(hours=1)]}).write_parquet(
+        tmp_path / "init=2026-01-15.parquet"
+    )
+    with pytest.raises(lk.CorrectnessFailureError):
+        lk.read_run_files(summary_dirs=[tmp_path], epoch_days=[day + 1])

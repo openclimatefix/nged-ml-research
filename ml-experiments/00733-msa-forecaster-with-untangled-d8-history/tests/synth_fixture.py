@@ -21,6 +21,8 @@ def make_segment(
     u_raw = np.stack([rng.random(s), rng.random(s) * 30.0, rng.random(s)], axis=1).astype(
         np.float32
     )
+    day_start = 48 * (1000 + np.arange(n_days))
+    init_us = 1_567_296_000_000_000 + day_start * 1_800_000_000
     seg = sy.SegmentArrays(
         present=present,
         covered=present.copy(),
@@ -38,6 +40,11 @@ def make_segment(
         top_spread=rng.random((n_days, 14, 48, sy.N_SPREAD_COLUMNS)).astype(np.float32),
         top_datetime=rng.normal(size=(n_days, 14, 48, sy.N_WEATHER_COLUMNS)).astype(np.float32),
         top_day_type=rng.integers(0, 8, (n_days, 14, 48)),
+        top_run_init_us=np.where(present, init_us, 0),
+        top_run_avail_us=np.where(present, init_us + 9 * 3_600_000_000, 0),
+        top_other_valid_us=np.where(present, init_us, 0),
+        top_c_grid=day_start + 24,
+        top_filled=np.broadcast_to(present[:, None, None], (n_days, 14, 48)).copy(),
     )
     seg.check_shapes()
     return seg

@@ -229,3 +229,47 @@ def test_summary_run_days_unions_two_folders(tmp_path: Path) -> None:
     assert result.statuses(segment=0) == [sy.STATUS_OK, sy.STATUS_GAP]
     with pytest.raises(sy.SynthError):
         sy.summary_run_days(summary_dirs=[tmp_path / "missing"])
+
+
+# --------------------------------------------------------------------------- origin-time weather
+
+
+def test_every_synthetic_batch_asserts_the_origin_time_weather_and_prints_an_example() -> None:
+    """A batch of covered origins passes, and its example row names the run read from the file."""
+    seg = make_segment()
+    times = sy.OriginTimes.empty(b=2)
+    for n, d in enumerate((10, 11)):
+        times.take(n=n, seg=seg, d=d, k=3)
+    assert times.assert_origin_time_weather() == 2 * 48
+    row = times.example()
+    assert row is not None and row.endswith("pass") and "lead day 4" in row
+
+
+@pytest.mark.parametrize(
+    ("field", "offset_us"),
+    [
+        ("top_run_avail_us", 9 * 3_600_000_000 + 1_800_000_000),
+        ("top_run_init_us", 1_800_000_000),
+        ("top_other_valid_us", 9 * 3_600_000_000),
+    ],
+)
+def test_a_synthetic_run_time_one_step_past_the_native_origin_fails(
+    field: str, offset_us: int
+) -> None:
+    """A run available, initialised, or a column valid after the native origin fails the batch."""
+    seg = make_segment()
+    assert seg.top_run_init_us is not None
+    getattr(seg, field)[10] = seg.top_run_init_us[10] + offset_us
+    times = sy.OriginTimes.empty(b=1)
+    times.take(n=0, seg=seg, d=10, k=0)
+    with pytest.raises(sy.leak.CorrectnessFailureError):
+        times.assert_origin_time_weather()
+
+
+def test_a_segment_without_origin_time_record_cannot_be_gathered() -> None:
+    """Missing run times raise instead of skipping the check."""
+    seg = make_segment()
+    seg.top_c_grid = None
+    times = sy.OriginTimes.empty(b=1)
+    with pytest.raises(sy.SynthError):
+        times.take(n=0, seg=seg, d=10, k=0)

@@ -10,6 +10,7 @@ of each bank. The official run on the real data folder refuses that argument.
 
 import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Final
 
@@ -137,6 +138,7 @@ def stage_banks(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         if not segments:
             msg = f"the bank {kind} holds no covered segment, so the world has nothing to read"
             raise st.CorrectnessFailureError(msg)
+        write_origin_time_example(root=root, kind=kind, segments=segments)
         world.write_world(root=root, kind=kind, segments=segments, extra={**counts, "limit": limit})
         result[kind] = counts
         print(f"bank {kind}: {counts}")
@@ -144,6 +146,43 @@ def stage_banks(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         root=root, payload={"constants": constants, "limit": limit, "banks_digest": digest}
     )
     return result
+
+
+def write_origin_time_example(
+    *, root: Path, kind: str, segments: Sequence[sy.SegmentArrays]
+) -> str:
+    """Check every covered origin of a bank's segments and write the first example row privately.
+
+    The synthetic world's origin-time weather assertion runs over every target row of every covered
+    origin here, and again on every batch. The example row names a base date, so it goes to
+    `PRIVATE/origin_time_example_<kind>.txt` and the public log gets only the count.
+
+    Args:
+        root: This experiment's data folder.
+        kind: The bank's kind.
+        segments: The bank's built segments.
+
+    Returns:
+        The example row.
+
+    Raises:
+        CorrectnessFailureError: When a target token fails the assertion, or no origin is covered.
+    """
+    example, n_tokens = None, 0
+    for seg in segments:
+        days = np.flatnonzero(seg.covered)
+        for k in range(sy.TOP_ROWS):
+            times = sy.OriginTimes.empty(b=len(days))
+            for n, d in enumerate(days):
+                times.take(n=n, seg=seg, d=int(d), k=k)
+            n_tokens += times.assert_origin_time_weather()
+            example = example or times.example()
+    if example is None:
+        msg = f"the bank {kind} holds no covered target token for the origin-time weather assertion"
+        raise st.CorrectnessFailureError(msg)
+    (paths.private_dir(root=root) / f"origin_time_example_{kind}.txt").write_text(example + "\n")
+    print(f"bank {kind}: origin-time weather asserted on {n_tokens} target tokens")
+    return example
 
 
 # --------------------------------------------------------------------------- channels

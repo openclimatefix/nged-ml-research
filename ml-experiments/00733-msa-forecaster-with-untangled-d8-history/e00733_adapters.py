@@ -22,7 +22,7 @@ built yet.
 
 import json
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00733_channels as channels
 import e00733_core as core
@@ -162,6 +162,44 @@ def table_flags(*, base: Path, n_grid: int) -> np.ndarray:
     return channels.read_table(path=paths.table_path(root=base)).dense(n_grid=n_grid)[1]
 
 
+def build_fold_data_with_run_files(*, pipe: object, device: str, keep_rows: bool = False) -> Any:
+    """Build experiment 713's fold data and attach the run times that the run files record.
+
+    Experiment 713 sets each origin day's run time to the origin minus 9 hours, so a check against
+    that array holds by construction. This function reads, for every origin day that holds target
+    rows, the run's initialisation time (from the file's name) and availability time (from the file's
+    own `power_fcst_init_time` column) into `ens.file_run_init_us` and `ens.file_run_avail_us`,
+    `(16, n_days)` arrays that are 0 where no target row exists. The target rows' other columns come
+    from the same stored run, so `ens.file_other_valid_us` is the run's initialisation time.
+
+    Args:
+        pipe: The pipeline of experiment 713.
+        device: "cpu" or "cuda".
+        keep_rows: Whether to keep the Candidate rows.
+
+    Returns:
+        Experiment 713's `FoldData`.
+    """
+    import e00713_inputs as inp713  # ty: ignore[unresolved-import]
+
+    data = inp713.build_fold_data(pipe=pipe, device=device, keep_rows=keep_rows)
+    ens = data.source.ens  # ty: ignore[unresolved-attribute]
+    has_rows = ens.filled.any(dim=-1).cpu().numpy()  # (16, n_days)
+    first_epoch = int(ens.first_day) + channels.GRID_START_EPOCH_DAY
+    days = np.flatnonzero(has_rows.any(axis=0))
+    read = leak.read_run_files(
+        summary_dirs=paths.ens_summary_dirs(), epoch_days=[first_epoch + int(d) for d in days]
+    )
+    init = np.zeros(has_rows.shape, dtype=np.int64)
+    avail = np.zeros(has_rows.shape, dtype=np.int64)
+    for d in days:
+        i, a = read[first_epoch + int(d)]
+        init[:, d] = np.where(has_rows[:, d], i, 0)
+        avail[:, d] = np.where(has_rows[:, d], a, 0)
+    ens.file_run_init_us, ens.file_run_avail_us, ens.file_other_valid_us = init, avail, init.copy()
+    return data
+
+
 def real_loader(*, root: Path | None = None) -> fit.RealLoader:
     """Return the loader of the real-fold fits: `(arm, fold, seed, device) -> RealInputs`.
 
@@ -184,7 +222,7 @@ def real_loader(*, root: Path | None = None) -> fit.RealLoader:
         )
         if device == "cpu":
             patch_cpu_tables(pipe=pipe)
-        data = inp713.build_fold_data(pipe=pipe, device=device, keep_rows=False)
+        data = build_fold_data_with_run_files(pipe=pipe, device=device)
         leak.assert_training_power_cut(power=data.clean, fold_start_idx=data.cutoff_idx)
         tensors, kept = arm_tensors_for(arm=arm, base=base, data=data, device=device)
         world = tr713.World(
@@ -246,7 +284,7 @@ def build_weather_cache(
     )
     if device == "cpu":
         patch_cpu_tables(pipe=pipe)
-    data = inp713.build_fold_data(pipe=pipe, device=device, keep_rows=True)
+    data = build_fold_data_with_run_files(pipe=pipe, device=device, keep_rows=True)
     mr, _ = data.rows
     return world.write_weather_cache(
         root=root, data=data, standardiser=mr.base.standardiser, d8_index=d8_index()

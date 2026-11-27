@@ -206,7 +206,7 @@ def predict_fold(
     )  # fmt: skip
     if device == "cpu":
         adapters.patch_cpu_tables(pipe=pipe)
-    data = inp713.build_fold_data(pipe=pipe, device=device, keep_rows=False)
+    data = adapters.build_fold_data_with_run_files(pipe=pipe, device=device)
     if data.fingerprint != record["fingerprint"]:
         msg = "the standardiser of the prediction phase differs from the fit's (verdict row 1)"
         raise st.CorrectnessFailureError(msg)

@@ -11,7 +11,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, NoReturn
 
 import e00733_channels as channels
 import e00733_core as core
@@ -41,7 +41,7 @@ FORBIDDEN_SYNTHETIC_INPUT_WORDS: Final = (
 """Words that no input of the synthetic forecaster may carry in its name."""
 
 
-def _fail(*, message: str) -> None:
+def _fail(*, message: str) -> NoReturn:
     raise CorrectnessFailureError(message)
 
 
@@ -131,6 +131,46 @@ def assert_origin_time_weather(
     return n
 
 
+def read_run_files(
+    *, summary_dirs: Sequence[Path], epoch_days: Sequence[int]
+) -> dict[int, tuple[int, int]]:
+    """Read each ensemble run's initialisation and availability times from the run files.
+
+    The initialisation time is 00:00 UTC of the date in the file's name (`init=YYYY-MM-DD.parquet`),
+    and the availability time is the file's own `power_fcst_init_time` column, which must hold one
+    value.
+
+    Args:
+        summary_dirs: The folders that hold the runs' summary files.
+        epoch_days: The days (days since 1970-01-01) whose runs are read.
+
+    Returns:
+        For each day, the initialisation time and the availability time in microseconds.
+
+    Raises:
+        CorrectnessFailureError: When a run has no file, or its file holds several availability times.
+    """
+    import polars as pl
+
+    out: dict[int, tuple[int, int]] = {}
+    for day in epoch_days:
+        name = f"init={datetime.fromtimestamp(int(day) * 86_400, UTC):%Y-%m-%d}.parquet"
+        path = next((f / name for f in summary_dirs if (f / name).exists()), None)
+        if path is None:
+            _fail(message=f"the run file {name} does not exist, so its availability cannot be read")
+        values = (
+            pl.scan_parquet(path)
+            .select(pl.col("power_fcst_init_time").dt.epoch("us").unique())
+            .collect()
+            .to_series()
+            .to_list()
+        )
+        if len(values) != 1:
+            _fail(message=f"the run file {name} holds {len(values)} availability times, not one")
+        out[int(day)] = (int(day) * DAY_US, int(values[0]))
+    return out
+
+
 def example_row(
     *,
     c_idx: int,
@@ -138,6 +178,7 @@ def example_row(
     run_init_us: int,
     other_latest_valid_us: int,
     passed: bool = True,
+    run_available_us: int | None = None,
 ) -> str:
     """Return the example row that the assertion prints, in the form of the plan.
 
@@ -147,6 +188,8 @@ def example_row(
         run_init_us: The initialisation time of its ENS run.
         other_latest_valid_us: The latest valid time of any other target-row column.
         passed: Whether the assertion passed.
+        run_available_us: The run's availability time as read from the data (default: the
+            initialisation time plus the publication delay).
 
     Returns:
         The text of the example row.
@@ -159,7 +202,7 @@ def example_row(
         f"origin-time weather: {core.SCORED_PRIMARY}, contract origin {_stamp(idx_us=contract)} "
         f"(native {native // 1000000 // 3600 % 24:02d}:00 UTC),\n"
         f"target valid {_stamp(idx_us=valid)}, lead day {lead_day}, ENS run {_stamp(idx_us=run_init_us)},\n"
-        f"available {_stamp(idx_us=run_init_us + core.ENSEMBLE_AVAILABLE_AFTER_HOURS * HOUR_US)}, "
+        f"available {_stamp(idx_us=run_init_us + core.ENSEMBLE_AVAILABLE_AFTER_HOURS * HOUR_US if run_available_us is None else run_available_us)}, "
         f"latest valid time of any other target-row column\n"
         f"{_stamp(idx_us=other_latest_valid_us)}: {'pass' if passed else 'FAIL'}"
     )

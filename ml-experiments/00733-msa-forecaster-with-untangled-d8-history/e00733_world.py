@@ -53,6 +53,7 @@ SKY_COLUMN: Final = 0
 sky in a history token)."""
 SUN_UP_WATTS: Final = 10.0
 """A shortwave above this many watts per square metre counts as sun-up."""
+DAY_US: Final = 86_400_000_000
 WORLD_DIR: Final = "world"
 WEATHER_FILE: Final = "weather_d8.npz"
 META_FILE: Final = "meta.json"
@@ -166,11 +167,16 @@ class EnsRows:
         valid_us: `(n,)` the valid-time stamps (period ends) in microseconds, sorted.
         weather: `(n, 7)` the standardised ensemble-mean weather columns.
         spread: `(n, 7)` the standardised ensemble spread columns.
+        run_init_us: The run's initialisation time (00:00 UTC of the file's date) in microseconds.
+        run_avail_us: The file's own `power_fcst_init_time` column in microseconds: the origin the
+            summary was built for, so the time at which the run is available.
     """
 
     valid_us: np.ndarray
     weather: np.ndarray
     spread: np.ndarray
+    run_init_us: int
+    run_avail_us: int
 
 
 def read_ens_rows(
@@ -199,12 +205,18 @@ def read_ens_rows(
         return None
     wanted = [f"{k}_{w}" for k in ("mean", "std") for w in WEATHER_NAMES]
     frame = (
-        pl.read_parquet(path, columns=["time_series_id", "valid_time", *wanted])
+        pl.read_parquet(
+            path, columns=["time_series_id", "power_fcst_init_time", "valid_time", *wanted]
+        )
         .filter(pl.col("time_series_id") == series_id)
         .sort("valid_time")
     )
     if frame.is_empty():
         return None
+    avail = frame["power_fcst_init_time"].dt.epoch("us").unique().to_numpy().astype(np.int64)
+    if len(avail) != 1:
+        msg = f"the summary of run {day} holds {len(avail)} power_fcst_init_time values, not one"
+        raise WorldError(msg)
     raw = np.stack([frame[c].to_numpy().astype(np.float64) for c in wanted], axis=1)
     precip = [
         WEATHER_NAMES.index("precipitation"),
@@ -215,6 +227,7 @@ def read_ens_rows(
     return EnsRows(
         valid_us=frame["valid_time"].dt.epoch("us").to_numpy().astype(np.int64),
         weather=z[:, :N_ENS_WEATHER].astype(np.float32), spread=z[:, N_ENS_WEATHER:].astype(np.float32),
+        run_init_us=int(run_epoch_day) * DAY_US, run_avail_us=int(avail[0]),
     )  # fmt: skip
 
 
@@ -276,7 +289,7 @@ def reading_constants(*, segments: Sequence[Any]) -> dict[str, float]:
     return {"mean": mean, "std": float(np.sqrt(max(sq / n - mean * mean, 1e-12))), "n": float(n)}
 
 
-def build_segment(
+def build_segment(  # noqa: PLR0915
     *, seg: Any, runs: RunCache, run_days: frozenset[Any] | set[int], constants: Mapping[str, float]
 ) -> sy.SegmentArrays:
     """Build one segment's arrays (the untangled channels are attached later).
@@ -316,6 +329,11 @@ def build_segment(
     top_spread = np.zeros((n, sy.TOP_ROWS, steps, sy.N_SPREAD_COLUMNS), dtype=np.float16)
     top_datetime = np.zeros((n, sy.TOP_ROWS, steps, sy.N_WEATHER_COLUMNS), dtype=np.float16)
     top_day_type = np.zeros((n, sy.TOP_ROWS, steps), dtype=np.int8)
+    top_filled = np.zeros((n, sy.TOP_ROWS, steps), dtype=bool)
+    run_init = np.zeros(n, dtype=np.int64)
+    run_avail = np.zeros(n, dtype=np.int64)
+    other_valid = np.zeros(n, dtype=np.int64)
+    c_grid = np.zeros(n, dtype=np.int64)
     for d in np.flatnonzero(covered):
         run = runs.get(epoch_day=int(epoch[d]))
         if run is None:
@@ -332,6 +350,10 @@ def build_segment(
         top_weather[d, ..., :N_ENS_WEATHER] = np.where(found[..., None], run.weather[pos], 0.0)
         top_spread[d] = np.where(found[..., None], run.spread[pos], 0.0)
         day_start = (first - ch.GRID_START_EPOCH_DAY + int(d)) * steps
+        top_filled[d] = found
+        run_init[d], run_avail[d] = run.run_init_us, run.run_avail_us
+        other_valid[d] = GRID_START_US + day_start * STEP_US
+        c_grid[d] = day_start + 24
         top_weather[d, ..., N_ENS_WEATHER:] = wx.weather[day_start, N_ENS_WEATHER:]
         top_datetime[d] = np.where(inside[..., None], wx.datetime[gc], 0.0)
         top_day_type[d] = np.where(inside, wx.day_type[gc], 0)
@@ -345,7 +367,8 @@ def build_segment(
         hist_weather=wx.weather[grid].astype(np.float32), hist_datetime=wx.datetime[grid].astype(np.float32),
         day_type=wx.day_type[grid].astype(np.int64), local_hh=wx.local_hh[grid].astype(np.int64), month=month,
         top_weather=top_weather, top_spread=top_spread, top_datetime=top_datetime,
-        top_day_type=top_day_type,
+        top_day_type=top_day_type, top_run_init_us=run_init, top_run_avail_us=run_avail,
+        top_other_valid_us=other_valid, top_c_grid=c_grid, top_filled=top_filled,
     )  # fmt: skip
 
 
