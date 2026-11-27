@@ -232,7 +232,7 @@ def test_timing_decision_drops_yt_then_fs_and_stops_when_counted_work_is_over() 
 def test_family_jobs_match_the_arm_table() -> None:
     """The families cover every fit of every arm exactly once (the screen is part of FU)."""
     total = sum(len(st.family_jobs(family=f)) for f in st.FAMILIES)
-    assert total == sum(a.n_fits for a in core.ARMS.values())
+    assert total == sum(a.n_fits for a in core.ARMS.values() if not a.post_hoc)
     screen = st.family_jobs(family="FU-screen")
     assert len(screen) == 8 and not set(screen) & set(st.family_jobs(family="FU"))
     assert len(st.family_jobs(family="FU")) == 32
@@ -279,7 +279,7 @@ def test_chain_runs_every_family_in_order_with_its_lines(tmp_path: Path) -> None
     )
     assert sum("fits starting" in line for line in log) == len(st.FAMILIES)
     assert sum("last fit ended" in line for line in log) == len(st.FAMILIES)
-    assert len(calls) == sum(a.n_fits for a in core.ARMS.values())
+    assert len(calls) == sum(a.n_fits for a in core.ARMS.values() if not a.post_hoc)
 
 
 def test_screen_rule_skips_the_rest_of_fu_and_the_placebo_but_not_the_synthetic_arms(

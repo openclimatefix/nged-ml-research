@@ -12,9 +12,12 @@ leaves
 `scores/failure_<stage>.json` with the message and the traceback.
 
 Stages built: `guard`, `banks`, `channels`, `limits`, `gallery`, `gallery2`, `smoke`, `timing`,
-`fit`, `chain`, `predict`, `score`, `report`, `figures`, `loss_curves`, `attention`, and
-`series`. `main` installs the stage functions of `e00733_runtime` and `e00733_figstages` into
-`STAGE_FUNCTIONS`, never at import. A stage with no function exits 2 with a message, never silently.
+`fit`, `chain`, `predict`, `score`, `report`, `figures`, `loss_curves`, `attention`, `series`,
+`posthoc`, and `posthoc_score`. The two post hoc stages run under `guard_posthoc` (legal only after
+the first test score), write under `<root>/posthoc/` alone, and never write a record of the main
+run, not even a failure or an invalid record. `main` installs the stage functions of
+`e00733_runtime` and `e00733_figstages` into `STAGE_FUNCTIONS`, never at import. A stage with no
+function exits 2 with a message, never silently.
 """
 
 import argparse
@@ -46,6 +49,8 @@ STAGES: Final = (
     "loss_curves",
     "attention",
     "series",
+    "posthoc",
+    "posthoc_score",
 )
 STAGE_FUNCTIONS: dict[str, Callable[[argparse.Namespace, Path], Any]] = {}
 """Functions of the stages that need the real-file adapters, by stage name (filled by the
@@ -67,7 +72,7 @@ def banks_digest(*, root730: Path) -> str:
     return banks730.banks_digest_id(root=root730)
 
 
-def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
+def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:  # noqa: PLR0912
     """Run one stage under its guard and return its exit code.
 
     A stage of `CPU_ONLY_STAGES` given `--device cuda` is refused with exit code 2, before the
@@ -80,13 +85,19 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
             file=sys.stderr,
         )
         return st.EXIT_GUARD
+    post_hoc = args.stage in st.POSTHOC_STAGES
     try:
-        st.guard_run(
-            root=root,
-            stage="chain" if args.stage == "guard" else args.stage,
-            banks_digest=digest,
-            validation_only=bool(getattr(args, "validation_only", False)),
-        ) if args.stage != "banks" else st.guard_run(root=root, stage="banks", banks_digest=digest)
+        if post_hoc:
+            st.guard_posthoc(root=root, stage=args.stage, banks_digest=digest)
+        elif args.stage != "banks":
+            st.guard_run(
+                root=root,
+                stage="chain" if args.stage == "guard" else args.stage,
+                banks_digest=digest,
+                validation_only=bool(getattr(args, "validation_only", False)),
+            )
+        else:
+            st.guard_run(root=root, stage="banks", banks_digest=digest)
         if args.stage == "guard":
             print("guard passed")
             return st.EXIT_OK
@@ -105,11 +116,15 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
             return st.exit_code(status=result)
         return st.EXIT_OK
     except BaseException as exc:
-        if isinstance(exc, st.CorrectnessFailureError):
+        if isinstance(exc, st.CorrectnessFailureError) and not post_hoc:
             st.record_invalid(root=root, rule=str(exc))
         if isinstance(exc, KeyboardInterrupt | SystemExit):
             raise
-        write_failure(root=root, stage=args.stage, exc=exc)
+        if post_hoc:
+            if not isinstance(exc, st.GuardError):  # a refusal leaves no file behind
+                st.write_posthoc_failure(root=root, stage=args.stage, exc=exc)
+        else:
+            write_failure(root=root, stage=args.stage, exc=exc)
         traceback.print_exc()
         return st.exit_code(exc=exc)
 
@@ -118,6 +133,7 @@ def install_runtime() -> None:
     """Put the stage functions of `e00733_runtime` into `STAGE_FUNCTIONS`."""
     import e00733_figstages as figstages
     import e00733_gallery2 as gallery2
+    import e00733_posthoc as posthoc
     import e00733_runtime as rt
     import e00733_scorestage as scorestage
     import e00733_smokerun as smokerun
@@ -131,6 +147,7 @@ def install_runtime() -> None:
             "smoke": smokerun.stage_smoke, "figures": figstages.stage_figures,
             "loss_curves": figstages.stage_loss_curves, "series": figstages.stage_series,
             "attention": figstages.stage_attention,
+            "posthoc": rt.stage_posthoc, "posthoc_score": posthoc.stage_posthoc_score,
         }
     )  # fmt: skip
 
@@ -212,6 +229,11 @@ def parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--png-dir", default=None, help="stage gallery2: a folder that also receives PNG copies"
+    )
+    p.add_argument(
+        "--arms",
+        default=None,
+        help="stage smoke: only these arms, such as FS,YS (the post hoc arms), in a scratch folder",
     )
     p.add_argument("--arm", default=None)
     p.add_argument("--fold", default=None)

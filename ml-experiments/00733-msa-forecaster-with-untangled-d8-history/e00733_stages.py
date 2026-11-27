@@ -67,7 +67,7 @@ READING_STAGES: Final = ("score", "report", "figures", "loss_curves", "attention
 """The stages that read the test outputs; none may run while the chain is fitting."""
 CPU_ONLY_STAGES: Final = (
     "guard", "banks", "channels", "limits", "gallery", "gallery2", "score", "report", "figures",
-    "loss_curves", "attention", "series",
+    "loss_curves", "attention", "series", "posthoc_score",
 )  # fmt: skip
 """The stages that compute on the CPU: `run.sh` skips the GPU check and the GPU lock for them, so
 they default to `--device cpu` and refuse `--device cuda`."""
@@ -80,6 +80,20 @@ gate, and no recorded failure."""
 FIT_STAGES: Final = ("fit", "chain")
 """The stages that also need the smoke test and the timing gate."""
 FAMILIES: Final = ("F0r", "FU-screen", "FU", "FU-S", "Y0", "YU", "FS", "YT")
+POSTHOC_STAGES: Final = ("posthoc", "posthoc_score")
+"""The stages of the post hoc runs set after the verdict. They are not in `GATED_STAGES`: `guard_run`
+refuses every fit once the first test score exists, and the post hoc stages have a guard of their own
+(`guard_posthoc`), which needs that score."""
+POSTHOC_FAMILIES: Final = ("YO", "FS", "YS")
+"""The families the `posthoc` stage fits, in order: the oracle YO, FS on the real folds, then YS."""
+POSTHOC_COST_CAP_HOURS: Final = 11.9
+"""No post hoc fit starts when the running total of measured GPU-process-hours, plus the fit's
+expected hours, would pass this cap. The absolute stop line is `core.STOP_LINE_HOURS`."""
+POSTHOC_DIR: Final = "posthoc"
+POSTHOC_STARTED: Final = "posthoc/posthoc_started.json"
+POSTHOC_STATUS: Final = "posthoc/posthoc_status.json"
+POSTHOC_GATE_RECORDS: Final = (PRE_FIT_GUARDS, PANEL_CHECK, REVIEW_GATE, SMOKE_FILE, TIMING_FILE)
+"""The gate records of the main run that the fits of the post hoc root read (copied, never changed)."""
 
 
 # --------------------------------------------------------------------------- files
@@ -396,6 +410,146 @@ def guard_run(*, root: Path, stage: str, banks_digest: str, validation_only: boo
         raise GuardError(msg)
 
 
+# --------------------------------------------------------------------------- the post hoc stages
+
+
+def posthoc_dir(*, root: Path) -> Path:
+    """Return the folder that holds every output of the post hoc runs."""
+    return root / POSTHOC_DIR
+
+
+def posthoc_fit_root(*, root: Path) -> Path:
+    """Return the data folder of the post hoc fits, `posthoc/<name of root>`.
+
+    The experiment store finds a folder of experiment 733 by its name, so the fits, networks, and
+    prediction sets of the post hoc runs live in a folder with the name of the main data folder.
+    """
+    return posthoc_dir(root=root) / root.name
+
+
+def posthoc_state(*, root: Path) -> str | None:
+    """Return the state in `posthoc/posthoc_status.json`, or None."""
+    path = root / POSTHOC_STATUS
+    return read_json(path=path).get("state") if path.exists() else None
+
+
+def guard_posthoc(*, root: Path, stage: str, banks_digest: str) -> None:
+    """Refuse a post hoc stage unless the main run is over, its verdict is out, and its gates passed.
+
+    This guard is separate from `guard_run`, which refuses every fit once the first test score
+    exists and has no exception. A post hoc run is legal only after that score.
+
+    Args:
+        root: The data folder of the main run.
+        stage: `posthoc` (the fits) or `posthoc_score` (the readings).
+        banks_digest: The digest id of experiment 730's banks in use.
+
+    Raises:
+        GuardError: When the stage is not a post hoc stage, the run marker differs, the main chain
+            is not complete, the first test score has not been taken, a correctness check has
+            failed, a pre-fit gate, the smoke test, or the timing gate has not passed, another post
+            hoc run is running (stage `posthoc`), or no post hoc run has finished (stage
+            `posthoc_score`).
+    """
+    if stage not in POSTHOC_STAGES:
+        msg = f"`{stage}` is not a post hoc stage"
+        raise GuardError(msg)
+    marker = root / RUN_MARKER
+    if not marker.exists() or read_json(path=marker) != run_marker_payload(
+        banks_digest=banks_digest
+    ):
+        msg = "no run marker matches the banks and the code in use: the main run has not been made with this code"
+        raise GuardError(msg)
+    if not marker_exists(root=root):
+        msg = f"`{stage}` is legal only after the verdict, and {TEST_MARKER} does not exist: the first test score has not been taken"
+        raise GuardError(msg)
+    if chain_state(root=root) != "complete":
+        msg = f"`{stage}` needs the main chain complete (`chain_status.json` says {chain_state(root=root)})"
+        raise GuardError(msg)
+    if invalid_recorded(root=root):
+        msg = f"`{stage}` refuses a run whose {INVALID_FILE} records a failed correctness check (verdict row 1)"
+        raise GuardError(msg)
+    for what, ok in (
+        ("channels.json and the channel table", channels_passed(root=root)),
+        ("limits.json", (root / "limits.json").exists()),
+        (f"{PRE_FIT_GUARDS} with the pre-fit guards passed", pre_fit_guards_passed(root=root)),
+        (
+            f"{PANEL_CHECK} with every panel passed",
+            gallery_passed(root=root, banks_digest=banks_digest),
+        ),
+        (f"{REVIEW_GATE} with both reviews passed", review_gate_passed(root=root)),
+        (f"{SMOKE_FILE} with a pass under the current code version", smoke_passed(root=root)),
+        (f"{TIMING_FILE} with a pass", timing_passed(root=root)),
+    ):
+        if not ok:
+            msg = f"`{stage}` needs {what}"
+            raise GuardError(msg)
+    state = posthoc_state(root=root)
+    if stage == "posthoc" and state == "running":
+        msg = f"`posthoc` refuses to start: {POSTHOC_STATUS} says that a post hoc run is running"
+        raise GuardError(msg)
+    if stage == "posthoc_score" and state not in ("complete", "failed"):
+        msg = (
+            f"`posthoc_score` needs {POSTHOC_STATUS} that says complete or failed (it says {state})"
+        )
+        raise GuardError(msg)
+
+
+def write_posthoc_started(*, root: Path, arms: Sequence[str]) -> None:
+    """Write `posthoc/posthoc_started.json` before the first post hoc fit (a rerun keeps the first).
+
+    The marker records that the runs are post hoc, were set after the first test score, and who
+    asked for them.
+
+    Args:
+        root: The data folder of the main run.
+        arms: The arms to be fitted.
+
+    Raises:
+        GuardError: When the first test score does not exist.
+    """
+    test_marker = root / "scores" / TEST_MARKER
+    if not test_marker.exists():
+        msg = "a post hoc marker needs the first test score"
+        raise GuardError(msg)
+    path = root / POSTHOC_STARTED
+    if path.exists():
+        return
+    write_once_json(
+        path=path,
+        payload={
+            "post_hoc": True, "set_after_the_first_test_score": True,
+            "test_started_mtime_ns": test_marker.stat().st_mtime_ns,
+            "started_ns": time.time_ns(),
+            "requested_by": "the maintainer, after seeing the verdict",
+            "reason": "FS and YT were dropped by the timing gate on cost; FS and the new synthetic arms YS and YO are fitted report-only",
+            "arms": list(arms), "code_version": CODE_VERSION,
+        },
+    )  # fmt: skip
+
+
+def write_posthoc_status(*, root: Path, state: str, **extra: object) -> None:
+    """Write `posthoc/posthoc_status.json` (state running, complete, failed, or stopped)."""
+    write_json(
+        path=root / POSTHOC_STATUS,
+        payload={
+            "state": state,
+            "post_hoc": True,
+            "code_version": CODE_VERSION,
+            "pid": os.getpid(),
+            **extra,
+        },
+    )
+
+
+def write_posthoc_failure(*, root: Path, stage: str, exc: BaseException) -> None:
+    """Record the failure of a post hoc stage under `posthoc/` and nowhere else."""
+    write_json(
+        path=posthoc_dir(root=root) / f"failure_{stage}.json",
+        payload={"stage": stage, "post_hoc": True, **fit.failure_payload(exc=exc)},
+    )
+
+
 # --------------------------------------------------------------------------- the jobs and the timing gate
 
 
@@ -668,6 +822,213 @@ def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:  # noqa: PLR0
         return read_json(path=root / CHAIN_STATUS)
     write_chain_status(root=root, state=state, failed=failed, screen_stopped=screen_stopped)
     return read_json(path=root / CHAIN_STATUS)
+
+
+def job_hours_of(*, root: Path, arm: str, fold: str | None, seed: int) -> float | None:
+    """Return the measured GPU-process-hours of one job (fit plus prediction), or None.
+
+    The seconds are those of the job record `fits/<job>.job.json` under `root`.
+    """
+    path = root / "fits" / f"{fit.job_name(arm=arm, fold=fold, seed=seed)}.job.json"
+    if not path.exists():
+        return None
+    record = read_json(path=path)
+    return (float(record["fit_seconds"]) + float(record["predict_seconds"])) / 3600.0
+
+
+def arm_job_hours(*, root: Path, arm: str) -> list[float]:
+    """Return the measured GPU-process-hours of every job of `arm` under `root`."""
+    out = []
+    for path in sorted((root / "fits").glob(f"{arm}_*.job.json")):
+        record = read_json(path=path)
+        out.append((float(record["fit_seconds"]) + float(record["predict_seconds"])) / 3600.0)
+    return out
+
+
+def main_chain_hours(*, root: Path) -> float:
+    """Return the measured GPU-process-hours of the main chain: every job record of the main root."""
+    return sum(
+        (float(read_json(path=p)["fit_seconds"]) + float(read_json(path=p)["predict_seconds"]))
+        / 3600.0
+        for p in sorted((root / "fits").glob("*.job.json"))
+    )
+
+
+def posthoc_cost(*, root: Path) -> dict[str, Any]:
+    """Return the measured cost of the post hoc fits, in GPU-process-hours, and the running total.
+
+    Args:
+        root: The data folder of the main run.
+
+    Returns:
+        `main_chain`, `per_arm` (each post hoc arm that has a job record), `posthoc`, and
+        `running_total` (the main chain's hours plus the post hoc fits').
+    """
+    fit_root = posthoc_fit_root(root=root)
+    per_arm = {
+        arm: round(sum(hours), 3)
+        for arm in POSTHOC_FAMILIES
+        if (hours := arm_job_hours(root=fit_root, arm=arm))
+    }
+    main = main_chain_hours(root=root)
+    posthoc = sum(per_arm.values())
+    return {
+        "main_chain": round(main, 3), "per_arm": per_arm, "posthoc": round(posthoc, 3),
+        "running_total": round(main + posthoc, 3),
+    }  # fmt: skip
+
+
+@dataclass
+class PosthocSteps:
+    """What the post hoc run calls, so a test can replace each step.
+
+    Attributes:
+        run_job: Runs one fit and its predictions (arm, fold, seed) and returns the record.
+        fit_root: The data folder of the post hoc fits (`posthoc_fit_root`).
+        log: Receives the progress lines.
+        select_jobs: Keeps a subset of a family's jobs (a debug run on a scratch root).
+        main_hours: Returns the measured GPU-process-hours of the main chain.
+        job_hours: Returns the measured hours of a finished post hoc job, or None when it has none.
+        reference_hours: Returns the expected hours of the first fit of an arm (YU's mean).
+    """
+
+    run_job: Callable[[str, str | None, int], dict]
+    fit_root: Path
+    log: Log = print
+    select_jobs: Callable[
+        [str, list[tuple[str, str | None, int]]], list[tuple[str, str | None, int]]
+    ] = field(default=lambda _family, jobs: jobs)
+    main_hours: Callable[[], float] = field(default=lambda: 0.0)
+    job_hours: Callable[[str, str | None, int], float | None] = field(
+        default=lambda _arm, _fold, _seed: None
+    )
+    reference_hours: Callable[[str], float] = field(default=lambda _arm: 0.0)
+
+
+COST_CAP_MESSAGE: Final = "stopped at the cost cap; ask the manager"
+
+
+def run_posthoc(*, root: Path, steps: PosthocSteps) -> dict[str, Any]:  # noqa: PLR0912, PLR0915
+    """Fit the post hoc families (YO, then FS, then YS) and write `posthoc/posthoc_status.json`.
+
+    The run writes the marker `posthoc/posthoc_started.json` before the first fit and nothing else
+    outside `posthoc/`. A failed fit is report-only: its failure record goes to the fit folder, the
+    run goes on, and the status ends `failed` with the failed jobs. A stop, a correctness failure,
+    and a guard error end the run at once.
+
+    **The cost cap.** The running total is the main chain's measured GPU-process-hours plus the
+    post hoc fits' as they finish. Before each fit, the run does not start it when the running
+    total plus the fit's expected hours would pass `POSTHOC_COST_CAP_HOURS`, or when the running
+    total has already reached the stop line `core.STOP_LINE_HOURS`, which no fit may start past.
+    The expected hours are the mean of the arm's finished fits, or the reference (YU's mean) for the
+    arm's first fit. Every fit not yet started is then skipped, so the last fits of the run (YS's)
+    are the first to go, and the run ends `stopped` (exit code 3) with the skipped jobs and the
+    reason in the status file. A job whose record exists from an earlier run is counted and not run
+    again.
+
+    Args:
+        root: The data folder of the main run.
+        steps: The fit steps.
+
+    Returns:
+        The final status; its state is "complete" when every fit succeeded, else "failed" or
+        "stopped".
+    """
+    write_posthoc_started(root=root, arms=POSTHOC_FAMILIES)
+    write_posthoc_status(root=root, state="running")
+    failed: list[str] = []
+    skipped: list[dict[str, str]] = []
+    main = steps.main_hours()
+    plan = [
+        (arm, fold, seed)
+        for family in POSTHOC_FAMILIES
+        for arm, fold, seed in steps.select_jobs(family, family_jobs(family=family))
+    ]
+    finished: dict[str, list[float]] = {}
+    for arm, fold, seed in plan:
+        hours = steps.job_hours(arm, fold, seed)
+        if hours is not None:
+            finished.setdefault(arm, []).append(hours)
+
+    def total() -> float:
+        return main + sum(sum(v) for v in finished.values())
+
+    def payload() -> dict[str, Any]:
+        return {
+            "hours": {
+                "main_chain": round(main, 3),
+                "per_arm": {a: round(sum(v), 3) for a, v in finished.items()},
+                "running_total": round(total(), 3), "cap": POSTHOC_COST_CAP_HOURS,
+                "stop_line": core.STOP_LINE_HOURS,
+            },
+            "skipped": skipped, "failed": failed,
+        }  # fmt: skip
+
+    capped = False
+    try:
+        for i, (arm, fold, seed) in enumerate(plan):
+            name = fit.job_name(arm=arm, fold=fold, seed=seed)
+            if steps.job_hours(arm, fold, seed) is not None:
+                steps.log(f"post hoc fit {name} is already measured: not run again")
+                continue
+            expected = (
+                sum(finished[arm]) / len(finished[arm])
+                if finished.get(arm)
+                else steps.reference_hours(arm)
+            )
+            if total() >= core.STOP_LINE_HOURS or total() + expected > POSTHOC_COST_CAP_HOURS:
+                reason = (
+                    f"the running total {total():.2f} plus the expected {expected:.2f} "
+                    f"GPU-process-hours passes the cap of {POSTHOC_COST_CAP_HOURS}"
+                )
+                skipped += [
+                    {"job": fit.job_name(arm=a, fold=f, seed=s), "reason": reason}
+                    for a, f, s in plan[i:]
+                    if steps.job_hours(a, f, s) is None
+                ]
+                steps.log(f"{COST_CAP_MESSAGE}: {reason}; {len(skipped)} fits are skipped")
+                capped = True
+                break
+            steps.log(f"post hoc fit {name}: running total {total():.2f}, expected {expected:.2f}")
+            try:
+                steps.run_job(arm, fold, seed)
+                (steps.fit_root / "fits" / f"{name}.failed.json").unlink(missing_ok=True)
+                hours = steps.job_hours(arm, fold, seed)
+                if hours is not None:
+                    finished.setdefault(arm, []).append(hours)
+            except CorrectnessFailureError, StoppedError, GuardError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                failed.append(name)
+                write_json(
+                    path=steps.fit_root / "fits" / f"{name}.failed.json",
+                    payload=fit.failure_payload(exc=exc),
+                )
+                steps.log(f"post hoc fit {name} failed: {type(exc).__name__}: {exc}")
+    except StoppedError as exc:
+        write_posthoc_status(root=root, state="stopped", reason=str(exc), **payload())
+    except CorrectnessFailureError:
+        write_posthoc_status(
+            root=root, state="failed", reason="correctness failure",
+            traceback=traceback.format_exc(), **payload(),
+        )  # fmt: skip
+    except GuardError as exc:
+        write_posthoc_status(
+            root=root, state="failed", reason=f"guard: {exc}",
+            traceback=traceback.format_exc(), **payload(),
+        )  # fmt: skip
+        raise
+    except Exception as exc:  # noqa: BLE001
+        write_posthoc_status(
+            root=root, state="failed", reason=f"{type(exc).__name__}: {exc}",
+            traceback=traceback.format_exc(), **payload(),
+        )  # fmt: skip
+    else:
+        if capped:
+            write_posthoc_status(root=root, state="stopped", reason=COST_CAP_MESSAGE, **payload())
+        else:
+            write_posthoc_status(root=root, state="failed" if failed else "complete", **payload())
+    return read_json(path=root / POSTHOC_STATUS)
 
 
 def exit_code(  # noqa: PLR0911

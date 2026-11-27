@@ -1078,6 +1078,79 @@ def stage_chain(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     return run_chain_stage(root=root, args=args, run_one=run_one)
 
 
+def prepare_posthoc_root(*, root: Path, fit_root: Path) -> None:
+    """Prepare the data folder of the post hoc fits, `posthoc/<name of root>`.
+
+    The folder links the main run's read-only inputs (`limits.json`, `channels.json`, `channels/`,
+    and `world/`) and holds copies of the run marker and of the gate records, which the guard of the
+    fit and prediction processes reads. Nothing outside `fit_root` changes.
+
+    Args:
+        root: The data folder of the main run.
+        fit_root: The data folder of the post hoc fits (`stages.posthoc_fit_root`).
+
+    Raises:
+        RuntimeError733: When an input or a gate record of the main run does not exist.
+    """
+    import e00733_smokerun as smokerun
+
+    smokerun.link_inputs(root=root, scratch=fit_root)
+    for name in (st.RUN_MARKER, *st.POSTHOC_GATE_RECORDS):
+        source = root / name
+        if not source.exists():
+            msg = f"the main run holds no {name}, so the post hoc fits cannot read it"
+            raise RuntimeError733(msg)
+        target = fit_root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+
+
+def stage_posthoc(args: argparse.Namespace, root: Path) -> dict[str, Any]:
+    """Fit the post hoc arms YO and YS (synthetic) and FS (real folds) into `<root>/posthoc/`.
+
+    The fits and predictions use the code and the caps of the chain, each in a new process. The
+    stage writes no file outside `posthoc/`: not `scores/test_started`, the verdict, the readings,
+    or `chain_status.json`. A failed fit is report-only.
+
+    Args:
+        args: The parsed arguments (`--device`, and on a scratch root `--max-passes` and
+            `--first-job-per-family`).
+        root: The data folder of the main run.
+
+    Returns:
+        The status of the post hoc run, with its `state`.
+
+    Raises:
+        RuntimeError733: When `--first-job-per-family` is given without a scratch data root.
+    """
+    cap = check_max_passes_allowed(args=args)
+    first = bool(getattr(args, "first_job_per_family", False))
+    if first and getattr(args, "data_root", None) is None:
+        msg = "--first-job-per-family is for a scratch data root"
+        raise RuntimeError733(msg)
+    fit_root = st.posthoc_fit_root(root=root)
+    prepare_posthoc_root(root=root, fit_root=fit_root)
+    run_one = make_predicting_job(
+        root=fit_root, device=args.device, max_passes=cap, data_root=str(fit_root)
+    )
+
+    def reference_hours(arm: str) -> float:
+        """Return the expected hours of an arm's first fit: YU's mean in the main run, else the plan's."""
+        yu = st.arm_job_hours(root=root, arm="YU")
+        return sum(yu) / len(yu) if yu else core.ARMS[arm].hours_per_fit
+
+    steps = st.PosthocSteps(
+        run_job=run_one, fit_root=fit_root,
+        select_jobs=keep_first_job if first else (lambda _f, jobs: jobs),
+        main_hours=lambda: st.main_chain_hours(root=root),
+        job_hours=lambda arm, fold, seed: st.job_hours_of(
+            root=fit_root, arm=arm, fold=fold, seed=seed
+        ),
+        reference_hours=reference_hours,
+    )  # fmt: skip
+    return st.run_posthoc(root=root, steps=steps)
+
+
 def measure_timing(args: argparse.Namespace, root: Path) -> dict[str, float]:
     """Measure the timing gate: one fold of FU at seed 0 and 5 passes of YU, each fit and predicted.
 
