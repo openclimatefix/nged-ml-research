@@ -165,7 +165,10 @@ def independent_calendar() -> dict[date, tuple[int, int, int]]:
 
 
 def test_school_columns_equal_csv() -> None:
-    """S1 to S3 equal the two csv files on every date from 2024-04-01 to 2026-11-30; S3 is 1 only in blocks of at most 10 days."""
+    """S1 to S3 equal the two csv files on every date from 2024-04-01 to 2026-11-30.
+
+    S3 is 1 only in blocks of at most 10 days.
+    """
     expected = independent_calendar()
     days = [
         date(2024, 4, 1) + timedelta(days=i)
@@ -194,7 +197,10 @@ def test_school_columns_equal_csv() -> None:
 
 
 def test_placebo_calendar() -> None:
-    """The placebo calendar equals the real calendar 21 days later; print the share of placebo holiday days that are real holiday days."""
+    """The placebo calendar equals the real calendar 21 days later.
+
+    The test prints the share of placebo holiday days that are real holiday days.
+    """
     start = cols.code_of(day=date(2024, 4, 1))
     stop = cols.code_of(day=date(2026, 11, 30)) - 21
     real = cols.school_columns(codes=np.arange(start, stop + 1))
@@ -391,7 +397,10 @@ def test_w1_w2_monthly_anomaly() -> None:
 
 
 def test_columns_read_no_era5() -> None:
-    """No code that builds a new input column reads ERA5: W1 and W2 come from the row's own B1 columns, W3 from the expected-weather table."""
+    """No code that builds a new input column reads ERA5.
+
+    W1 and W2 come from the row's own B1 columns, and W3 from the expected-weather table.
+    """
     folder = Path(__file__).parent
     for name in ("e00735_columns.py", "e00735_model.py", "e00735_k1.py"):
         code = "\n".join(
@@ -403,7 +412,10 @@ def test_columns_read_no_era5() -> None:
 
 
 def test_w3_causal() -> None:
-    """W3 reads no expected-weather day that ended less than 24 hours before the origin (experiment 437's `check` pattern)."""
+    """W3 reads no expected-weather day that ended less than 24 hours before the origin.
+
+    The test follows experiment 437's `check` pattern.
+    """
     n_days = 40
     first = cols.code_of(day=date(2026, 1, 1))
     rng = np.random.default_rng(0)
@@ -485,7 +497,10 @@ def test_w3_causal() -> None:
 
 
 def test_build_block() -> None:
-    """The block holds each arm's columns in order, with K and W built from the real or permuted closeness and never from existing columns."""
+    """The block holds each arm's columns in order.
+
+    K and W are built from the real or permuted closeness and never from existing columns.
+    """
     c = np.linspace(0.9, 0.01, 16)
     perm = np.roll(np.arange(16), 5)
     codes = np.asarray(
@@ -537,7 +552,10 @@ def test_build_block() -> None:
 
 
 def test_cells_known_answer() -> None:
-    """One row's sums equal the hand-computed pinball losses, signed error, and coverage; quantiles must be sorted."""
+    """One row's sums equal the hand-computed pinball losses, signed error, and coverage.
+
+    The quantiles must be sorted.
+    """
     import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 
     taus = np.asarray(lib.TAUS)
@@ -604,7 +622,10 @@ def test_cells_known_answer() -> None:
 
 
 def synthetic_pair(*, effect: float, noise: float, seed: int = 0) -> score.Pair:
-    """Return a pair of 12 months x 3 seeds of cells on the school window, with a constant paired CRPS difference of `effect` plus noise."""
+    """Return a pair of 12 months x 3 seeds of cells on the school window.
+
+    The paired CRPS difference is the constant `effect` plus noise.
+    """
     rng = np.random.default_rng(seed)
     rows = []
     start = cols.code_of(day=date(2025, 11, 1))
@@ -653,7 +674,10 @@ def cell_frame(*, rows: list[tuple]) -> pl.DataFrame:
 
 
 def test_pair_on_row_keys() -> None:
-    """Cells pair only when both arms hold the same rows; equal counts of different rows, and a cell one arm lacks, are left out and counted."""
+    """Cells pair only when both arms hold the same rows.
+
+    Equal counts of different rows, and a cell one arm lacks, are left out and counted.
+    """
     day = cols.code_of(day=date(2026, 1, 10))
     a = cell_frame(
         rows=[
@@ -728,7 +752,10 @@ def test_held_in_mask_excludes_july() -> None:
 
 
 def test_p4_shared_blocks() -> None:
-    """P4's two parts number their 7-day blocks from the union of their rows, so one pick is one calendar week in both."""
+    """P4's two parts number their 7-day blocks from the union of their rows.
+
+    One pick is therefore one calendar week in both.
+    """
     pair = synthetic_pair(effect=0.0, noise=0.0)
     week = pair.frame["vday"].to_numpy() // score.BLOCK_DAYS
     mask_a = week % 3 == 0
@@ -751,7 +778,11 @@ def test_p4_shared_blocks() -> None:
 
 
 def test_check_block_catches_silent_zeros() -> None:
-    """`check_block` refuses a float64 block, a zero K1, a zero S1 over holiday dates, and zero W1 on holiday rows."""
+    """`check_block` refuses a float64 block and three kinds of zero column.
+
+    The refused zero columns are a zero K1, a zero S1 over holiday dates, and a zero W1 on holiday
+    rows.
+    """
     spec = cols.ARMS["SKW"]
     codes = np.asarray([cols.code_of(day=date(2026, 2, 16)), cols.code_of(day=date(2026, 2, 17))])
     factors = cols.Factors(
@@ -788,7 +819,10 @@ def test_terms_csv_standard_reader() -> None:
 
 
 def test_bootstrap() -> None:
-    """The two-level bootstrap returns the known constant, brackets zero when there is no effect, and counts months and fits."""
+    """The two-level bootstrap returns the known constant.
+
+    It brackets zero when there is no effect, and counts months and fits.
+    """
     pair = synthetic_pair(effect=-0.1, noise=0.0)
     mask = np.ones(pair.frame.height, dtype=bool)
     r = score.reading(
@@ -951,7 +985,10 @@ def test_verdict_mapping() -> None:
 
 
 def test_phase_runner() -> None:
-    """The phase runner refuses without a marker, stops at 5.5 GPU-process-hours, and writes failure records with the traceback."""
+    """The phase runner refuses without a marker and stops at 5.5 GPU-process-hours.
+
+    It also writes failure records with the traceback.
+    """
     import e00735_phases as ph  # ty: ignore[unresolved-import]
 
     codes = {0, ph.EXIT_FAILED, ph.EXIT_STOP, ph.EXIT_USAGE, ph.EXIT_GATE_FAILED, ph.EXIT_BUSY}
@@ -1048,7 +1085,10 @@ def test_run_script_never_writes_under_677() -> None:
 
 
 def test_677_hashes() -> None:
-    """The hashes of 677's stage-1 weights and statistics files are recorded on the first run and compared on every later run."""
+    """The hashes of 677's stage-1 weights and statistics files are recorded on the first run.
+
+    Every later run compares them.
+    """
     root677 = score.ROOT_677
     files = []
     for month in score.MONTHS:
@@ -1077,7 +1117,10 @@ def test_677_hashes() -> None:
 
 
 def test_zero_start() -> None:
-    """With zero weights on the new columns, every arm's network gives the control's outputs on 1,000 rows, with labels attached and detached."""
+    """With zero weights on the new columns, every arm gives the control's outputs.
+
+    The test uses 1,000 rows, with labels attached and detached.
+    """
     try:
         import torch  # ty: ignore[unresolved-import]
     except ModuleNotFoundError:

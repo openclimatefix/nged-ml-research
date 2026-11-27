@@ -17,8 +17,8 @@ per-half-hour losses, and writes only their sums per Primary, local valid date, 
 afterwards works on those sums, so the peak memory is one fit's rows (about 0.3 GB) and the bootstrap
 needs about 1 GB. The sums are of 11-quantile CRPS (twice the mean pinball loss, in points of
 capacity), the absolute error of the median, the signed error of the median (median minus actual),
-the pinball loss and the coverage at q01, q05, q95, and q99, the median minus the forecast mean, and the
-signed error at leads of 12 to 36 hours.
+the pinball loss and the coverage at q01, q05, q95, and q99, the median minus the forecast mean, and
+the signed error at leads of 12 to 36 hours.
 
 **The unit of the interval is the fit.** The two-level bootstrap draws refit months with replacement,
 then the 3 seeds with replacement inside each drawn month, then the 7-day blocks of valid dates that
@@ -337,7 +337,9 @@ def fit_code_hash(*, path: Path, month: str) -> str:
 
 
 def stamp_of(*, arm: str, month: str, seed: int) -> dict[str, str] | None:
-    """Return what a cell file must record to be current: the fit's code hash, the sha256 of its input file, and the cell version.
+    """Return what a cell file must record to be current.
+
+    The record holds the fit's code hash, the sha256 of its input file, and the cell version.
 
     A stored or baseline arm has no fit: its input is experiment 677's stored backtest file, named by
     its size and modification time (the file is far too large to hash on every run).
@@ -874,7 +876,10 @@ def group_mask(*, pair: Pair, indices: list[int]) -> np.ndarray:
 
 
 def pair_of(*, arms: dict[str, pl.DataFrame], a: str, b: str, weather) -> Pair | None:  # noqa: ANN001
-    """Return the joined pair of two arms, or None if either is missing (a baseline may leave any share of rows unpaired)."""
+    """Return the joined pair of two arms, or None if either is missing.
+
+    A baseline may leave any share of rows unpaired.
+    """
     if a not in arms or b not in arms:
         return None
     limit = 1.0 if {a, b} & set(BASELINES) else MAX_UNPAIRED
@@ -1059,7 +1064,10 @@ def stage_contrasts(*, r0_from_stored: bool) -> dict:
 
 
 def descriptive(*, arms, pairs, groups, weather, held, add, window_rows) -> None:  # noqa: ANN001
-    """Add the descriptive readings: SKW minus S, P4, the bank-holiday slice, finer windows, October, July to September."""
+    """Add the descriptive readings that decide nothing.
+
+    They are SKW minus S, P4, the bank-holiday slice, finer windows, October, and July to September.
+    """
     six, eight, coastal = groups["six signed-MW"], groups["eight MVA-only"], groups["4 coastal"]
     sets = (("six", six), ("eight", eight), ("4 coastal", coastal), ("all 16", list(range(16))))
     for a, b in (
@@ -1182,7 +1190,9 @@ def per_primary_and_leave_one_out(*, arms, pairs, groups, held, add) -> None:  #
 
 
 def slope_readings(*, pairs, held, add) -> None:  # noqa: ANN001
-    """Add the slope of the school-window gain against the distance from the coast, in points of capacity per km.
+    """Add the slope of the school-window gain against the distance from the coast.
+
+    The slope is in points of capacity per km.
 
     Per Primary, the paired CRPS difference of the held-in school window is a ratio of sums; the
     slope is the least-squares slope of those 16 ratios on the Primaries' coast distances. The
@@ -1219,7 +1229,9 @@ def slope_readings(*, pairs, held, add) -> None:  # noqa: ANN001
 
 
 def p6_table(*, arms) -> None:  # noqa: ANN001
-    """Write P6: each arm's mean signed error of the 12 to 36 hour median at D19, D4, and D9 on 2026-10-24 to 2026-11-01.
+    """Write P6: each arm's mean signed error at D19, D4, and D9 around 2026-10-24.
+
+    The error is that of the 12 to 36 hour median, over 2026-10-24 to 2026-11-01.
 
     The error is median minus actual in points of capacity, from the stored `s1236` sums of the
     2026-10 refit's cells, and the table also holds each arm minus R0. P6 predicts that S minus R0

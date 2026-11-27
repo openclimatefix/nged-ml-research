@@ -104,7 +104,10 @@ def by_fit(*, table: pl.DataFrame, path: Path) -> None:
 
 
 def signed_error_by_distance(*, path: Path) -> None:
-    """Draw the signed error of the 12 to 36 hour median on school-window days against coast distance, for R0, S, and SKW."""
+    """Draw the signed error of the median against the distance from the coast.
+
+    The error is the 12 to 36 hour median on school-window days, for R0, S, and SKW.
+    """
     import altair as alt
     import plotting.ocf_theme  # noqa: F401
 

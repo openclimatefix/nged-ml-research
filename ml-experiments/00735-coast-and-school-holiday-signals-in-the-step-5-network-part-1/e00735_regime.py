@@ -1,5 +1,7 @@
 # ruff: noqa: E501, PERF401, ANN001
-"""Experiment 735: how each Primary's demand changed in each school holiday and on each bank holiday, year by year (CPU only).
+"""Experiment 735: how each Primary's demand changed in each school holiday and bank holiday (CPU only).
+
+The changes are given year by year.
 
 README. For each Primary, school-holiday block, and bank holiday from 2021-22 to October 2026, this
 script computes the mean demand on the block's days minus the mean demand on the same weekdays and
@@ -8,7 +10,8 @@ points of capacity (a point is 1% of the Primary's capacity). A bank holiday is 
 same weekday in the 14 days either side that are neither school-holiday days nor bank holidays.
 Term dates before 2021-09 are not on disk. It relies on `e00735_columns` (the school calendar and the
 local-date convention), `e00735_windows` (the Primary table), `e00735_diagnostic` (the cut date of
-D15 and D18), and `e00668_score_lib` (the cleaned power). D15 and D18 are set to NaN before 2025-03-01. Run with the experiment folders on `PYTHONPATH` (source `ml-experiments/00524*/env.sh`).
+D15 and D18), and `e00668_score_lib` (the cleaned power). D15 and D18 are set to NaN before
+2025-03-01. Run with the experiment folders on `PYTHONPATH` (source `ml-experiments/00524*/env.sh`).
 It writes `regime/regime.csv` and `regime/regime_by_year.svg` under experiment 735's data folder. No
 fit is involved. Series are Primary demand, never a metered generator.
 """
@@ -30,7 +33,10 @@ MIN_REFERENCE_DAYS: Final = 2
 
 
 def daily_profiles() -> tuple[np.ndarray, int]:
-    """Return (primaries, local days, 48) mean power in points of capacity per local half-hour, and the first day code."""
+    """Return (primaries, local days, 48) mean power in points of capacity per local half-hour.
+
+    The first day code is returned beside the array.
+    """
     import e00668_score_lib as lib  # ty: ignore[unresolved-import]
     import e00735_diagnostic as diag  # ty: ignore[unresolved-import]
 
@@ -84,7 +90,10 @@ def daily_profiles() -> tuple[np.ndarray, int]:
 def mean_difference(
     *, profiles: np.ndarray, first: int, target: list[int], reference_for
 ) -> np.ndarray:
-    """Return per Primary the mean over target days of (day's profile minus the mean profile of its reference days)."""
+    """Return per Primary the mean over target days of the day's profile minus the reference mean.
+
+    The reference mean is the mean profile of the day's reference days.
+    """
     n_days = profiles.shape[1]
     diffs = np.full((profiles.shape[0], len(target)), np.nan)
     for i, day in enumerate(target):

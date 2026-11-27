@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 735: the diagnostic gallery of the new input columns, shown to the maintainer before the first fit (CPU only).
+"""Experiment 735: the diagnostic gallery of the new input columns (CPU only).
+
+The maintainer views the gallery before the first fit.
 
 README. This script prints and draws what the new columns hold, using the calendar, the coast
 closeness, and daily weather, with no ENS rows and no fit. It relies on `e00735_columns`,
@@ -125,7 +127,11 @@ def main() -> None:
 
 
 def monthly_anomaly(*, weather: win.DailyWeather, values: np.ndarray) -> np.ndarray:
-    """Return (Primaries, days) anomalies of `values` against each Primary's calendar-month mean over 2019-09 to 2025-12, over its standard deviation, clipped to +-3."""
+    """Return (Primaries, days) anomalies of `values` against each Primary's calendar-month mean.
+
+    The mean is over 2019-09 to 2025-12, the anomaly is divided by the Primary's standard deviation,
+    and the result is clipped to +-3.
+    """
     n_p, n_days = values.shape
     codes = weather.first_code + np.arange(n_days)
     month = (
