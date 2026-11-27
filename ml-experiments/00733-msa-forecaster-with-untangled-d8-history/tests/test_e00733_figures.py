@@ -245,8 +245,8 @@ def test_real_attention_cases_are_the_sunniest_the_dullest_and_the_median_day_an
 ):
     """Each case takes its own origin; too few origins or an unknown case name is an error."""
     sw = np.array([3.0, 9.0, 1.0, 5.0, np.nan, 7.0])
-    got = att.pick_real_cases(shortwave=sw, names=("sunny day", "dull day", "winter day"))
-    assert got == {"sunny day": 1, "dull day": 2, "winter day": 3}
+    got = att.pick_real_cases(shortwave=sw, names=("sunny day", "dull day", "median day"))
+    assert got == {"sunny day": 1, "dull day": 2, "median day": 3}
     with pytest.raises(att.AttentionError):
         att.pick_real_cases(shortwave=np.array([1.0, np.nan]), names=("sunny day", "dull day"))
     with pytest.raises(att.AttentionError):

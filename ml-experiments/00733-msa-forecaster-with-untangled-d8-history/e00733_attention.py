@@ -179,11 +179,12 @@ def write_case(*, maps: Mapping[str, np.ndarray], label: str, path: Path) -> Non
 # --------------------------------------------------------------------------- part 5c: the `attention` stage
 
 REAL_CASES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
-    ("2026-05", ("sunny day", "dull day")),
-    ("2026-01", ("winter day",)),
+    ("2026-05", ("sunny day", "dull day", "median day")),
 )
-"""The fold of each real case; the sunny and the dull day have the highest and the lowest mean
-shortwave over the target day, and the winter day has the median."""
+r"""The fold of each real case; the sunny and the dull day have the highest and the lowest mean
+shortwave over the target day, and the median day has the median. The three cases come from one
+fold because the experiment 713 pipeline fixes its fold when it is first imported, so a process
+opens one fold only. M\* is drawn through F0r, which exists only on folds 2025-11 and 2026-05."""
 REAL_ARMS: Final = (("FU", "FU"), ("F0r", "M*"))
 """The arms drawn on the real cases and the label of each (F0r reproduces M* to 1e-6 of capacity)."""
 SYNTHETIC_ARMS: Final = ("YU", "Y0")
@@ -199,7 +200,7 @@ def pick_real_cases(
     Args:
         shortwave: The mean shortwave over the lead-day-2 target day of each origin.
         names: The cases of the fold: any of "sunny day" (highest), "dull day" (lowest), and
-            "winter day" (median).
+            "median day" (median).
 
     Returns:
         The origin position of each case; the positions differ between the cases.
@@ -218,7 +219,7 @@ def pick_real_cases(
             out[name] = int(order[-1])
         elif name == "dull day":
             out[name] = int(order[0])
-        elif name == "winter day":
+        elif name == "median day":
             out[name] = int(order[(len(order) - 1) // 2])
         else:
             msg = f"unknown attention case {name!r}"

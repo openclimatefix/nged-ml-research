@@ -771,10 +771,10 @@ published page carries the coverage counts.
   with the stored pass marked. The synthetic panels split the validation loss into the mixture
   negative log-likelihood and the sign head's cross-entropy.
 - **Attention maps:** the across-day attention weights and the read-out weights of FU and M\* for
-  D8's target tokens at lead day 2, on a sunny and a dull target day of fold 2026-05 and a winter day
-  of fold 2026-01, from a forward pass of the saved states; and the same maps for YU and Y0 on a
-  synthetic sample with reverse flow on the target day. The learned gain `γ` of the history path is
-  printed beside each map.
+  D8's target tokens at lead day 2, on a sunny, a dull, and a median-shortwave target day of fold
+  2026-05 (M\* is drawn through F0r), from a forward pass of the saved states; and the same maps
+  for YU and Y0 on a synthetic sample with reverse flow on the target day. The learned gain `γ` of
+  the history path is printed beside each map.
 - **Forecast time series at D8:** a day-ahead forecast and the full 14-day horizon of one origin, in
   winter and in summer, for FU, FS, and M\*, against D8's reading.
 - **The sign forecast on synthetic days:** for three S2 test segments, YU's and Y0's forecast
