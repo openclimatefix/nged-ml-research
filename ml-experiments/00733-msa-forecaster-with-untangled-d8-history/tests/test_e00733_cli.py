@@ -143,7 +143,7 @@ def test_the_cpu_stages_of_run_sh_are_the_stages_that_default_to_the_cpu() -> No
     import re
 
     text = (Path(__file__).parent.parent / "run.sh").read_text()
-    match = re.search(r"case \"\$\{1:-\}\" in ([a-z_ |]+)\) uses_gpu=0", text)
+    match = re.search(r"case \"\$\{1:-\}\" in ([a-z0-9_ |]+)\) uses_gpu=0", text)
     assert match is not None
     in_run_sh = {name.strip() for name in match.group(1).split("|")}
     assert in_run_sh == set(st.CPU_ONLY_STAGES)

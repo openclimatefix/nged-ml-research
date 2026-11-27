@@ -66,8 +66,8 @@ EXIT_FAILED: Final = core.CHAIN_FAILED_EXIT
 READING_STAGES: Final = ("score", "report", "figures", "loss_curves", "attention", "series")
 """The stages that read the test outputs; none may run while the chain is fitting."""
 CPU_ONLY_STAGES: Final = (
-    "guard", "banks", "channels", "limits", "gallery", "score", "report", "figures", "loss_curves",
-    "attention", "series",
+    "guard", "banks", "channels", "limits", "gallery", "gallery2", "score", "report", "figures",
+    "loss_curves", "attention", "series",
 )  # fmt: skip
 """The stages that compute on the CPU: `run.sh` skips the GPU check and the GPU lock for them, so
 they default to `--device cpu` and refuse `--device cuda`."""
@@ -343,6 +343,7 @@ def guard_run(*, root: Path, stage: str, banks_digest: str, validation_only: boo
     needs: dict[str, tuple[tuple[str, bool], ...]] = {
         "limits": (("channels.json and the channel table", channels_passed(root=root)),),
         "gallery": (("limits.json", (root / "limits.json").exists()),),
+        "gallery2": (("limits.json", (root / "limits.json").exists()),),
     }
     for what, ok in needs.get(stage, ()):
         if not ok:

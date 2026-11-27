@@ -4,7 +4,7 @@
 # The wrapper starts nothing by default: it needs `--go` before the script name, so that a stray
 # invocation only prints this help.
 #
-# Usage:  SLOT_CPUS=<cpu list, at most 6 cores, e.g. 16-21> run.sh --go e00733_cli.py <guard|banks|channels|limits|gallery|smoke|timing|fit|chain|predict|score|report|figures|loss_curves|attention|series> <arguments>
+# Usage:  SLOT_CPUS=<cpu list, at most 6 cores, e.g. 16-21> run.sh --go e00733_cli.py <guard|banks|channels|limits|gallery|gallery2|smoke|timing|fit|chain|predict|score|report|figures|loss_curves|attention|series> <arguments>
 #         SLOT_CPUS=<list> FITS_STARTING=1 run.sh --go ...     prints the "fits starting" line for the manager
 #         SLOT_CPUS=<list> LAST_FIT_ENDED=1 run.sh --go ...    prints the "last fit ended" line for the manager
 #
@@ -21,7 +21,7 @@
 #   - for a command that uses the GPU (no `--device cpu`, and `CUDA_VISIBLE_DEVICES` not empty): the
 #     `nvidia-smi` totals leave room for 6 GB under the total of 36 GB, at most one other GPU process
 #     (of this experiment or another, counted together) holds the GPU, and a lock file allows one worker
-#     of this experiment at a time. `guard`, `banks`, `channels`, `limits`, `gallery`, `score`, `report`, `figures`, `loss_curves`, `attention`, and `series` run on the CPU and skip both checks;
+#     of this experiment at a time. `guard`, `banks`, `channels`, `limits`, `gallery`, `gallery2`, `score`, `report`, `figures`, `loss_curves`, `attention`, and `series` run on the CPU and skip both checks;
 #   - this folder on PYTHONPATH: `e00733_paths.py` adds the folders of experiment 730, and of the experiments that 730 imports, from this checkout.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # default to dummy values because the contracts package reads them at import. Each fit holds at most
@@ -92,7 +92,7 @@ uses_gpu=1
 [ -z "${CUDA_VISIBLE_DEVICES+x}" ] || [ -n "${CUDA_VISIBLE_DEVICES}" ] || uses_gpu=0
 for arg in "$@"; do [ "$arg" = "cpu" ] && uses_gpu=0; done
 # these stages read files and compute on the CPU only: no GPU check and no GPU lock
-case "${1:-}" in guard | banks | channels | limits | gallery | score | report | figures | loss_curves | attention | series) uses_gpu=0 ;; esac
+case "${1:-}" in guard | banks | channels | limits | gallery | gallery2 | score | report | figures | loss_curves | attention | series) uses_gpu=0 ;; esac
 lock_prefix=""
 if [ "$uses_gpu" = 1 ] && command -v nvidia-smi >/dev/null; then
     used_mb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '{s+=$1} END {print s+0}')

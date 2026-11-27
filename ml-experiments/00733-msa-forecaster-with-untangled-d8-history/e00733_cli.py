@@ -11,10 +11,10 @@ and 5 for any failed fit or chain; never 1, which the launcher reserves for "slo
 leaves
 `scores/failure_<stage>.json` with the message and the traceback.
 
-Stages built: `guard`, `banks`, `channels`, `limits`, `gallery`, `smoke`, `timing`, `fit`, `chain`,
-`predict`, `score`, `report`, `figures`, `loss_curves`, `attention`, and `series`. `main` installs
-the stage functions of `e00733_runtime` and `e00733_figstages` into `STAGE_FUNCTIONS`, never at
-import. A stage with no function exits 2 with a message, never silently.
+Stages built: `guard`, `banks`, `channels`, `limits`, `gallery`, `gallery2`, `smoke`, `timing`,
+`fit`, `chain`, `predict`, `score`, `report`, `figures`, `loss_curves`, `attention`, and
+`series`. `main` installs the stage functions of `e00733_runtime` and `e00733_figstages` into
+`STAGE_FUNCTIONS`, never at import. A stage with no function exits 2 with a message, never silently.
 """
 
 import argparse
@@ -34,6 +34,7 @@ STAGES: Final = (
     "channels",
     "limits",
     "gallery",
+    "gallery2",
     "smoke",
     "timing",
     "fit",
@@ -116,6 +117,7 @@ def run_stage(*, args: argparse.Namespace, root: Path, digest: str) -> int:
 def install_runtime() -> None:
     """Put the stage functions of `e00733_runtime` into `STAGE_FUNCTIONS`."""
     import e00733_figstages as figstages
+    import e00733_gallery2 as gallery2
     import e00733_runtime as rt
     import e00733_scorestage as scorestage
     import e00733_smokerun as smokerun
@@ -123,7 +125,8 @@ def install_runtime() -> None:
     STAGE_FUNCTIONS.update(
         {
             "banks": rt.stage_banks, "channels": rt.stage_channels, "limits": rt.stage_limits,
-            "gallery": rt.stage_gallery, "fit": rt.stage_fit, "chain": rt.stage_chain,
+            "gallery": rt.stage_gallery, "gallery2": gallery2.stage_gallery2,
+            "fit": rt.stage_fit, "chain": rt.stage_chain,
             "predict": rt.stage_predict, "score": scorestage.stage_score,
             "smoke": smokerun.stage_smoke, "figures": figstages.stage_figures,
             "loss_curves": figstages.stage_loss_curves, "series": figstages.stage_series,
@@ -206,6 +209,9 @@ def parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--scratch", default=None, help="stage smoke: a scratch folder outside the data folder"
+    )
+    p.add_argument(
+        "--png-dir", default=None, help="stage gallery2: a folder that also receives PNG copies"
     )
     p.add_argument("--arm", default=None)
     p.add_argument("--fold", default=None)
