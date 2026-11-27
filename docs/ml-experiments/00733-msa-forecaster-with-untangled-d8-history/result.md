@@ -653,19 +653,11 @@ say which.
 
 ### Forecast examples at D8
 
-**The day-ahead and 14-day forecasts of FU and M\* lie close together in winter and in summer.** The
-series figure draws, for the origins of 2026-02-13 (winter) and 2026-06-09 (summer), the day-ahead
-forecast and the 14-day forecast of FU and M\* against D8's reading, as shares of capacity. FS was
-not fitted, so the panels do not draw it.
-
-![Day-ahead and 14-day forecasts of FU and M* at D8 for a winter origin and a summer origin, against
-D8's reading](series_real.svg)
-
-![The day-ahead forecast of FU with and without its untangled channels (FU masked) and D8's reading,
-for the origin of 2026-02-01](series_channels.svg)
-
-*The second figure shows the effect of the channels on one day-ahead forecast: the forecast of FU
-and the forecast of FU with every channel masked lie close together, as R4 reports.*
+**The page does not publish forecast time series of D8's real reading.** The series figures that
+draw D8's real net reading for a winter origin and a summer origin, and for one origin with and
+without the untangled channels, are kept in the private data folder, because the reading shows when
+the generating engine starts and stops. The synthetic-world figure `series_sign.svg` above draws
+the sign forecast against the true sign instead.
 
 **The plan's load-shift event plots could not be drawn.** D8 has 0 logged load-shift events with
 forecasts at both their start and their end in the scored rows, so the series stage drew none
@@ -676,13 +668,13 @@ forecasts at both their start and their end in the scored rows, so the series st
 - **The origin-time weather assertion passed on every batch.** It reads the initialisation time and
   availability time of the weather run (the 00:00 UTC run, "00Z", of the European Centre for
   Medium-Range Weather Forecasts ensemble, ENS) for every target token of every batch, and it
-  printed this example for the first checked sample of a real fold:
+  printed this example for the first checked sample of a real fold, with its date written as D:
 
   ```text
-  origin-time weather: D8, contract origin 2026-05-23 12:00 UTC (native 09:00 UTC),
-  target valid 2026-05-24 12:00 UTC, lead day 2, ENS run 2026-05-23 00:00 UTC,
-  available 2026-05-23 09:00 UTC, latest valid time of any other target-row column
-  2026-05-23 00:00 UTC: pass
+  origin-time weather: D8, contract origin D 12:00 UTC (native 09:00 UTC),
+  target valid D+1 12:00 UTC, lead day 2, ENS run D 00:00 UTC,
+  available D 09:00 UTC, latest valid time of any other target-row column
+  D 00:00 UTC: pass
   ```
 
 - **The target-poison check passed for every FU and FU-S fit.** A copy of the channel table with
@@ -1422,9 +1414,7 @@ row 0 if more than half the test segments lack runs, and the check left out 8 of
 
 **D8 has 0 logged load-shift events with forecasts at both their start and end in the scored rows,
 so the plan's event plots could not be drawn.** The series stage found 0 such events
-(`scores/series_stage.json`), so no event panel exists. The figures `series_real.svg` and
-`series_channels.svg` show a winter and a summer origin and one origin with and without the channels
-instead, and the R10 slices inside events and after events hold no half-hours.
+(`scores/series_stage.json`), so no event panel exists. The R10 slices inside events and after events hold no half-hours.
 
 **All six synthetic fits stored the first-pass network, which limits what C3 and C4 can show.** All
 six synthetic fits (Y0 and YU, seeds 0 to 2) stored the network of pass 1: the validation loss (the
@@ -1456,8 +1446,8 @@ or more, so a null C1 says little about whether a good transfer signal would hel
 
 **Anonymisation.** The page shows no engine size, no connection date, no distance, no register
 entry, no series identifier, and no generator time series. D8 is a substation and is named.
-Forecasts of D8's reading appear on calendar dates, and no real-day untangled channel is drawn. The
-base dates of the synthetic samples appear only in the private log, and the page draws the synthetic
+No forecast time series of D8's real reading and no real-day untangled channel is drawn, and no
+calendar date of a real day appears in a figure. The base dates of the synthetic samples appear only in the private log, and the page draws the synthetic
 series without dates. The panels of `PRIVATE/gallery2/` are not published: the history and placebo
 panels show real-day untangled channels, and the synthetic panels show the real base-day reading
 beside the injected series.
@@ -1502,11 +1492,20 @@ outwards is 0.0123, 0.0028, 0.0019, 0.0036, 0.0011, and 0.0005, and the largest 
 0.786, 0.345, 0.245, 0.185, and 0.097. The panel check records that the nearest bin's mean is at
 least 3 times the mean difference more than 12 hours before the limit, as the rule asks.
 
+**G14 tests that the re-run depends on the history only through its visible part, and a large
+difference at the limit is expected.** The untangling network reads a 48-hour window, so a
+half-hour just before the visibility limit has its later context cut off in the re-run, and the
+stored output and the re-run can differ there by up to 0.955 in P(X<0). The rule bounds the means,
+not the largest difference: it requires the mean in the last 6 hours to be at least 3 times the mean
+more than 12 hours before the limit, and every 6-hour bin more than 12 hours before the limit to have
+a mean below 0.01. Both hold (the far bins' means are at most 0.0036), and 0.955 at 0 hours before
+the limit passes because the limit moves with the history.
+
 ![G14: the absolute difference between the stored and the re-run P(X<0) by hours before the
 visibility limit, mean and largest](gallery_g14.svg)
 
 **G15: the base rate that the sign head forecasts is about 4% and peaks around midnight and in the
-evening.** The share of reverse flow in the synthetic target rows averages 0.039 to 0.041 at each
+evening.** The share of reverse flow in the synthetic target rows averages 0.036 to 0.041 at each
 lead day, and by half-hour of the day it is 0.112 at the first half-hour, 0.098 at half-hour 4,
 0.007 at half-hour 24, and 0.089 at half-hour 44 (the half-hours are numbered 0 to 47 from the start
 of the day). The smallest share in the panel is 0.003 and the largest is 0.123, so the share is
