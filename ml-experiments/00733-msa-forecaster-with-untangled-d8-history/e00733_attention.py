@@ -296,7 +296,7 @@ def open_fold(
         adapters.patch_cpu_tables(pipe=pipe)
     data = adapters.build_fold_data_with_run_files(pipe=pipe, device=device)
     tensors, _ = adapters.arm_tensors_for(arm=arm, base=root, data=data, device=device)
-    source = train.UntSource(source=data.source, tensors=tensors)
+    source = train.UntSource(source=data.source, tensors=tensors, root=root)
     if rows == "test":
         origins = data.test_origin_idx
     else:

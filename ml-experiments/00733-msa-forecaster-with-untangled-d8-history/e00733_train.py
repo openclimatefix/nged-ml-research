@@ -26,6 +26,7 @@ from collections import deque
 from collections.abc import Callable, Generator, Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Final
 
 import e00733_core as core
@@ -134,9 +135,18 @@ class UntAssembled:
 class UntSource:
     """A 713 `Source` plus the untangled channels of one arm (the counterpart of 716's `PvSource`)."""
 
-    def __init__(self, *, source: object, tensors: inputs.ChannelTensors) -> None:
-        """Hold the wrapped source and the channel tensors; both sit on one device."""
-        self.source, self.tensors = source, tensors
+    def __init__(
+        self, *, source: object, tensors: inputs.ChannelTensors, root: Path | None = None
+    ) -> None:
+        """Hold the wrapped source and the channel tensors; both sit on one device.
+
+        Args:
+            source: The wrapped 713 source.
+            tensors: The channel tensors.
+            root: This experiment's data folder, which receives the example row of the first
+                checked batch (`None`: the row is printed and not written).
+        """
+        self.source, self.tensors, self.root = source, tensors, root
         self.device = source.device  # ty: ignore[unresolved-attribute]
 
     def with_power_in(self, *, power_in: torch.Tensor) -> UntSource:
@@ -144,6 +154,7 @@ class UntSource:
         return UntSource(
             source=self.source.with_power_in(power_in=power_in),  # ty: ignore[unresolved-attribute]
             tensors=self.tensors,
+            root=self.root,
         )
 
     @property
@@ -192,7 +203,7 @@ class UntSource:
             run_avail_us=run_avail, other_valid_us=other_valid,
         )  # fmt: skip
         if check:
-            check_batch(batch=batch)
+            check_batch(batch=batch, root=self.root)
         return batch
 
 
@@ -260,10 +271,13 @@ _EXAMPLE_PRINTED: list[str] = []
 """The example row of this process's first checked batch (empty until one is checked)."""
 
 
-def _print_example(*, batch: UntAssembled, c: np.ndarray, filled: np.ndarray) -> None:
+def _print_example(
+    *, batch: UntAssembled, c: np.ndarray, filled: np.ndarray, root: Path | None
+) -> None:
     """Print the plan's example row for the first target token of the batch's first sample.
 
-    The row is read from the batch's own run times and written to `PRIVATE/origin_time_example_real.txt`.
+    The row is read from the batch's own run times and written to
+    `PRIVATE/origin_time_example_real.txt` under `root` (not written when `root` is None).
     """
     i = int(np.flatnonzero(filled.any(axis=1))[0])
     target = to_numpy(tensor=batch.target_idx)[i][filled[i]][0]
@@ -274,10 +288,11 @@ def _print_example(*, batch: UntAssembled, c: np.ndarray, filled: np.ndarray) ->
     )  # fmt: skip
     _EXAMPLE_PRINTED.append(row)
     print(row, flush=True)
-    (paths.private_dir() / "origin_time_example_real.txt").write_text(row + "\n")
+    if root is not None:
+        (paths.private_dir(root=root) / "origin_time_example_real.txt").write_text(row + "\n")
 
 
-def check_batch(*, batch: UntAssembled) -> None:
+def check_batch(*, batch: UntAssembled, root: Path | None = None) -> None:
     """Run the per-batch assertions.
 
     The assertions cover the origin-time weather of every target token, the history order, and the
@@ -285,6 +300,7 @@ def check_batch(*, batch: UntAssembled) -> None:
 
     Args:
         batch: The assembled batch.
+        root: This experiment's data folder, which receives the example row (None: none written).
 
     Raises:
         CorrectnessFailureError: When a target token reads a run that is not the origin's own 00Z run
@@ -303,7 +319,7 @@ def check_batch(*, batch: UntAssembled) -> None:
             run_available_us=to_numpy(tensor=batch.run_avail_us),
         )  # fmt: skip
         if checked and not _EXAMPLE_PRINTED:
-            _print_example(batch=batch, c=c, filled=filled)
+            _print_example(batch=batch, c=c, filled=filled, root=root)
     ch = batch.inputs.hist_u
     ok = batch.inputs.hist_u_ok
     if not bool(torch.isfinite(ch).all()) or bool((ch[~ok] != 0).any()):

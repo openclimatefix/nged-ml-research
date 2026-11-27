@@ -913,6 +913,14 @@ published page carries the coverage counts.
   have followed a look at test figures. They now refuse without `scores/test_started`, which
   `score` writes only after the choices were fixed. A run that reads validation rows only (a
   scratch root) needs no marker, and `loss_curves` reads stored fit records only.
+- **No test or process writes into the data folder that `DATA_PATH_INTERNAL` names unless it was
+  given that folder as its root (ruling of the design lead, 2026-11-27, set before any experiment
+  733 fit exists).** The example row of the first checked real batch had gone to the default data
+  folder, so a test run created a `PRIVATE` folder in the real data folder, and the smoke and
+  timing processes wrote there too. Every source now carries the root of its run and writes the row
+  there, and a source with no root prints the row and writes nothing. A session-wide check in the
+  test configuration compares the listing of the data folder before and after the tests and fails
+  on any change, and a test checks the example row with and without a root.
 
 ## Method
 

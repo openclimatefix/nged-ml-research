@@ -134,7 +134,7 @@ def target_poison_check(
         tensors, _ = adapters.arm_tensors_for(
             arm=arm, base=root, data=data, device=device, poison_idx=target if poison else None
         )  # fmt: skip
-        source = train.UntSource(source=data.source, tensors=tensors)  # ty: ignore[unresolved-attribute]
+        source = train.UntSource(source=data.source, tensors=tensors, root=root)  # ty: ignore[unresolved-attribute]
         frame = pred.forecast_frame(
             net=net, test_origin_idx=pick, source=source, target_mean=data.target_mean,  # ty: ignore[unresolved-attribute]
             target_std=data.target_std, seed=seed, grid_start_us=grid_start_us, time_series_ids=ids,  # ty: ignore[unresolved-attribute]
@@ -218,7 +218,7 @@ def predict_fold(
     else:
         tensors, _ = adapters.arm_tensors_for(arm=arm, base=root, data=data, device=device)
         world_ = tr713.World(
-            source=train.UntSource(source=data.source, tensors=tensors), cutoff_idx=data.cutoff_idx,
+            source=train.UntSource(source=data.source, tensors=tensors, root=root), cutoff_idx=data.cutoff_idx,
             clean=data.clean, target_mean=data.target_mean, target_std=data.target_std, month=fold, placebo_pool=None,
         )  # fmt: skip
         origins = validation_origins(world_=world_, data=data)
@@ -232,7 +232,7 @@ def predict_fold(
         tensors, _ = adapters.arm_tensors_for(
             arm=arm, base=root, data=data, device=device, variant=variant
         )
-        source = train.UntSource(source=data.source, tensors=tensors)
+        source = train.UntSource(source=data.source, tensors=tensors, root=root)
         frame = pred.forecast_frame(
             net=net, test_origin_idx=origins, source=source, target_mean=data.target_mean,
             target_std=data.target_std, seed=seed, grid_start_us=prep422.GRID_START_US,

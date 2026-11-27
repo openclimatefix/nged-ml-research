@@ -226,7 +226,7 @@ def real_loader(*, root: Path | None = None) -> fit.RealLoader:
         leak.assert_training_power_cut(power=data.clean, fold_start_idx=data.cutoff_idx)
         tensors, kept = arm_tensors_for(arm=arm, base=base, data=data, device=device)
         world = tr713.World(
-            source=train.UntSource(source=data.source, tensors=tensors), cutoff_idx=data.cutoff_idx,
+            source=train.UntSource(source=data.source, tensors=tensors, root=base), cutoff_idx=data.cutoff_idx,
             clean=data.clean, target_mean=data.target_mean, target_std=data.target_std, month=fold, placebo_pool=None,
         )  # fmt: skip
         star = arms713.m_star(data_dir=ML_EXPERIMENTS_DATA_DIR)

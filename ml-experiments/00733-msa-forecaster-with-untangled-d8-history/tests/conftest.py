@@ -34,3 +34,25 @@ def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.
 def rng() -> np.random.Generator:
     """Return a seeded generator."""
     return np.random.default_rng(733)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _data_folder_gains_no_file() -> Iterable[None]:
+    """Fail the session when a test leaves a file in this experiment's real data folder.
+
+    The folder is the one that `DATA_PATH_INTERNAL` names, which holds the real (or the scratch)
+    run. Every test writes under `tmp_path`, so the listing must be the same after the session.
+    """
+    import os
+
+    folder = e00733_paths.data_root() if os.environ.get("DATA_PATH_INTERNAL") else None
+
+    def listing() -> list[tuple[str, int]]:
+        if folder is None or not folder.exists():
+            return []
+        return sorted((str(p.relative_to(folder)), p.stat().st_mtime_ns) for p in folder.rglob("*"))
+
+    before = listing()
+    yield
+    after = listing()
+    assert after == before, f"the tests changed the data folder: {set(after) ^ set(before)}"

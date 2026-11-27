@@ -381,3 +381,36 @@ def make_world_copy(segs: list[sy.SegmentArrays]) -> list[sy.SegmentArrays]:
     import copy
 
     return copy.deepcopy(segs)
+
+
+# --------------------------------------------------------------------------- no write into the real data folder
+
+
+def _listing(folder: Path) -> list[str]:
+    return sorted(str(p.relative_to(folder)) for p in folder.rglob("*")) if folder.exists() else []
+
+
+def test_the_example_row_goes_to_the_given_root_and_never_to_the_data_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With a root the example row lands under it; without one it is printed only; the folder that
+    `DATA_PATH_INTERNAL` names gains no file either way."""
+    internal = tmp_path / "internal"
+    internal.mkdir()
+    monkeypatch.setenv("DATA_PATH_INTERNAL", str(internal))
+    before = _listing(internal)
+    for root_name in (None, "root"):
+        monkeypatch.setattr(tn, "_EXAMPLE_PRINTED", [])
+        root = tmp_path / root_name if root_name else None
+        src = tn.UntSource(
+            source=FakeSource(), tensors=make_channel_tensors(n_grid=48 * 400), root=root
+        )
+        src.assemble(
+            primary=torch.tensor([3]),
+            c_idx=torch.tensor([48 * 300 + 24]),
+            lead_day=torch.tensor([0]),
+        )
+        assert len(tn._EXAMPLE_PRINTED) == 1
+        written = tmp_path / "root" / "PRIVATE" / "origin_time_example_real.txt"
+        assert written.exists() == (root is not None)
+    assert _listing(internal) == before
