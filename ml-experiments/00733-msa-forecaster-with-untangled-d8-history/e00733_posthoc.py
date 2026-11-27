@@ -16,7 +16,7 @@ folder, which this module never writes.
 - P3: YOb minus Y0b, Brier score of the sign on the synthetic world, single seed.
 - P4: YUb minus Y0b, Brier score of the sign on the synthetic world, single seed.
 
-P3 and P4 are point differences only: one seed gives no interval and no claim of significance.
+P3 and P4 are point differences only: one seed gives no interval.
 Beside them, the report lists each synthetic arm's stored pass, its validation sign cross-entropy at that
 pass, and its Brier score on the scored test half-hours, for Y0b, YUb, and YOb and for seed 0 of Y0
 and YU of the main run.

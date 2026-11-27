@@ -179,6 +179,7 @@ def test_yob_reads_the_true_channels_of_history_half_hours_before_the_origin_onl
     assert ok.any() and np.isfinite(u).all()
     # The cut-off is exact: the slot c - 55 (stamp c - 54) is the newest visible and carries the
     # truth, and the slot c - 54 is not visible, so a cut-off moved by one half-hour fails either way.
+    assert core.NEWEST_VISIBLE_BEFORE_CONTRACT == 54  # pinned: the cut-off itself must not move
     newest, first_hidden = (
         origin - core.NEWEST_VISIBLE_BEFORE_CONTRACT - 1,
         origin - core.NEWEST_VISIBLE_BEFORE_CONTRACT,
