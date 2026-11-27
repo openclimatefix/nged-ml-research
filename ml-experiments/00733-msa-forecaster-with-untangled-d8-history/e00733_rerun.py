@@ -28,6 +28,7 @@ import e00733_core as core
 import e00733_paths as paths  # noqa: F401
 import numpy as np
 from e00733_channels import GRID_START_EPOCH_DAY
+from e00733_leakage import CorrectnessFailureError
 
 STEPS: Final = core.WINDOW_STEPS
 MID: Final = core.WINDOW_MIDDLE_START
@@ -55,7 +56,7 @@ HIDDEN_ROWS: Final = ("r", "r_mask", "csi", "cams_mask", "d_bsp", "bsp_mask")
 ERA5_ROWS: Final = ("t2m", "wind10", "precip")
 
 
-class RerunError(RuntimeError):
+class RerunError(CorrectnessFailureError):
     """A re-run check failed (a correctness failure, verdict row 1)."""
 
 

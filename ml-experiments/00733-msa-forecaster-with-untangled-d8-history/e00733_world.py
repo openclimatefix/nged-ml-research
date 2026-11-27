@@ -35,6 +35,7 @@ import e00733_core as core
 import e00733_rerun as rr
 import e00733_synth as sy
 import numpy as np
+from e00733_leakage import CorrectnessFailureError
 
 GRID_START_US: Final = 1_567_296_000_000_000
 STEP_US: Final = 1_800_000_000
@@ -61,7 +62,7 @@ KINDS: Final = ("train_s3", "train_s4", "validation", "test")
 """The banks of the synthetic forecasting world."""
 
 
-class WorldError(RuntimeError):
+class WorldError(CorrectnessFailureError):
     """The synthetic world met an input it cannot use (a correctness failure, verdict row 1)."""
 
 

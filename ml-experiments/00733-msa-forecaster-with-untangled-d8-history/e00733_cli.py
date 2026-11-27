@@ -202,10 +202,18 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse the arguments, pin the threads, and run the stage."""
     args = parser().parse_args(argv)
-    paths.pin_threads()
-    install_runtime()
-    root = Path(args.data_root) if args.data_root else paths.data_root()
-    return run_stage(args=args, root=root, digest=banks_digest(root730=paths.root_730()))
+    try:
+        paths.pin_threads()
+        install_runtime()
+        root = Path(args.data_root) if args.data_root else paths.data_root()
+        digest = banks_digest(root730=paths.root_730())
+    except BaseException as exc:
+        if isinstance(exc, KeyboardInterrupt | SystemExit):
+            raise
+        traceback.print_exc()
+        print(f"setup of stage {args.stage} failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return st.exit_code(exc=exc)
+    return run_stage(args=args, root=root, digest=digest)
 
 
 if __name__ == "__main__":

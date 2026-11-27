@@ -633,7 +633,9 @@ def run_chain(*, root: Path, steps: ChainSteps) -> dict[str, Any]:  # noqa: PLR0
     return read_json(path=root / CHAIN_STATUS)
 
 
-def exit_code(*, exc: BaseException | None = None, status: Mapping[str, Any] | None = None) -> int:
+def exit_code(  # noqa: PLR0911
+    *, exc: BaseException | None = None, status: Mapping[str, Any] | None = None
+) -> int:
     """Return the exit code of a stage or a chain: stopped 3, invalid 4, a failed chain 5.
 
     A guard refusal 2, else 0. Never 1.
@@ -648,6 +650,8 @@ def exit_code(*, exc: BaseException | None = None, status: Mapping[str, Any] | N
         return EXIT_FAILED
     if status is not None:
         state = status.get("state")
+        if state == "failed" and status.get("reason") == "correctness failure":
+            return EXIT_INVALID
         return (
             EXIT_OK if state == "complete" else EXIT_STOPPED if state == "stopped" else EXIT_FAILED
         )

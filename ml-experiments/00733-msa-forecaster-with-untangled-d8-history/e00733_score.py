@@ -26,13 +26,14 @@ import e00733_core as core
 import e00733_paths as paths  # noqa: F401
 import numpy as np
 import polars as pl
+from e00733_leakage import CorrectnessFailureError
 
 KEYS: Final = ("time_series_id", "power_fcst_init_time", "valid_time")
 LEVEL_PERCENT: Final = 100.0 * core.LEVEL
 EPS: Final = 1e-12
 
 
-class ScoreError(RuntimeError):
+class ScoreError(CorrectnessFailureError):
     """A scoring input is unusable (a correctness failure, verdict row 1)."""
 
 

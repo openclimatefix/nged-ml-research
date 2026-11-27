@@ -21,6 +21,7 @@ import e00733_paths as paths  # noqa: F401
 import e00733_rerun as rerun
 import numpy as np
 import torch
+from e00733_leakage import CorrectnessFailureError
 
 # isort: split
 import e00716_batch as batch716
@@ -30,7 +31,7 @@ STEPS: Final = core.STEPS_PER_DAY
 DROPOUT_KEY: Final = 733
 
 
-class InputsError(RuntimeError):
+class InputsError(CorrectnessFailureError):
     """An input check failed (a correctness failure, verdict row 1)."""
 
 

@@ -112,3 +112,14 @@ def test_score_stage_writes_the_test_marker_only_after_the_choice_check(
     )
     assert cli.run_stage(args=_args("score"), root=tmp_path, digest=DIGEST) == 0
     assert st.marker_exists(root=tmp_path)
+
+
+def test_an_unexpected_error_in_the_setup_exits_5_never_1(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An import error before the stage runs exits 5, which is not read as `slot busy`."""
+
+    def broken() -> None:
+        msg = "no module named torch"
+        raise ImportError(msg)
+
+    monkeypatch.setattr(cli, "install_runtime", broken)
+    assert cli.main(["guard"]) == cli.st.EXIT_FAILED == 5

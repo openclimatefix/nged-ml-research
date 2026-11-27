@@ -33,6 +33,7 @@ import e00733_leakage as leak
 import e00733_paths as paths  # noqa: F401
 import numpy as np
 from e00733_channels import StoppedError
+from e00733_leakage import CorrectnessFailureError
 
 SUMMARY_FILE: Final = re.compile(r"^init=(\d{4}-\d{2}-\d{2})\.parquet$")
 """The name of a run summary file."""
@@ -51,7 +52,7 @@ SCORED_K0: Final = tuple(d - 1 for d in core.SYNTHETIC_LEAD_DAYS)
 """The scored lead days 2 to 10 as zero-based lead indices."""
 
 
-class SynthError(RuntimeError):
+class SynthError(CorrectnessFailureError):
     """A check of the synthetic world failed (a correctness failure, verdict row 1)."""
 
 

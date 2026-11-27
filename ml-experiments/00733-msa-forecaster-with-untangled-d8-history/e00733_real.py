@@ -28,6 +28,7 @@ import e00733_paths as paths  # noqa: F401
 import e00733_rerun as rr
 import numpy as np
 from e00733_channels import GRID_START_EPOCH_DAY, StoredOutputs
+from e00733_leakage import CorrectnessFailureError
 
 TOLERANCE_REPRODUCTION: Final = 1e-2
 """The largest allowed difference between a re-computed output with nothing hidden and the stored
@@ -38,7 +39,7 @@ D8_SERIES_ID: Final = 26
 """The `time_series_id` of D8 in the ensemble summaries."""
 
 
-class RealWindowError(RuntimeError):
+class RealWindowError(CorrectnessFailureError):
     """The real-window builder met an input it cannot use (a correctness failure, verdict row 1)."""
 
 

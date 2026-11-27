@@ -357,3 +357,31 @@ def test_a_fit_stage_needs_the_base_day_and_test_segment_guards(tmp_path: Path) 
     st.guard_run(root=tmp_path, stage="chain", banks_digest=DIGEST)
     with pytest.raises(st.GuardError):
         st.record_pre_fit_guard(root=tmp_path, name="other", payload={})
+
+
+@pytest.mark.parametrize(
+    "module_error",
+    ["e00733_inputs.InputsError", "e00733_rerun.RerunError", "e00733_synth.SynthError",
+     "e00733_world.WorldError", "e00733_real.RealWindowError", "e00733_score.ScoreError"],
+)  # fmt: skip
+def test_a_correctness_failure_inside_the_chain_ends_it_with_exit_4_not_5(
+    tmp_path: Path, module_error: str
+) -> None:
+    """A module error documented as verdict row 1 ends the chain as `invalid` with exit 4."""
+    import importlib
+
+    module, name = module_error.split(".")
+    error = getattr(importlib.import_module(module), name)
+    assert issubclass(error, st.CorrectnessFailureError)
+    _ready(tmp_path, through="timing")
+
+    def run_job(arm: str, fold: str | None, seed: int) -> dict:
+        raise error("a check failed")
+
+    steps = st.ChainSteps(
+        run_job=run_job, f0r_gate=lambda: None, screen_point=lambda: 0.0, log=lambda _m: None,
+        now=lambda: "T",
+    )  # fmt: skip
+    status = st.run_chain(root=tmp_path, steps=steps)
+    assert status["state"] == "failed" and st.invalid_recorded(root=tmp_path)
+    assert st.exit_code(status=status) == st.EXIT_INVALID == 4
