@@ -130,12 +130,14 @@ stored forecasts).** The maintainer asked whether reverse flow at D8 is the reas
 - **Per Primary, B1 is below zero at 11 of the 16 Primaries and above zero at 5.** The eight's B1 is
   positive at D2 (+0.007), D3 (+0.012), and D4 (+0.064), and negative at D8 (-0.174) and D12
   (-0.113).
-- **D8 is where the mixture helps the eight most.** Without D8 the eight's B1 is -0.022, with D8
-  alone -0.174. Leaving D8 out makes the eight weaker, so the reverse-flow Primary is not the cause.
+- **D8, the Primary the maintainer named as the reverse-flow case, is where the mixture helps the
+  eight most.** Without D8 the eight's B1 is -0.022, with D8
+  alone -0.174. Leaving D8 out makes the eight weaker, so D8 is not the cause.
 - **The data cannot separate reverse-flow half-hours at the eight.** The eight are stored as
-  apparent power with no negative values. At the six, 792 half-hours have negative observed power,
-  and B1 on those half-hours is -0.499 against -0.055 elsewhere. That is 0.3% of rows and probably
-  one Primary, so it is an observation and not a result.
+  apparent power with no negative values, so D8's reverse flow is invisible in the data. At the six,
+  792 forecast rows have negative observed power, all at D10 and covering 88 distinct half-hours. B1
+  on those rows is -0.499 against -0.055 elsewhere. That is 0.3% of the rows at one Primary, so it
+  is an observation and not a result.
 - **The eight's monthly B1 swings about twice as much as the six's.** The standard deviation of the
   8 monthly means is 0.114 at the eight (range -0.185 to +0.139), 0.123 at the eight without D8, and
   0.063 at the six. B2 has the same spread at both groups (0.040 and 0.048). The month-to-month
@@ -173,11 +175,15 @@ the days around Christmas), scored on folds 2025-12 and 2026-01, forecast 0.062 
 - **Triggers.** Audit triggers 1 (placebo and `Z` rule) and 5 (nested arm beating its container) did
   not fire on the screen. The error-of-the-median guard moves with CRPS at both groups, so trigger 3
   did not fire. Leave-one-Primary-out keeps the sign at both groups, so trigger 4 did not fire.
-- **Numbers from code that has not had its Opus review.** The post hoc reverse-flow table, the
-  masked-history scores, the `U27`, `UX`, and `Z` contrasts (a new `secondary` command in
-  `e00718_contrasts.py`), the loss plot, the read-out weight plot, and the attention maps all come
-  from scripts that wait for one Opus diff-limited review before the pull request leaves draft. The
-  `secondary` command changes no line of the headline path.
+- **Review of the new analysis code.** One Opus review
+  (`briefs/msa_architecture/f9_result_code_review.md`) covered the post hoc, masked-history,
+  loss-plot, attention-plot, and `secondary` code. It reproduced the printed B1 numbers, the D8-only
+  value, and the 792 negative rows exactly. It found two must-fix faults in the attention plots (the
+  batch used ERA5 weather, and absent rows were drawn as real rows of age 2), and the charts were
+  redrawn after the fix. The remaining findings were fixed or reworded. The review did not recompute
+  the masked-history scores, the `secondary` contrasts, B2, or the part 1 numbers, and the redrawn
+  attention charts have not had a second look. A Sonnet check confirmed that the `secondary` command
+  changes no line of the headline path (file hash `3706cc64757a1bfa`).
 - **Not done.** The selection-swap read-out (rows chosen with live-fair weather) was not built. The
   cold-night guard and the selection-swap guard are therefore unread.
 - **Unlogged events.** NGED's load-shift logs may miss events, so the clean-lag rows may hold events
