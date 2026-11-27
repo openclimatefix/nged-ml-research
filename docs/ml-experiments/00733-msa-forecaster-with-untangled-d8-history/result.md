@@ -87,58 +87,68 @@ metric: >-
   by lead band and reading band, and the CRPS of the forecast reading.
 verdict: not supported
 best_arm: >-
-  No arm beats the control. FU (the forecaster with the untangled history of D8) scores 0.23% of the
-  control's mean CRPS worse than M* at D8 (C1 +0.23%, interval -1.05% to +1.71%). On synthetic days
-  YU forecasts reverse flow better than persistence (C3 -0.00488, interval -0.00829 to -0.00216) and
-  no better than Y0, the same forecaster without the untangled history (C4 -0.00001, interval
-  -0.00118 to +0.00109). All numbers are interim.
+  No arm beats the control. FU (the forecaster with the untangled history of D8) differs from M* at
+  D8 by +0.23% of the control's mean CRPS, with an interval of -1.05% to +1.71% that includes zero
+  (C1). On synthetic days YU forecasts reverse flow better than persistence (C3 -0.00488, interval
+  -0.00829 to -0.00216) and shows no detectable difference from Y0, the same forecaster without the
+  untangled history (C4 -0.00001, interval -0.00118 to +0.00109). All six synthetic fits stored the
+  network of pass 1, so C3 and C4 compare one-pass networks. The counted read is final (`interim` is
+  false in `scores/verdict.json`); numbers labelled post hoc are report-only.
 headline: >-
-  Adding the untangling network's probability of reverse flow and its load-transfer step
-  probability to D8's 14 history days changed the CRPS of the forecast of D8's apparent power by
-  +0.23% of the control's mean (C1, interval -1.05% to +1.71%), so the verdict is row 7, `not
-  supported` (no detectable difference). The placebo that carries the same signals from 28 days
-  earlier is indistinguishable from FU (C2 -0.36%, -2.15% to +0.60%). On synthetic days a head of the
+  Adding the untangling network's probability of reverse flow and its load-transfer step probability
+  to D8's 14 history days changed the CRPS of the forecast of D8's apparent power by +0.23% of the
+  control's mean (C1, interval -1.05% to +1.71%), so the verdict is row 7, `not supported` (no
+  detectable difference). The placebo that carries the same signals from 28 days earlier shows no
+  detectable difference from FU (C2 -0.36%, -2.15% to +0.60%). On synthetic days a head of the
   forecaster beats the persistence of the untangled history (C3 -0.00488, -0.00829 to -0.00216) and
-  its sign-forecast word is "skilful" (Brier skill 0.338 against the climatology), but the same
-  forecaster without the untangled history scores the same (C4 -0.00001, -0.00118 to +0.00109). The
-  guard that C1's point keeps its sign with each fold month left out failed. All numbers are
-  interim.
+  its sign-forecast word is "skilful" (Brier skill 0.338 against the climatology), and the same
+  forecaster without the untangled history shows no detectable difference (C4 -0.00001, -0.00118 to
+  +0.00109). All six synthetic fits (Y0 and YU, seeds 0 to 2) stored the network of pass 1: the
+  validation loss (the mixture negative log-likelihood plus the sign cross-entropy) rose from the
+  first pass while the training loss kept falling, and a patience of 20 passes stopped each fit at
+  pass 21. So C3 and C4 compare one-pass networks, and the C4 null says nothing about whether
+  history signals could help. The cause is a stopping rule on a validation loss that the sign term
+  does not dominate. Verdict row 7 comes from the real-fold contrasts C1 and C2, which are
+  unaffected. The guard that C1's point keeps its sign with each fold month left out failed.
 lessons: >-
-  The plan named row 7 as the likeliest verdict, and row 7 came out. C1 is +0.23% with a half-width of
-  1.38%, so the experiment resolves differences of about 1.4% of the CRPS and finds none. C1's
+  The plan named row 7 as the likeliest verdict, and row 7 came out. C1 is +0.23% with a half-width
+  of 1.38%, so the experiment resolves differences of about 1.4% of the CRPS and finds none. C1's
   sign changes when December 2025 is left out (R8), and the report-only slices disagree: a gain of
-  2.19% in the midday half-hours of April to June and a loss of 2.10% on cold winter nights. The
-  sign forecast of the synthetic world is skilful, and the forecaster beats persistence by about
-  0.005 in Brier score at every lead day from 2 to 10, but YU and Y0 are equal at every lead day,
-  and the oracle-history arm that would say whether any sign history can help was dropped by the
-  timing gate, so a null C4 has three candidate explanations that the page cannot tell apart. A post
-  hoc probe of Y0's hidden state predicts the sign of each history half-hour with an AUC of 0.955,
-  which favours the explanation that the forecaster already infers the sign, with the caveat that
-  the probe also sees weather and time of day. Every synthetic fit stored its first pass, because
-  the validation loss of the reading rose from pass 1. All numbers are interim.
+  2.19% in the midday half-hours of April to June and a loss of 2.10% on cold winter nights, which
+  together cover about 11% of the scored half-hours. The sign forecast of the synthetic world is
+  skilful, and the forecaster beats persistence by about 0.005 in Brier score at every lead day from
+  2 to 10, but YU and Y0 show no detectable difference at any lead day. All six synthetic fits
+  stored the network of pass 1, because the validation loss rose from pass 1 while the training loss
+  kept falling, so the C4 null says nothing about whether history signals could help. The
+  oracle-history arm was dropped by the timing gate, so a null C4 has three candidate explanations
+  that the page cannot tell apart. A post hoc probe of Y0's hidden state predicts the sign of each
+  history half-hour with an AUC of 0.955, which fits the explanation that the forecaster already
+  infers the sign, with the caveat that the probe also sees weather and time of day.
 take_home_message: >-
   Telling D8's demand forecaster which of its past half-hours were reverse flow, and when load was
   transferred, changed its forecast error by +0.23%, with an interval from -1.05% to +1.71%, so the
-  data show neither a gain nor a loss and the change is not worth porting. On synthetic days a
-  forecaster beats a rule that repeats the past reverse flow, but it does so equally well without
-  the untangled history, so the untangled history is not what makes the forecast of reverse flow
-  skilful. The forecaster may already infer the sign of past half-hours from the readings and the
-  weather, and a test that fits the arm with the true sign in the history would say whether any
-  further untangling can help.
+  data show no detectable gain or loss, and a port is not supported. On synthetic days a forecaster
+  beats a rule that repeats the past reverse flow, and it does so with no detectable difference
+  without the untangled history. Both synthetic forecasters are first-pass networks, so that
+  comparison says nothing about whether history signals could help. The post hoc probe suggests that
+  the forecaster may infer the sign of past half-hours from the readings and the weather; the page
+  does not show it.
 advice:
   - >-
     Do not add the untangling network's probability of reverse flow and its transfer-step
-    probability to the history rows of D8's demand forecaster in the expectation of a gain,
-    because C1 is +0.23% of the CRPS (-1.05% to +1.71%) and the placebo FU-S is indistinguishable
+    probability to the history rows of D8's demand forecaster in the expectation of a gain, because
+    C1 is +0.23% of the CRPS (-1.05% to +1.71%) and the placebo FU-S shows no detectable difference
     from FU (C1, C2).
   - >-
     Expect a test of one extra history input at one Primary, over 8 monthly folds and 5 seeds, to
     resolve the CRPS only to about 1.4% of the control's mean, and plan the smallest gain worth
     porting above that figure (C1 half-width 1.38%).
   - >-
-    Fit the oracle-history arm, which holds the true sign in the history, before any further test of
-    sign inputs to a forecaster, because C4 is null (-0.00001) and the oracle arm was dropped by the
-    timing gate, so no reading says whether any sign history can help (C4, R5, the post hoc probe).
+    Fit the oracle-history arm, which holds the true sign in the history, beside any further test of
+    sign inputs to a forecaster, and stop each synthetic fit on the sign head's own validation
+    cross-entropy, because the stored synthetic networks are first-pass networks, C4 is null
+    (-0.00001), and the timing gate dropped the oracle arm, so no reading says whether any sign
+    history can help (C4, R5, the post hoc probe).
   - >-
     Pre-register the midday window and the cold winter nights as slices before reading them, because
     the midday gain (-2.19%, -3.49% to -1.22%) and the cold-night loss (+2.10%, +0.32% to +4.60%)
@@ -151,8 +161,8 @@ advice:
   - >-
     Use the forecaster without untangled channels (Y0) as the reference for the probability of
     reverse flow on synthetic days, because it scores within 0.00001 of YU, and both beat the
-    persistence of the untangled history by about 0.005 at every lead day from 2 to 10 (C3, C4,
-    the per-lead reading).
+    persistence of the untangled history by about 0.005 at every lead day from 2 to 10 (C3, C4, the
+    per-lead reading), with the caveat that both stored the network of pass 1.
   - >-
     Time a synthetic fit on the real GPU before the plan fixes its pass cap, because running the
     frozen untangling network inside each batch made a pass cost about 90 seconds and the first
@@ -162,9 +172,10 @@ adopted_in: none
 ---
 
 **We asked whether the demand forecaster of D8 forecasts better when it is told what was hidden in
-D8's past readings.** D8 is a primary substation (a "Primary") whose meter reports apparent power, a
-magnitude with no sign. A gas engine and a solar farm connect below D8, so power sometimes flows out
-of D8 towards the grid, and the meter shows that export as a positive reading, the same as import. A
+D8's past readings.** D8 is a primary substation (a "Primary") on the distribution network of
+National Grid Electricity Distribution (NGED), and its meter reports apparent power, a magnitude
+with no sign. A generating engine and a solar farm connect below D8, so power sometimes flows out of
+D8 towards the grid, and the meter shows that export as a positive reading, the same as import. A
 neural network that forecasts D8 from its last 14 days of readings therefore cannot tell, from the
 readings alone, which past half-hours were import and which were export.
 
@@ -174,6 +185,30 @@ flowed in reverse, the output of unmetered solar panels in megawatts, and the pr
 block of customers was moved to or from a neighbouring Primary (a load transfer). The untangling
 network learned on synthetic days with a known answer and has never seen a real day with that
 answer.
+
+**In short, the verdict is `not supported` (verdict row 7): the untangled history of D8 changed the
+forecast of D8's reading by less than the data can resolve.**
+
+- **(a) Do the untangled history signals improve the forecast of D8's apparent power?** The data
+  show no detectable difference. FU (the forecaster with the signals in its history) minus M\*
+  (experiment 713's selected forecaster, the control) is +0.23% of the control's mean continuous
+  ranked probability score (CRPS), with an interval of -1.05% to +1.71% (C1). The placebo FU-S (a
+  forecaster that reads the same signals from 28 days earlier) shows no detectable difference from
+  FU (C2, -0.36%, interval -2.15% to +0.60%).
+- **(b) Can a head of the forecaster forecast reverse flow on synthetic days, and does the untangled
+  history help it?** The head is skilful, and the data show no detectable gain from the untangled
+  history. The forecaster with the untangled history (YU) beats the persistence of that history by
+  0.00488 in Brier score (C3, interval -0.00829 to -0.00216), and its Brier skill against the
+  climatology of reverse flow is 0.338. The forecaster without the untangled history (Y0) shows no
+  detectable difference from YU: YU minus Y0 is -0.00001 (C4, interval -0.00118 to +0.00109).
+
+**All six synthetic fits stored the first-pass network, which limits what C3 and C4 can show.** All
+six synthetic fits (Y0 and YU, seeds 0 to 2) stored the network of pass 1: the validation loss (the
+mixture negative log-likelihood plus the sign cross-entropy) rose from the first pass while the
+training loss kept falling, and a patience of 20 passes stopped each fit at pass 21. So C3 and C4
+compare one-pass networks, and the C4 null says nothing about whether history signals could help.
+The cause is a stopping rule on a validation loss that the sign term does not dominate. Verdict row
+7 comes from the real-fold contrasts C1 and C2, which are unaffected.
 
 **This experiment added untangled signals to each of the forecaster's 14 history days and compared
 the forecast of D8's reading with the forecast of the same forecaster without them.** The untangling
@@ -199,29 +234,15 @@ estimate in the history rows), and the placebo follows experiments 716 and [expe
 row). The untangling network is that of experiment 732 (the untangling network on synthetic
 injections), whose synthetic days come from [experiment
 730](../00730-msa-d8-sign-detector-with-demand-head-and-masking/result.md) (the sign detector). The
-page gives the result, the post hoc runs requested after the verdict, the departures from the plan,
-the design as registered, the gallery of the synthetic world, the method, and the files.
-
-**In short, the verdict is `not supported` (verdict row 7): the untangled history of D8 changed the
-forecast of D8's reading by less than the data can resolve.** The answers to the two questions are
-as follows.
-
-- **(a) Do the untangled history signals improve the forecast of D8's apparent power?** No
-  detectable difference. FU (the forecaster with the signals) minus M\* (experiment 713's selected
-  forecaster, the control) is +0.23% of the control's mean CRPS, with an interval of -1.05% to
-  +1.71%. The placebo FU-S is indistinguishable from FU (-0.36%, interval -2.15% to +0.60%).
-- **(b) Can a head of the forecaster forecast reverse flow on synthetic days, and does the untangled
-  history help it?** The head is skilful and the history does not help. The forecaster with the
-  untangled history (YU) beats the persistence of that history by 0.00488 in Brier score (interval
-  -0.00829 to -0.00216), and its Brier skill against the climatology of reverse flow is 0.338. The
-  forecaster without the untangled history (Y0) scores the same: YU minus Y0 is -0.00001 (interval
-  -0.00118 to +0.00109).
+page gives the result, the post hoc runs requested after the verdict, the design as registered, the
+departures from the plan, the gallery of the synthetic world, the method, and the files.
 
 ## Result
 
-*Every number on this page comes from the first and only scoring of the test half-hours, and is
-interim until the reviews of the results and the prose are complete. Numbers come from
-`scores/report.txt`, `scores/verdict.json`, `scores/readings.json`, `scores/timing.json`,
+*Every number on this page comes from the first and only scoring of the test half-hours, and the
+counted read is final (`interim` is false in `scores/verdict.json`). Numbers labelled post hoc are
+report-only. Readings R1 to R12 are the report-only readings that "Contrasts" lists. Numbers come
+from `scores/report.txt`, `scores/verdict.json`, `scores/readings.json`, `scores/timing.json`,
 `scores/screen.json`, `diagnostics/per_lead.json`, `diagnostics/probe.json`, or a fit record under
 `fits/`, all under `data/ml-experiments/00733-msa-forecaster-with-untangled-d8-history/`. The
 exceptions are derived by hand: the absolute Brier scores of YU, B-hist, and B-clim in "Every arm's
@@ -243,27 +264,37 @@ experiment resolves differences of about 1.4% of the CRPS.
 
 **The normalised mean absolute error of the median points the same way as the CRPS.** FU minus M\*
 in the mean absolute error of the median forecast is +0.069 points, which is less than 1% of the
-mean absolute error of about 13.5 points that R10 prints for M\*. The two readings agree in sign, so
-the guard that they move together holds, and audit trigger 3 of the `ml-experiment` skill does not
-fire.
+mean absolute error of about 13.5 points that the all-rows reading R10 prints for M\*. The two
+readings agree in sign, so the guard that they move together holds. The audit rule of the
+`ml-experiment` skill for a CRPS contrast and a mean-absolute-error contrast of opposite signs
+(trigger 3) does not fire.
 
 **The placebo cannot be told from FU either.** FU minus the placebo FU-S (C2) is -0.36% (interval
 -2.15% to +0.60%), half-width 1.37%. FU-S reads the same two signals from 28 days earlier, so the
-data cannot tell a forecaster that reads the wrong days' signals from one that reads the right
-days'. The interval of C2 is as wide as the interval of C1, so C2 cannot show a gain of the signals
-from the right days either.
+data cannot tell a forecaster that reads the wrong days' signals from a forecaster that reads the
+right days' signals. The interval of C2 is as wide as the interval of C1, so C2 cannot show a gain
+of the signals from the right days either.
 
 **(b) A head of the forecaster forecasts reverse flow on synthetic days better than persistence, and
 the untangled history is not the reason.** The measure is the Brier score of the probability that
 D8's signed power is negative (the mean squared difference between the probability and what
-happened, 0 or 1; lower is better), over 407,808 half-hours of lead days 2 to 10 from 8,496 samples
-in 56 test segments. YU minus the persistence rule B-hist (C3) is -0.00488 (interval -0.00829 to
--0.00216), a gain, and the log loss agrees (-0.0244). YU minus Y0 (C4) is -0.00001 (interval
+happened, 0 or 1; lower is better), over 407,808 half-hours of lead days 2 to 10. The half-hours
+come from 8,496 forecasting samples (each one origin day and one lead day inside one segment) in 56
+test segments (each one synthetic month of D8's base days) of experiment 730's test bank (a stored
+set of synthetic samples). YU minus the persistence rule B-hist (C3) is -0.00488 (interval -0.00829
+to -0.00216), a gain, and the log loss agrees (-0.0244). YU minus Y0 (C4) is -0.00001 (interval
 -0.00118 to +0.00109), and the log loss agrees (-0.0012). The sign-forecast word is "skilful": YU's
 Brier skill against B-clim (the training banks' share of reverse flow by hour, day type, and month)
 is 0.338 against a bar of 0.10, and its reliability term is 0.00014 against a bar of 0.00369. The
 history word is "no detectable difference". The oracle-history reading R5, which says whether even
-the true sign in the history helps, is void, because the timing gate dropped the arm YT.
+the true sign in the history helps, is void, because the timing gate (the projection of the fits'
+cost against the stop line of 12 GPU-process-hours) dropped the arm YT (the forecaster that reads
+the true sign in the history).
+
+**The history word describes one-pass networks.** All six synthetic fits stored pass 1, because the
+validation loss rose from the first pass while the training loss kept falling, as "Loss curves"
+shows. C3 and C4 therefore compare one-pass networks, and the C4 null says nothing about whether
+history signals could help. Verdict row 7 rests on C1 and C2, which are unaffected.
 
 ### The verdict is `not supported`: C1's interval includes zero
 
@@ -284,8 +315,8 @@ CRPS, and C1's point (+0.23%) is on the wrong side of it, so the data give no su
 ![The real-fold contrasts C1 and C2, and the readings R3, R4, and R8 by lead band, as relative CRPS
 differences at D8, each with its 98.75% interval](contrasts_real.svg)
 
-*The dot chart of the CRPS contrasts at D8. The dots of C1 and C2 sit within 0.4% of zero, and every
-interval on the chart includes zero.*
+*The dot chart of the CRPS contrasts at D8. The dots of C1 and C2 sit within 0.4% of zero, and the
+intervals of C1 and C2 include zero.*
 
 ![The synthetic-world contrasts C3, C4, and R7 as differences in the Brier score of the probability
 of reverse flow, each with its 98.75% interval](contrasts_synthetic.svg)
@@ -303,8 +334,7 @@ points with 2025-11, 2025-12, 2026-01, 2026-02, 2026-03, 2026-04, 2026-05, and 2
 turn. Leaving out 2025-12 gives a negative point of -0.0065 points. The guard matters only for rows
 3 to 5, which need C1 to be a gain, so the failure changes no row.
 
-**The plan predicted row 7 as the likeliest verdict, and the result is row 7.** The plan's
-predictions fared as follows.
+**The plan predicted row 7 as the likeliest verdict, and the result is row 7.**
 
 - **C1 between -2% and +0.5% with an interval that includes zero:** C1 is +0.23%, inside the range,
   and its interval includes zero. The prediction of (a) would have failed if C1's lower end were
@@ -316,17 +346,18 @@ predictions fared as follows.
   matching loss sits on cold winter nights (+2.10%, +0.32% to +4.60%).
 - **C3 is a gain and the sign-forecast word is "skilful":** both hold (C3 -0.00488, skill 0.338).
 - **C4 is a gain:** it is not. C4 is -0.00001 with an interval that includes zero, so the history
-  word is "no detectable difference", and this part of the prediction of (b) failed.
+  word is "no detectable difference", and this part of the prediction of (b) failed, at one-pass
+  networks.
 - **The oracle-history arm YT beats YU by more than YU beats Y0:** the reading is void, because the
   timing gate dropped YT.
 
 ### Every arm's score
 
-**On the real folds the arms score within about 1% of one another, and every difference has an
-interval that includes zero.** R10 prints the CRPS and the mean absolute error of the median at D8
-over seeds 0 to 2 and all 8 folds: FU scores a CRPS of 7.509 points and a mean absolute error of
-13.636 points, and M\* scores 7.450 and 13.505. R10 reads seeds 0 to 2 (the plan fixes that) and C1
-reads seeds 0 to 4, so the +0.059-point gap between FU and M\* in R10 is not C1, and has no
+**On the real folds the arms score within about 1% of one another, and the differences that carry an
+interval include zero.** R10 prints the CRPS and the mean absolute error of the median at D8 over
+seeds 0 to 2 and all 8 folds: FU scores a CRPS of 7.509 points and a mean absolute error of 13.636
+points, and M\* scores 7.450 and 13.505. R10 reads seeds 0 to 2, as the plan fixes, and C1 reads
+seeds 0 to 4. The +0.059-point gap between FU and M\* in R10 is therefore not C1, and it has no
 interval.
 
 **On the synthetic world the Brier score of the probability of reverse flow separates the
@@ -355,8 +386,8 @@ days 2 to 3 (interval -1.20% to +1.68%, 23,020 half-hours), +0.20% at days 4 to 
 minus M\*, in points) are +0.082 in 2025-11, +0.174 in 2025-12, +0.112 in 2026-01, -0.053 in
 2026-02, -0.027 in 2026-03, -0.079 in 2026-04, -0.054 in 2026-05, and -0.038 in 2026-06. FU is worse
 in the three winter folds and better in the five later folds. Eight monthly values leave no power to
-say whether the pattern is a seasonal effect of the signals or chance, and the leave-one-month-out
-guard above says that one month, December, carries C1's sign.
+say whether the pattern is a seasonal effect of the signals or chance. The leave-one-month-out guard
+above shows that one month, December, carries C1's sign.
 
 **The midday half-hours gain and the cold winter nights lose, as two report-only slices.** R8 reads
 the midday half-hours (10:00 to 14:00 UTC) of folds 2026-04 to 2026-06 (6,156 half-hours): FU minus
@@ -364,18 +395,21 @@ M\* is -0.139 points, -2.19% of the control's mean (interval -3.49% to -1.22%), 
 monthly values are negative (-0.201, -0.093, and -0.121 points). On cold winter nights (4,761
 half-hours) FU minus M\* is +0.180 points, +2.10% (interval +0.32% to +4.60%), and all four monthly
 values are positive. Both slices are report-only, are read at 98.75% with no correction for the five
-slices of R8, and carry no verdict. The two slices have opposite signs and nearly cancel in C1.
+slices of R8 (three lead bands, midday, and cold nights), and carry no verdict. The two slices have
+opposite signs and together cover about 11% of the 102,078 scored half-hours, so they do not explain
+C1's value.
 
 ### The other 15 Primaries, masking, and the re-run
 
-**The path harms no other Primary that the data can show.** R3 is FU minus M\* pooled over the 15
+**The path shows no harm in the pooled 15 other Primaries.** R3 is FU minus M\* pooled over the 15
 Primaries that carry no untangled channel, on 1,528,785 half-hours: -0.13% (interval -0.81% to
 +0.44%).
 
-**A forecaster given masked channels scores the same as FU.** R4 is FU with every untangled channel
-masked at prediction, minus FU, at D8: -0.52% (interval -3.37% to +1.95%). The masked forecaster is
-not worse than FU, so the trained forecaster shows no detectable reliance on the channels, and the
-interval is too wide to say that it relies on them by less than 3%.
+**A forecaster given masked channels shows no detectable difference from FU.** R4 is FU with every
+untangled channel masked at prediction, minus FU, at D8: -0.52% (interval -3.37% to +1.95%). The
+masked forecaster is not worse than FU, so the trained forecaster shows no detectable reliance on
+the channels. The interval is too wide to say that the forecaster relies on the channels by less
+than 3%.
 
 **The re-run of days D - 2 and D - 1 moved the forecast by nothing the score can see.** R12 is FU
 scored with the stored untangled outputs of days D - 2 and D - 1 in place of the re-run, minus FU:
@@ -384,10 +418,12 @@ reads is therefore insensitive to the hidden-span re-run at the precision of the
 
 ### Tails and coverage
 
-**FU's tail quantiles score a little better than M\*'s and cover the same.** R9 reads the q01, q05,
-q95, and q99 pinball loss and coverage of FU and M\* at D8, over seeds 0 to 2 (102,078 half-hours
-each), with no interval. FS was not fitted, because the timing gate dropped it, so the reading
-covers FU and M\* only.
+**FU's tail pinball losses are slightly lower than M\*'s, and the coverages of the two forecasters
+differ by at most 0.006.** R9 reads the q01, q05, q95, and q99 pinball loss and coverage of FU and
+M\* at D8, over seeds 0 to 2 (102,078 half-hours each), with no interval, so the page reads no
+difference from it. The coverage of M\* is closer to the nominal level than the coverage of FU on
+all four quantiles. FS (the forecaster that reads only the probability of reverse flow) was not
+fitted, because the timing gate dropped it, so the reading covers FU and M\* only.
 
 | Quantile | FU pinball loss | M\* pinball loss | FU coverage | M\* coverage | Nominal |
 |---|---|---|---|---|---|
@@ -399,8 +435,7 @@ covers FU and M\* only.
 ![The coverage of D8's tail quantiles for FU and M*, against the nominal level](coverage.svg)
 
 *Both forecasters put too many readings above the q95 and q99 quantiles and too many below the q01
-and q05 quantiles, by similar amounts, so the tails of the two forecasters are as miscalibrated as
-each other. FS was not fitted: the timing gate dropped it.*
+and q05 quantiles, by similar amounts. FS was not fitted: the timing gate dropped it.*
 
 **The avoidable-curtailment cost is not defined for D8.** The reading is `reactive power assumed
 zero; cost not defined for unsigned meters`, because D8 reads unsigned apparent power and the
@@ -419,13 +454,13 @@ inside events would undercount. The scenarios say nothing about transfers.
 
 ### The sign forecast on synthetic days
 
-**The forecaster of reverse flow beats persistence at every lead day, and the untangled history adds
-nothing to it.** YU minus B-hist is -0.00488 (C3), and the per-lead reading of "Why C4 is null"
-finds the same gain of about 0.005 at each lead day from 2 to 10. The sign-forecast word is
-"skilful" on the plan's rule: C3 is a gain, YU's Brier skill against B-clim is 0.338 (bar 0.10), and
-its reliability term is 0.00014 (bar 0.1 times the test rows' share of reverse flow of 0.03694,
-which is 0.00369). The test rows hold 15,064 reverse-flow half-hours, above the 500 that the word
-needs.
+**The forecaster of reverse flow beats persistence at every lead day, and the data show no
+detectable gain from the untangled history.** YU minus B-hist is -0.00488 (C3), and the per-lead
+reading of "Why C4 is null" finds the same gain of about 0.005 at each lead day from 2 to 10. The
+sign-forecast word is "skilful" on the plan's rule: C3 is a gain, YU's Brier skill against B-clim is
+0.338 (bar 0.10), and its reliability term is 0.00014 (bar 0.1 times the test rows' share of reverse
+flow of 0.03694, which is 0.00369). The test rows hold 15,064 reverse-flow half-hours, above the 500
+that the word needs.
 
 **YU is far from the untangling network's probability on the target day.** R7 (YU minus O) is
 +0.0144 (interval +0.0055 to +0.0300): O, which reads the target day's reading and observed weather,
@@ -461,17 +496,19 @@ probability against observed share](reliability_sign.svg)
 *The reliability diagram of YU, Y0, and the persistence rule B-hist over 10 bins of forecast
 probability. YU and Y0 lie on one line close to the diagonal, and B-hist departs from it.*
 
-![Forecast probability of reverse flow of YU, Y0, and B-hist over 10 target days, with the true
-sign, for four synthetic test segments](series_sign.svg)
+![Forecast probability of reverse flow of YU, Y0, and B-hist over 9 target days (lead days 2 to 10),
+with the true sign, for four synthetic test segments](series_sign.svg)
 
 *Four synthetic test segments, three with reverse flow and one without, with the true sign and the
 three forecasts over lead days 2 to 10. No calendar date appears on the axis.*
 
 ### Why C4 is null: two post hoc diagnostics
 
-**The maintainer asked, after seeing the verdict, why the untangled history does not help the sign
-forecast, and two post hoc diagnostics followed.** Both read synthetic days only, are report-only,
-and change no verdict. Three explanations are candidate:
+**The maintainer asked, after seeing the verdict, why the untangled history showed no detectable
+gain in the sign forecast, and two post hoc diagnostics followed.** Both read synthetic days only,
+are report-only, and change no verdict. Both also read the one-pass networks of Y0 and YU, so every
+reading below carries the caveat that those networks stopped at pass 1. Three explanations are
+candidate:
 
 - **The future sign is hard to forecast because the engine is random.** The simulated engine starts
   and stops at random, so no history says when it will run, and a forecaster with or without the
@@ -483,13 +520,13 @@ and change no verdict. Three explanations are candidate:
   weather, and the time of day,** so the untangler's probability of reverse flow adds no information
   the forecaster lacks.
 
-**The per-lead reading shows no lead at which YU helps.** The sign Brier score of Y0 and YU is 0.020
-to 0.023 at every lead day from 2 to 10, and the persistence rule scores 0.025 to 0.028, so both
-forecasters beat persistence by about 0.005 at every lead day. YU minus Y0 stays between -0.00027
-and +0.00015, and each of the nine intervals contains zero. The pooled difference reproduces C4
-(-0.00001), and the difference shows no trend with lead day: YU does not help at short leads and
-wash out later. The intervals come from the scoring's bootstrap and are not adjusted for nine lead
-days.
+**The per-lead reading shows no lead day at which YU differs detectably from Y0.** The sign Brier
+score of Y0 and YU is 0.020 to 0.023 at every lead day from 2 to 10, and the persistence rule scores
+0.025 to 0.028, so both forecasters beat persistence by about 0.005 at every lead day. YU minus Y0
+stays between -0.00027 and +0.00015, and each of the nine intervals contains zero. The pooled
+difference reproduces C4 (-0.00001), and the difference shows no trend with lead day, and no
+detectable gain at short leads that washes out later. The intervals come from the scoring's
+bootstrap and are not adjusted for nine lead days.
 
 ![The sign Brier score of Y0, YU, and the persistence rule at each lead day from 2 to 10, and the
 difference YU minus Y0 with its interval](posthoc_per_lead.svg)
@@ -500,13 +537,17 @@ zero.*
 **The probe shows that Y0's hidden state already holds much of the sign of its history.** A logistic
 regression (the probe) predicts the true sign of each history half-hour from the 64-value hidden
 state of the forecaster's token for it, after the last attention block and layer normalisation. The
-probe was fitted on 2,000 validation-bank samples (40 history tokens each) from 17 segments and
-scored on 22,360 tokens from 7 other test segments, and each seed of the forecaster has its own
-probe. For Y0, which never sees the untangler's signals, the probe scores a Brier score of 0.037 and
-an AUC (the chance that a reverse-flow token outranks another token) of 0.955 on average over three
-seeds. Always forecasting the base rate of reverse flow (5.9%) scores 0.056 and an AUC of 0.5, and
-the untangler's own probability scores 0.013 and 0.996. YU's probe scores 0.025 and 0.982, but YU
-reads the injected signals directly.
+probe was fitted on 2,000 samples (40 history tokens each, a token being the forecaster's input for
+one half-hour of one history row) from 17 segments of the validation bank (experiment 730's stored
+set of synthetic samples that stops the fits), and scored on 22,360 tokens from the 7 other
+validation-bank segments, and each seed of the forecaster has its own probe.
+
+**The probe of Y0 scores better than the base rate and worse than the untangler on both scores.**
+For Y0, which never sees the untangler's signals, the probe scores a Brier score of 0.037 and an AUC
+(the chance that a reverse-flow token outranks another token) of 0.955 on average over three seeds.
+Always forecasting the base rate of reverse flow (5.9%) scores 0.056 and an AUC of 0.5, and the
+untangler's own probability scores 0.013 and 0.996. YU's probe scores 0.025 and 0.982, but YU reads
+the injected signals directly.
 
 ![The Brier score and AUC of the probes of Y0 and YU, the untangler's output, and the base rate, on
 the history tokens of the test segments](posthoc_probe.svg)
@@ -522,14 +563,16 @@ if the extra information concerns half-hours that matter little for the forecast
 
 - **The probe also reads the weather and time-of-day features in each token,** so it does not show
   that Y0 infers the sign from the reading alone.
-- **The probe was scored on 7 test segments,** so its intervals are wide, and no interval is
-  printed.
+- **The probe was scored on 7 validation-bank segments,** so its intervals are wide, and no interval
+  is printed.
 - **The per-lead intervals are not adjusted for nine lead days.**
 
 **The page does not show which of the three explanations holds.** The arm that would separate them
-is YT, which holds the true sign in the history: if YT scored no better than Y0, the sign history
-cannot help at all, and the untangler's quality is not the limit. The timing gate dropped YT, so R5
-is void.
+is YT, the forecaster that holds the true sign in the history. If YT showed no detectable gain over
+Y0, the true sign in the history would not help either, and the quality of the untangler would not
+be the limit on this forecaster. The timing gate dropped YT, so R5 is void. The one-seed post hoc
+arm YOb (see "Post hoc runs requested after the verdict") holds the true sign and the true solar
+output, and was fixed before any post hoc fit to speak to this question.
 
 ### Loss curves
 
@@ -537,11 +580,11 @@ is void.
 validation loss of a synthetic fit is the mixture negative log-likelihood of the reading plus the
 sign head's cross-entropy. The negative log-likelihood of the validation bank is between 2.03 and
 2.23 at pass 1 and between 3.03 and 3.56 at pass 21 in every fit, while the training loss fell at
-every pass, so the forecaster of the reading fitted the training banks and not the validation bank.
-The sign head's own validation cross-entropy stayed near 0.11 to 0.12 and was lowest at pass 3, 1,
-and 4 for Y0 (seeds 0 to 2) and at pass 2, 2, and 4 for YU. The stored networks of C3 and C4 are the
-first-pass networks, and each fit stopped after 21 passes (pass 1 plus a patience of 20), under the
-cap of 40.
+every pass, so the fit of the reading improved on the training banks and worsened on the validation
+bank. The sign head's own validation cross-entropy stayed near 0.11 to 0.12 and was lowest at pass
+3, 1, and 4 for Y0 (seeds 0 to 2) and at pass 2, 2, and 4 for YU. The stored networks of C3 and C4
+are therefore the networks of pass 1, and each fit stopped after 21 passes (pass 1 plus a patience
+of 20), under the cap of 40. C3 and C4 compare one-pass networks.
 
 **On the real folds the fits stopped on patience in 10 to 27 passes, and none hit the cap.** The
 stored pass of stage 2 averages 5.6 for FU, 5.8 for FU-S, and 4.5 for F0r, and the stored pass of
@@ -561,9 +604,9 @@ differs from Y0's on one synthetic day.** Each figure shows two maps from a forw
 state: the across-day attention weights of the first axial block, and the read-out weights that
 build the similar-day base, for D8's target tokens at lead day 2. The three real cases are a sunny,
 a dull, and a median-shortwave target day of fold 2026-05, and the learned gain `γ` of the history
-path is printed under each map. M\* is drawn through F0r, and FU's gain has a mean absolute value of
-0.022 and a largest value of 0.086. The read-out maps number the 14 history rows 0 to 13, as the
-figures do.
+path is printed under each map. M\* is drawn through F0r (FU's architecture with every new channel
+absent, which reproduces M\*), and FU's gain has a mean absolute value of 0.022 and a largest value
+of 0.086. The read-out maps number the 14 history rows 0 to 13, as the figures do.
 
 ![FU on a sunny day of fold 2026-05: across-day attention of block 1 and the read-out weights of the
 similar-day base](attention_FU_sunny_day_2026-05.svg)
@@ -603,9 +646,10 @@ read-out weights](attention_YU_synthetic_reverse_flow.svg)
 of 0.108. YU gives the read-out weight 0.285 to row 11 and 0.172 to row 4, and Y0 gives 0.224 to row
 11 and 0.258 to row 4. One cell of YU's map holds a weight of 0.68.*
 
-**The synthetic maps differ more than the real ones, from one sample and two separately trained
-forecasters.** The two forecasters were trained from random starts, so a difference between their
-maps may come from the seed and not from the signals, and one sample cannot say which.
+**The synthetic maps differ more than the real maps do, but they come from one sample and two
+separately trained forecasters.** The two forecasters were trained from random starts, so a
+difference between their maps may come from the seed and not from the signals, and one sample cannot
+say which.
 
 ### Forecast examples at D8
 
@@ -623,15 +667,16 @@ for the origin of 2026-02-01](series_channels.svg)
 *The second figure shows the effect of the channels on one day-ahead forecast: the forecast of FU
 and the forecast of FU with every channel masked lie close together, as R4 reports.*
 
-**The plan's six load-shift event plots could not be drawn.** D8 has only 2 logged load-shift
-events, and neither has forecasts at both its start and its end in the scored rows, so the series
-stage drew none (`scores/series_stage.json` records 0 events and 7 windows).
+**The plan's load-shift event plots could not be drawn.** D8 has 0 logged load-shift events with
+forecasts at both their start and their end in the scored rows, so the series stage drew none
+(`scores/series_stage.json` records 0 events and 7 windows).
 
 ### Checks
 
-- **The origin-time weather assertion passed on every batch.** It reads the run's initialisation
-  time and availability time for every target token of every batch, and it printed this example for
-  the first checked sample of a real fold:
+- **The origin-time weather assertion passed on every batch.** It reads the initialisation time and
+  availability time of the weather run (the 00:00 UTC run, "00Z", of the European Centre for
+  Medium-Range Weather Forecasts ensemble, ENS) for every target token of every batch, and it
+  printed this example for the first checked sample of a real fold:
 
   ```text
   origin-time weather: D8, contract origin 2026-05-23 12:00 UTC (native 09:00 UTC),
@@ -660,211 +705,47 @@ stage drew none (`scores/series_stage.json` records 0 events and 7 windows).
 
 ### What the result means for later experiments
 
-**Adding the untangling network's reverse-flow and transfer-step signals to D8's history rows is not
-a route to a better forecast of D8's reading.** C1's interval of -1.05% to +1.71% cannot rule out a
-loss or a gain of 1%, and the placebo cannot be told from FU. The forecaster of the plan's family
-infers much of the sign from the reading and the weather already, which the probe suggests and the
-oracle-history arm would have tested.
+**Adding the untangling network's reverse-flow and transfer-step signals to D8's history rows gave
+no detectable gain in the forecast of D8's reading in this experiment.** C1's interval of -1.05% to
++1.71% cannot rule out a loss or a gain of 1%, and the placebo shows no detectable difference from
+FU. The probe suggests that the forecaster already infers much of the sign from the reading and the
+weather, but the page does not show it, and the main run did not fit the oracle-history arm that
+would test it.
 
-**A test that wants to settle the question should fit the oracle-history arm first.** If the true
-sign in the history does not help either, the untangler is not the limit, and no further untangling
-of D8's history is worth building. If it does help, the untangler's remaining error is the limit,
-and the pre-registered gain is what an untangler can still deliver.
+**Whether the untangler's error limits the forecast needs the oracle-history arm.** If the true sign
+in the history gave no detectable gain either, the quality of the untangler would not be the limit
+on this forecaster. If the true sign did give a gain, the untangler's remaining error would be the
+limit, and the pre-registered gain would be what an untangler can still deliver. The one-seed post
+hoc arm YOb gives this reading for one seed, within the caveat that the synthetic networks of the
+main run stored pass 1.
 
-**The reading that the midday half-hours gain and the cold nights lose deserves a pre-registered
-test, because it is the one pattern in the real folds that the plan predicted.** The gain sits in
-the spring and summer midday half-hours, where the plan predicted it, and the loss sits on winter
-nights. The slices are report-only, and C1's sign depends on December 2025.
+**The midday gain and the cold-night loss are report-only patterns, and the plan predicted the
+midday gain.** The gain sits in the spring and summer midday half-hours, where the plan predicted
+it, and the loss sits on winter nights. Both slices cover about 11% of the scored half-hours, both
+are report-only, and C1's sign depends on December 2025.
 
 ## Post hoc runs requested after the verdict
 
-**After seeing the verdict, the maintainer asked for further fits, and the page reports them as
-report-only readings that change no verdict.** The first is FS, the forecaster that reads P(reverse
-flow) alone, on the real folds. The maintainer's reason is that the transfer-step signal is poor
-(recall of 7.7% on the simulated steps of 5 points or more in experiment 732) and may destroy a
-gain from P(reverse flow) alone. The timing gate dropped FS on cost, so R1 (FS minus M\*) and R2
-(FU minus FS) are void in the table above, and the fits are requested to fill that gap. The second
-is a one-seed check on the synthetic world: Y0b, YUb, and YOb are the forecasters Y0, YU, and the
-oracle, fitted at seed 0 and stopped on the sign head's own validation cross-entropy, because all
-six synthetic fits of the main run stored pass 1. The ruling in "What changed from the plan and
-what limits the page" gives the stopping rule and the cost.
+**After seeing the verdict, the maintainer asked for post hoc fits, and the page reports them as
+report-only readings that change no verdict.** Two sets of fits were fixed before any post hoc fit
+ran. The first is FS, the forecaster that reads the probability of reverse flow alone, on the real
+folds. The reason is that the transfer-step signal is poor (a recall of 7.7% of the simulated steps
+of 5 points or more in experiment 732) and may destroy a gain from the probability of reverse flow
+alone. The timing gate dropped FS on cost, so R1 (FS minus M\*) and R2 (FU minus FS) are void in the
+tables above, and the post hoc fits fill that gap.
 
-**Neither set of fits has run when this page is written.** The fits use the plan's recipe and bars.
-They add no counted contrast and no Bonferroni correction, and every interval of the real folds is
-read at 98.75%. The synthetic check reports point differences only.
+**The second set is a one-seed check on the synthetic world, with stopping on the sign head's own
+validation cross-entropy.** All six synthetic fits of the main run stored pass 1 (see the caveat at
+the top of the page). The check fits three forecasters at seed 0: Y0b and YUb are Y0 and YU
+refitted, and YOb is the oracle-history forecaster, which receives the true sign and the true solar
+output in place of the untangler's signals. The stopping rule was set before any post hoc fit. The
+section "What changed from the plan and what limits the page" gives the rule and the cost.
+
+**The post hoc fits add no counted contrast and no Bonferroni correction.** Every interval of the
+real folds is read at 98.75%, and the synthetic check reports point differences only. The results
+are inserted below when they exist.
 
 POSTHOC_RESULTS_PENDING
-
-## What changed from the plan and what limits the page
-
-**No bank and no bar changed, and the test and validation months follow the rule only.** The
-registered constants, the smallest gain g of 2%, the Bonferroni level of 98.75%, the verdict table,
-the seeds, and the digest-pinned banks of experiment 730 are as the plan registered them. The
-synthetic world's test and validation months follow experiment 729's rule (a list that stays in
-experiment 729's private `PRIVATE/splits.md`), and no choice read a test score. The run followed the
-plan's gates in order: three Opus code reviews before any run (`scores/review_gate.json`), a smoke
-test of every arm on the real GPU, and a gallery of the synthetic world that the manager viewed and
-approved (`PRIVATE/gallery/panel_check.json`). Each item below departed from the plan or limits what
-the page can claim. The dated rulings are those of the design lead and are recorded in the plan's
-"Choices of the plan" at the dates given.
-
-**The signal rule dropped the solar output, so FU reads the probability of reverse flow and the
-transfer step only (rulings of 2026-11-26).** Experiment 732 never scored its check K2, so the
-condition for the P(X<0) source, which the plan wrote as "H2 and K2 pass", reads "H2 passes". With
-experiment 732's result (verdict row 4, H2 passing, the solar word "not shown", and the transfer
-word "works only in Brier score"), the rule gave P(X<0) from experiment 732's U\* and the
-transfer-step probability from U\*, and dropped the solar output (zeroed, with its flag off). FU
-therefore reads only P(reverse flow) and the transfer step, and `channels.json` records the choice.
-The stored solar output of the untangling network appears in grey on the history panels of the
-private gallery for reference only, and the forecaster never receives it.
-
-**The G14 gate rule was replaced twice, and both changes preceded any fit.** The first rule asked
-that the stored and the re-run outputs of the untangling network be identical before the visibility
-limit. The premise was wrong, because the untangling network reads its whole window, so the real
-differences are 0.06 at most at 24 to 48 hours before the limit and 0.6 within 3 hours (ruling of
-2026-11-26). The rule then required a monotone decay of the 6-hour bin means with a slack of 5e-4,
-and the real differences decay noisily (the bin means from the limit outwards are 0.0123, 0.0028,
-0.0019, 0.0036, 0.0011, and 0.0005), so the monotone condition was replaced by two conditions: the
-mean difference in the nearest 6-hour bin is at least 3 times the mean difference over all
-half-hours more than 12 hours before the limit, and every 6-hour bin more than 12 hours before the
-limit has a mean below 0.01 (ruling of 2026-11-27). The poison test and the bound of 0.01 over
-origins more than 24 hours before the limit stay. The gallery panel records that all six conditions
-pass. Of the 7,872 half-hours in the 6 hours before the limit on the synthetic validation bank, 40
-(0.5%) have a difference above 0.5. They come from 6 of 24 segments, and 33 are true reverse-flow
-half-hours on which the stored output averages 0.82 and the re-run output 0.23, which fits a re-run
-that cannot see the half-hours after the limit. All of them are history tokens and none is a scored
-target row, because the nearest target row lies 27 hours after the limit.
-
-**F0r trains with the new path's learning rates at zero, and the path is gated by the per-token flag
-(ruling of 2026-11-27).** An ungated path added `gamma * W2 * GELU(b1) / r` to every history token
-even with every flag off, so after a one-pass fit `gamma` was up to 0.12 and F0r differed from M\*
-by up to 0.307. The path's output is now multiplied by the flag, so it is exactly 0 where the
-channel is absent, on every arm. F0r also trains with a learning-rate scale of 0 for the new
-parameters, and the fit stops with a correctness failure if any new parameter, `gamma` included,
-differs from its initial value afterwards.
-
-**A missing counted reading is verdict row 1, and row 2 follows the plan's text (ruling of
-2026-11-27).** C1 is counted always, and C2 is counted whenever C1 is a gain. A counted reading that
-is absent or not finite after a complete chain is row 1 (`invalid`), never row 7. Row 2 (`failed`)
-follows the table's text, "a fit that C1 or C2 needs raised": a failed F0r, FU, or FU-S job. A
-failed Y0 or YU job is not row 2, and the sign-forecast word and the history word then read `void`.
-No counted reading was missing and no job failed.
-
-**The channel is absent on every history token whose power stage 3 shifted (ruling of 2026-11-27).**
-The stored channel output at a token belongs to the unshifted power, so a shifted token carries no
-channel: its flag is off and its channel values are 0. The rule covers FU, FU-S, and FS alike.
-
-**The timing gate had faults that the first real runs exposed, and the pass cap fell from 80 to
-40.** The gate timed FU on the fold 2025-11, whose training window is the shortest, and predicted
-validation rows, where the target-poison check never runs; it now fits the fold 2026-06 and predicts
-test rows in a scratch folder (ruling of 2026-11-27). Prediction had run in the fitting process, and
-the experiment's checks require a separate process. The first smoke run failed because its scratch
-folder lacked the run marker (`failure_smoke.json`). A first timing gate stopped the line at verdict
-row 0, because the counted work projected to 17.12 GPU-process-hours against the stop line of 12
-(`failure_timing.json`). The gate had measured about 90 seconds a pass for the synthetic fits (470
-seconds for 5 passes of YU), because each batch also runs the frozen untangling network forward. The
-manager chose the cut: the cap on the synthetic passes fell from 80 to 40, and the patience of 20,
-every bar, the seeds, the real-fold fits, and the stop line stayed (ruling of 2026-11-27). The first
-synthetic fits stopped early on patience, with the best pass at pass 1, so the cap never bound.
-Other changes of the same day made a batch of the synthetic world cheaper to cut (a packed bank,
-gathered in one step on prefetch threads, with batches identical to the per-segment cut), stopped a
-CPU smoke test from opening the chain, stopped the figure stages from reading test rows before the
-first-test-score marker exists, and made the join of the sign forecasts to the truth check each
-archive's keys and not only its length.
-
-**The timing gate dropped FS and YT, and the report-only readings were redefined to read the arms
-that were fitted (ruling of 2026-11-27).** With the real-fold fits at 224.6 seconds and the
-synthetic fits at 3,763 seconds at the cap of 40 passes, the projection was 11.109 GPU-process-hours
-with YT and FS dropped, under the stop line of 12, so the counted work ran. The `score` stage had
-defined R9 (the tails), R10 (the load-shift scenarios), and the series panels over FU, FS, and M\*,
-and had computed R9 and R10 as void for want of FS. The ruling was made after the chain and before
-any R9 or R10 value was read: R9 and R10 now read FU and M\*, each records the arms it read and the
-arm the gate dropped, and the figures name the missing arm. R1 and R2 (which need FS) and R5 (which
-needs YT) stay void. Nothing in the verdict, the contrasts, the bars, or the stop line changed.
-
-**FS and a one-seed synthetic check run post hoc and report-only (ruling of the design lead,
-2026-11-27, set before any post hoc fit).** The maintainer asked for the runs after seeing the
-verdict (row 7, not supported), because the transfer-step channel may be so noisy that it hides the
-gain of P(reverse flow) alone. The timing gate had dropped FS and YT on cost. After the first scored
-fits, the finding that all six synthetic fits of the main run (Y0, and YU at seeds 0 to 2) stored
-pass 1 led the manager to replace the synthetic arm YS and the three-seed oracle YO by one
-pre-registered check. In those six fits the validation loss, the mixture negative log-likelihood
-plus the sign binary cross-entropy, rose from pass 1 while the training loss fell, the patience of
-20 stopped each fit at pass 21, and the sign head's own validation cross-entropy stayed flat (0.116
-to 0.122). The check is three fits at seed 0 only, named Y0b, YUb, and YOb. They are the same
-forecasters as Y0, YU, and the oracle. The oracle reads the true sign and the true unmetered solar
-output of the history half-hours strictly before the origin, with no untangler and the transfer-step
-channel absent. The three fits are stopped on the sign head's own validation binary cross-entropy:
-the stored network is the pass with the lowest validation sign cross-entropy, the patience of 20
-counts passes on that loss alone, and the fit has at most 40 passes. Every other setting is
-unchanged (the learning rate, the weight decay, the batch size, the gradient clipping, and the loss
-weights), so each network still trains on the sum of the mixture negative log-likelihood and the
-sign cross-entropy, and only the stopping and storing criterion changes. This is the one stopping
-rule, chosen before any post hoc fit. YS is dropped because FS on the real folds already asks the
-question of P(reverse flow) alone. The cost is about 1.5 GPU-process-hours for FS (24 fits) and
-about 1.8 for the three synthetic fits (roughly 35 minutes each). With the main chain's 7.2 hours,
-the total comes to about 10.5, against the absolute stop line of 12 and a cost cap of 11.9. If the
-check shows that the history signals matter, seeds 1 and 2 are not run without the maintainer's
-decision. The stage `posthoc` fits FS first, then Y0b, YUb, and YOb, and does not start a fit when
-the running total of measured hours plus the fit's expected hours would pass the cap; the last
-arm started is the first skipped, and the stage then ends with exit code 3. Four contrasts are
-read, each labelled post hoc. P1 is FS minus FU and P2 is FS minus M\*, on the CRPS of D8 with the
-month-block bootstrap and t widening of C1. P3 is YOb minus Y0b and P4 is YUb minus Y0b, on the
-Brier score of the sign, as point differences only, labelled "single seed, post hoc, no interval
-claim". Beside them, the report lists each synthetic arm's stored pass, its validation sign
-cross-entropy, and its Brier score on the test half-hours, with Y0 and YU of the main run (pass 1
-stored). The verdict, the counted contrasts, the bars, and the tables do not change.
-
-**The attention cases all come from fold 2026-05, and M\* is drawn through F0r.** The pipeline of
-experiment 713 fixes its fold when it is imported, so a process opens one fold (the first attempt
-failed on an assertion that named folds 2026-05 and 2025-11, `failure_attention.json`). The stage
-runs on the CPU, builds the dataset of FU and of M\* one at a time to keep within the host limit of
-14 GB, and checks that both arms draw from the same origins.
-
-**The synthetic ENS coverage was not computed.** The base days of the synthetic world take their
-target weather from the ENS runs of the real date of each base day. The summaries come from
-experiment 607 (the ENS summaries from 2024-04 onwards) plus the summaries that experiment 707 (the
-ENS backfill pretraining) back-filled for 2020-10-15 to 2024-03-31, so no download was needed. Base
-days before 2020-10-15 hold no ensemble run and are coverage-gap data. The `synthetic_coverage`
-entry of `scores/verdict.json` reads `not computed`, and the page quotes no share. The line stops at
-row 0 if more than half the test segments lack runs, and the check left out 8 of 64.
-
-**D8 has only 2 logged load-shift events, so the plan's 6 event plots could not be drawn.** The plan
-said to draw every logged event if the folds held fewer than 6. The series stage found 0 events with
-forecasts at both their start and their end in the scored rows (`scores/series_stage.json`), so no
-event panel exists. The figures `series_real.svg` and `series_channels.svg` show a winter and a
-summer origin and one origin with and without the channels instead, and the R10 slices inside events
-and after events hold no half-hours.
-
-**The synthetic fits stored their first pass, and the stop rule cannot be asked to stop on the sign
-alone.** The plan's validation loss is the sum of the mixture negative log-likelihood and the sign
-head's cross-entropy, each with weight 1.0. The negative log-likelihood of the validation bank is
-lowest at pass 1 in every fit and rises afterwards, so the sum is lowest at pass 1, while the sign
-head's own validation cross-entropy is lowest at passes 1 to 4. The stored networks of C3 and C4 are
-therefore the first-pass networks. A null C4 is a null at that early stop, and the page does not
-know whether a later stop on the sign alone would change C4.
-
-**Plan items that were not done.** FS and YT were dropped, so R1, R2, and R5 are void. The synthetic
-gallery panels G10, G11, and G13 draw the pass or fail of each item of their written lists as bar
-charts, and not the layouts and the series that the plan described; G12, G14, and G15 draw the
-panels of the plan. The share of absent flags per fold in FU and in FU-S, which the plan said to
-print, is not in the report. The base-day guard counts in `scores/pre_fit_guards.json` are not
-interpreted here. The real-day panels of the untangled channels are in `PRIVATE/gallery2/` and are
-not published.
-
-**The synthetic fits are on a world with no load transfers, and the transfer signal of FU reads a
-detector that finds 7.7% of simulated steps.** The transfer-step channel is near zero in the
-synthetic world, so C3 and C4 test the sign channel alone. The transfer step that FU reads on real
-days comes from a detector that experiment 732 found finds 7.7% of the simulated steps of 5 points
-or more, so a null C1 says little about whether a good transfer signal would help.
-
-**Anonymisation.** The page shows no engine size, no connection date, no distance, no register
-entry, no series identifier, and no generator time series. D8 is a substation and is named.
-Forecasts of D8's reading appear on calendar dates, and no real-day untangled channel is drawn. The
-base dates of the synthetic samples appear only in the private log, and the page draws the synthetic
-series without dates. The panels of `PRIVATE/gallery2/` are not published: the history and placebo
-panels show real-day untangled channels, and the synthetic panels show the real base-day reading
-beside the injected series.
 
 ## The design as registered
 
@@ -883,7 +764,7 @@ weather lies in the future, so the target rows read only the weather forecast is
 the forecast origin, and no untangled value of a target half-hour ever enters the forecaster.
 
 **The untangling network enters frozen, through its stored outputs, and is never trained through the
-forecaster's loss.** Three reasons decide this choice:
+forecaster's loss.** The stored outputs enter the forecaster for three reasons:
 
 - The frozen network was fitted only on synthetic days built from D8's pre-engine readings. Those
   days lie inside the training window of experiment 713's stage 1, but stage 1 is not refitted here
@@ -913,7 +794,7 @@ a known sign.** The world is built from experiment 730's synthetic D8 months, wh
 engine, simulated solar output, and the fold of the meter, so that each half-hour has a true sign.
 Each forecasting sample takes 14 history days and up to 14 target days from one synthetic month. The
 target rows read the real ENS weather forecast issued on the base day's date, so the synthetic
-forecast faces the same weather uncertainty as a real one.
+forecast faces the same weather uncertainty as a real forecast.
 
 ### Terms
 
@@ -937,7 +818,9 @@ forecast faces the same weather uncertainty as a real one.
   row** is the row of one lead day k, as experiment 713 defines them.
 - **A segment** is one calendar month of D8's pre-engine base days carrying one continuous draw of
   injected engine and solar output, as experiment 730 defines it. **A base day** is a UTC day of
-  D8's real pre-engine reading.
+  D8's real pre-engine reading. **A bank** is a stored set of synthetic samples of experiment 730
+  (training, validation, or test). **A sample** is one origin day and one lead day inside one
+  segment, and **a token** is the forecaster's input for one half-hour of one row.
 - **The synthetic forecasting world** is the set of forecasting samples built inside segments, in
   "The synthetic forecasting world".
 
@@ -959,9 +842,9 @@ forecast faces the same weather uncertainty as a real one.
   M* exactly.
 - **Experiment 729** is invalid, because a bug left half of its synthetic solar farms silent. Every
   generator whose output this experiment reads is drawn in a gallery before the first fit.
-- **Experiment 730:** the sign-only U-net S gave the best probability of reverse flow on synthetic
-  days (Brier score 0.00853), and a demand output with a shared encoder made the sign worse. On real
-  days its check H2 passed.
+- **Experiment 730:** the sign-only U-net S gave the lowest Brier score of experiment 730's arms for
+  the probability of reverse flow on synthetic days (0.00853), and a demand output with a shared
+  encoder made the sign worse. On real days its check H2 passed.
 - **Experiment 732** trains one U-net, U\*, for the sign, the solar output, and the transfer steps,
   and stores U\*'s outputs for every real D8 day from the start of the forecaster's training window
   to the end of the last fold, apart from days with no reading.
@@ -971,8 +854,8 @@ forecast faces the same weather uncertainty as a real one.
 **The forecaster is M\*, unchanged, with one zero-initialised input path for the untangled
 channels.** Every arm on the real folds starts from M*'s stored stage 1 state of the same fold and
 seed and runs stages 2 and 3 of experiment 713's recipe through experiment 716's copied training
-loop. A network that loads M*'s state with every new channel absent gives M*'s forecast bit for bit,
-and a unit test checks that.
+loop. A forecaster that loads M*'s state with every new channel absent gives M*'s forecast bit for
+bit, and a unit test checks that.
 
 **The history path is experiment 716's token path, widened from one channel to three.** For each
 history token the path computes `γ ⊙ (W2 GELU(W1 [u·ok, v·ok, w·ok, ok]) / r)`, where u is the
@@ -1016,8 +899,8 @@ fold months. The checks read aggregates of the untangling network's outputs and 
 732's solar word is "not shown", which neither "reasonable" nor "partly" matches, so the solar
 output is set to zero with its flag off in every token (`channels.json`: usable `p_neg` and
 `step_p`, dropped `solar`, P(X<0) source U\*). A dropped signal keeps the arms' shape. FU carries
-both usable signals and FS would carry P(X<0) alone, and FU and FS are distinct arms. FU therefore
-reads only P(reverse flow) and the transfer step.
+both usable signals and FS would carry P(X<0) alone. FU therefore reads only P(reverse flow) and the
+transfer step.
 
 ### How the outputs are placed on the history grid
 
@@ -1031,13 +914,14 @@ is before the visibility limit, so the stored outputs of those days enter unchan
 **For each origin the untangling network is run again on UTC days D − 2 and D − 1, with every input
 after the visibility limit hidden.** The stored windows of those two days end after the visibility
 limit, at 12:00 UTC on days D − 1 and D. The re-run hides D8's reading, the readings of the three
-neighbours, and the BSP steps after the limit by setting each value and its presence mask to zero,
-which is the hidden-span input that experiment 732 trained on. The CAMS sky after the limit is
-hidden through its presence mask. The ERA5 temperature, wind speed, and precipitation after the
-limit are replaced by the ENS-mean values of the latest 00Z run issued at or before the native
-origin. The untangled channel of a history half-hour is present only where the forecaster's own
-power token is visible. The re-run costs two windows per origin per seed, a few minutes of GPU time
-in all.
+neighbours, and the steps of the bulk supply point (BSP) meter after the limit by setting each value
+and its presence mask to zero, which is the hidden-span input that experiment 732 trained on. The
+sky from the Copernicus Atmosphere Monitoring Service (CAMS) after the limit is hidden through its
+presence mask. The temperature, wind speed, and precipitation of the ERA5 reanalysis (the European
+Centre for Medium-Range Weather Forecasts reanalysis of observed weather) after the limit are
+replaced by the ENS-mean values of the latest 00Z run issued at or before the native origin. The
+untangled channel of a history half-hour is present only where the forecaster's own power token is
+visible. The re-run costs two windows per origin per seed, a few minutes of GPU time in all.
 
 **The same rule builds the channels of the synthetic forecasting world and of the placebo.** The
 placebo FU-S reads, for each history half-hour, the untangled values of the same half-hour 28 days
@@ -1054,18 +938,18 @@ real-environment smoke test prints the coverage per fold.
 
 ### Leakage and origin-time weather
 
-**Every target row of every arm reads its weather from the NWP run issued at or before the forecast
-origin, and an assertion checks this row by row.** On the real folds the target row reads the ENS
-00Z run of day D, available at the native origin, through experiment 713's inputs. The assertion
-reads, for every target token of every sample in every batch, the run's initialisation time and its
-availability time, and fails unless the initialisation time is 00:00 UTC on day D and the
-availability time is at or before the native origin. The same assertion checks that every other
-target-row column (the trailing-temperature and solar-gain columns, and the CAMS day summary of day
-D − 1) reads no valid time at or after the native origin. Those columns are observations of past
-days that a live service may not hold at the native origin, so the code records them as a lab
-shortcut, and every score is a ceiling on that account, as experiment 725's unrun read-out T3 says.
-The date-time columns (solar geometry, calendar, and holiday flags) hold no weather. The assertion
-prints one example row, which the "Checks" list reproduces for a real fold.
+**Every target row of every arm reads its weather from the numerical weather prediction (NWP) run
+issued at or before the forecast origin, and an assertion checks this row by row.** On the real
+folds the target row reads the ENS 00Z run of day D, available at the native origin, through
+experiment 713's inputs. The assertion reads, for every target token of every sample in every batch,
+the run's initialisation time and its availability time, and fails unless the initialisation time is
+00:00 UTC on day D and the availability time is at or before the native origin. The same assertion
+checks that every other target-row column (the trailing-temperature and solar-gain columns, and the
+CAMS day summary of day D − 1) reads no valid time at or after the native origin. A live service may
+not hold those columns at the native origin, because they are observations of past days. The code
+records them as a lab shortcut, so every score is a ceiling, as experiment 725's unrun read-out T3
+says. The date-time columns (solar geometry, calendar, and holiday flags) hold no weather. The
+assertion prints one example row, which the "Checks" list reproduces for a real fold.
 
 **The synthetic forecasting world runs the same assertion against the base day's date.** Its target
 rows read the ENS 00Z run of the real date of the origin's base day, and the example of the
@@ -1150,7 +1034,8 @@ is close to the rule B-hist, and a unit test checks that.
 
 **Load transfers are absent from the synthetic forecasting world.** Experiment 730's banks carry no
 transfer, so the transfer-step channel is near zero there, and the synthetic world tests the sign
-and solar channels only.
+channel alone, because the signal rule dropped the solar channel (see "What changed from the plan
+and what limits the page").
 
 ### Arms
 
@@ -1221,11 +1106,13 @@ the loss frame from `experiment_store.losses_for_bootstrap` pairs rows on the ru
 time. The interval comes from experiment 713's month-block bootstrap with 100,000 resamples. With
 one Primary the bootstrap has one factor, the 8 fold months, whose Kish effective number is 8, so
 the interval is widened by the ratio of the Student t quantile (7 degrees of freedom) to the normal
-quantile, which is the widening rule of experiments 729 to 732 applied to one factor. On the
-synthetic world the interval comes from experiment 729's two-way bootstrap, called unchanged: within
-each test month, blocks of 7 consecutive origin dates and, independently, whole segments are
-resampled, with 20,000 resamples, generator seed 733, the Kish effective number of each factor
-printed, and the same t widening when either factor falls below 20.
+quantile, which is the widening rule of experiments 729 to 732 applied to one factor.
+
+**On the synthetic world the interval comes from experiment 729's two-way bootstrap, resampling
+blocks of 7 origin dates and whole segments.** The bootstrap is called unchanged: within each test
+month, blocks of 7 consecutive origin dates and, independently, whole segments are resampled, with
+20,000 resamples, generator seed 733, the Kish effective number of each factor printed, and the same
+t widening when either factor falls below 20.
 
 **C1 reads 5 seeds and C2 reads 3, so the report prints the half-width of each interval beside the
 verdict.** A C2 that includes zero only because its interval is wider than C1's is then visible to
@@ -1289,9 +1176,9 @@ the q01 or q99 pinball loss at D8.
   "hurts" when C4 is a loss. R5 is printed beside it: when R5 is not a gain, even the true sign in
   the history does not help the sign head, so a null C4 says nothing about the untangling network.
 
-**The skill bar of 0.10 asks the sign head to remove one tenth of the climatology's Brier score.**
-The bar is a judgement and not a ported gain: a forecast that removes less than a tenth adds little
-to a decision about reverse flow 2 to 10 days ahead.
+**The skill bar of 0.10 requires the sign head to remove one tenth of the climatology's Brier
+score.** The bar is a judgement and not a ported gain: a forecast that removes less than a tenth
+adds little to a decision about reverse flow 2 to 10 days ahead.
 
 **A failed report-only fit leaves the verdict untouched,** and its readings are `void`. A rerun is
 the same attempt only when a fit raised, the fix changes no constant, and the Opus reviewer confirms
@@ -1312,7 +1199,7 @@ launcher that refuses to start when the slot is busy.
 | Y0 | 3 | 1,899 | 1.58 |
 | YU | 3 | 1,970 | 1.64 |
 | Fits in all | 74 | | 5.88 |
-| Prediction steps (F0r, FU, FU-S) | | | 1.13 |
+| Prediction steps (F0r, FU, FU-S, Y0, YU) | | | 1.13 |
 | Timing gate | | | 0.20 |
 | The chain in all | | | 7.2 |
 
@@ -1321,27 +1208,227 @@ whole experiment used about 7.4.** The peak GPU memory of the timing gate was 3.
 of 6 GB, and its peak resident memory 10.8 GB, under the cap of 14 GB. The plan assumed 288 seconds
 for a real-fold fit, and the timing gate measured 224.6 seconds for one on the longest training
 window. Every synthetic fit stopped after 21 passes of about 90 seconds, so the 40-pass cap never
-bound, and the 3,763 seconds that the gate projected for a synthetic fit at the cap is about twice
-the 1,899 to 1,970 seconds that the fits took.
+bound. A synthetic fit took 1,899 to 1,970 seconds, about half the 3,763 seconds that the gate
+projected at the cap.
 
 ### Earlier advice followed
 
-**The plan followed 16 items of earlier advice and departed from one.** It reads the gain at one
-Primary metered in MVA, D8 (experiment 713); reports the other 15 Primaries beside D8 (713); refits
-stages 2 and 3 from the stored stage 1 state with the same seed and checks that with F0r (725);
-reads the gain against a placebo that carries the wrong day's values (716, 717); gives the slow
-history path of the synthetic fits a longer patience, and adds an oracle-history arm (716; the arm
-was dropped); loads one fold at a time in the scorer (717); treats history weather that a live
-service could build as a caveat (725); reads no rerun of the neighbour-row contrasts (715); uses
-experiment 730's sign-only S as the fallback for the sign (730); reads the harm of the sign head per
-reading band (730); draws every arm in a dot chart (730); aligns every pair of row sets by key
-(730); checks that every simulated component and every untangled channel is nonzero where it should
-be (729); calls the real loaders in the smoke test (729); and counts every threshold over the
-half-hours where the quantity exists (729). The departure is from experiment 715's advice of 400
-passes with a patience of 30 before a known-answer test of the axial-attention network: the
-synthetic fits ran at most 40 passes with a patience of 20, because 400 passes would cost more than
-the 12 GPU-process-hours of the slot. Every fit logs whether the validation loss was still falling
-at the cap, and none hit the cap.
+**The plan followed 15 of the 17 items of earlier advice that it listed and departed from 2.** Each
+item ends with the number of the experiment that gave it.
+
+- Read the gain at one Primary metered in MVA, D8 (experiment 713).
+- Report the other 15 Primaries beside D8 (713).
+- Refit stages 2 and 3 from the stored stage 1 state with the same seed and check that with F0r
+  (725).
+- Read the gain against a placebo that carries the wrong day's values (716, 717).
+- Give the slow history path of the synthetic fits a longer patience (716).
+- Load one fold at a time in the scorer (717).
+- Treat history weather that a live service could build as a caveat (725).
+- Read no rerun of the neighbour-row contrasts (715).
+- Use experiment 730's sign-only S as the fallback for the sign (730).
+- Read the harm of the sign head per reading band (730).
+- Draw every arm in a dot chart (730).
+- Align every pair of row sets by key (730).
+- Check that every simulated component and every untangled channel is nonzero where it should be
+  (729).
+- Call the real loaders in the smoke test (729).
+- Count every threshold over the half-hours where the quantity exists (729).
+
+**The plan departed from two items.** The first is the oracle-history arm of experiment 716, which
+the timing gate dropped. The second is experiment 715's advice of 400 passes with a patience of 30
+before a known-answer test of the axial-attention network: the synthetic fits ran at most 40 passes
+with a patience of 20, because 400 passes would cost more than the 12 GPU-process-hours of the slot.
+Every fit logs whether the validation loss was still falling at the cap, and none hit the cap.
+
+## What changed from the plan and what limits the page
+
+**No bank and no bar changed, and the test and validation months follow the rule only.** The
+registered constants, the smallest gain g of 2%, the Bonferroni level of 98.75%, the verdict table,
+the seeds, and the digest-pinned banks of experiment 730 are as the plan registered them. The
+synthetic world's test and validation months follow experiment 729's rule (a list that stays in
+experiment 729's private `PRIVATE/splits.md`), and no choice read a test score. The rulings below
+are those of the design lead, each with its date.
+
+**The run followed the plan's gates in order: three Opus code reviews before any run, a smoke test
+of every arm on the real GPU, and a gallery of the synthetic world that the manager viewed and
+approved.** The reviews are recorded in `scores/review_gate.json`, and the gallery check in
+`PRIVATE/gallery/panel_check.json`.
+
+**The signal rule dropped the solar output, so FU reads the probability of reverse flow and the
+transfer step only (rulings of 2026-11-26).** Experiment 732 never scored its check K2, so the
+condition for the P(X<0) source, which the plan wrote as "H2 and K2 pass", reads "H2 passes". With
+experiment 732's result (verdict row 4, H2 passing, the solar word "not shown", and the transfer
+word "works only in Brier score"), the rule gave P(X<0) from experiment 732's U\* and the
+transfer-step probability from U\*, and dropped the solar output (zeroed, with its flag off). FU
+therefore reads only P(reverse flow) and the transfer step, and `channels.json` records the choice.
+The stored solar output of the untangling network appears in grey on the history panels of the
+private gallery for reference only, and the forecaster never receives it.
+
+**The G14 gate rule has two conditions, and it replaced two earlier versions before any fit.** The
+first version asked that the stored and the re-run outputs of the untangling network be identical
+before the visibility limit. The premise was wrong, because the untangling network reads its whole
+window, so the real differences are 0.06 at most at 24 to 48 hours before the limit and 0.6 within 3
+hours (ruling of 2026-11-26). The second version required a monotone decay of the 6-hour bin means
+with a slack of 5e-4. The real differences decay noisily (the bin means from the limit outwards are
+0.0123, 0.0028, 0.0019, 0.0036, 0.0011, and 0.0005), so the final rule has two conditions instead:
+the mean difference in the nearest 6-hour bin is at least 3 times the mean difference over all
+half-hours more than 12 hours before the limit, and every 6-hour bin more than 12 hours before the
+limit has a mean below 0.01 (ruling of 2026-11-27). The poison test and the bound of 0.01 over
+origins more than 24 hours before the limit stay. The gallery panel records that every condition of
+the rule passes.
+
+**Forty of the 7,872 half-hours in the 6 hours before the visibility limit differ by more than 0.5,
+and none of the 40 is a scored target row.** The 7,872 half-hours are those of the synthetic
+validation bank, and the 40 (0.5%) come from 6 of 24 segments. Of the 40, 33 are true reverse-flow
+half-hours on which the stored output averages 0.82 and the re-run output 0.23. That pattern fits a
+re-run that cannot see the half-hours after the limit. All 40 are history tokens and none is a
+scored target row, because the nearest target row lies 27 hours after the limit.
+
+**F0r trains with the new path's learning rates at zero, and the path is gated by the per-token flag
+(ruling of 2026-11-27).** An ungated path added `gamma * W2 * GELU(b1) / r` to every history token
+even with every flag off, so after a one-pass fit `gamma` was up to 0.12 and F0r differed from M\*
+by up to 0.307. The path's output is multiplied by the flag, so it is exactly 0 where the channel is
+absent, on every arm. F0r also trains with a learning-rate scale of 0 for the new parameters, and
+the fit stops with a correctness failure if any new parameter, `gamma` included, differs from its
+initial value afterwards.
+
+**A missing counted reading is verdict row 1, and row 2 follows the plan's text (ruling of
+2026-11-27).** C1 is counted always, and C2 is counted whenever C1 is a gain. A counted reading that
+is absent or not finite after a complete chain is row 1 (`invalid`), never row 7. Row 2 (`failed`)
+follows the table's text, "a fit that C1 or C2 needs raised": a failed F0r, FU, or FU-S job. A
+failed Y0 or YU job is not row 2, and the sign-forecast word and the history word then read `void`.
+No counted reading was missing and no job failed.
+
+**The channel is absent on every history token whose power stage 3 shifted (ruling of 2026-11-27).**
+The stored channel output at a token belongs to the unshifted power, so a shifted token carries no
+channel: its flag is off and its channel values are 0. The rule covers FU, FU-S, and FS alike.
+
+**The timing gate had faults that the first real runs exposed (ruling of 2026-11-27).** The gate
+timed FU on the fold 2025-11, whose training window is the shortest, and predicted validation rows,
+where the target-poison check never runs. The gate fits the fold 2026-06 and predicts test rows in a
+scratch folder. Prediction had run in the fitting process, and the experiment's checks require a
+separate process. The first smoke run failed because its scratch folder lacked the run marker
+(`failure_smoke.json`).
+
+**The timing gate stopped the line at verdict row 0 on a projection of 17.12 GPU-process-hours, and
+the manager cut the cap on the synthetic passes from 80 to 40 (ruling of 2026-11-27).** The counted
+work projected to 17.12 GPU-process-hours against the stop line of 12 (`failure_timing.json`). The
+gate had measured about 90 seconds a pass for the synthetic fits (the one-pass synthetic fits of the
+smoke test took 94.3 and 95.4 seconds), because each batch also runs the frozen untangling network
+forward. The manager chose the cut: the cap on the synthetic passes fell from 80 to 40, and the
+patience of 20, every bar, the seeds, the real-fold fits, and the stop line stayed. The first
+synthetic fits stopped early on patience, with the best pass at pass 1, so the cap never bound.
+
+**Four other code changes of the same day changed no score.** A packed bank, gathered in one step on
+prefetch threads with batches identical to the per-segment cut, made a batch of the synthetic world
+cheaper to cut. A CPU smoke test no longer opens the chain. The figure stages no longer read test
+rows before the first-test-score marker exists. The join of the sign forecasts to the truth checks
+each archive's keys and not only its length.
+
+**The timing gate dropped FS and YT, and the report-only readings were redefined to read the arms
+that were fitted (ruling of 2026-11-27).** With the real-fold fits at 224.6 seconds and the
+synthetic fits at 3,763 seconds at the cap of 40 passes, the projection was 11.109 GPU-process-hours
+with YT and FS dropped, under the stop line of 12, so the counted work ran. The `score` stage had
+defined R9 (the tails), R10 (the load-shift scenarios), and the series panels over FU, FS, and M\*,
+and had computed R9 and R10 as void for want of FS. The ruling was made after the chain and before
+any R9 or R10 value was read: R9 and R10 read FU and M\*, each records the arms it read and the arm
+the gate dropped, and the figures name the missing arm. R1 and R2 (which need FS) and R5 (which
+needs YT) stay void. Nothing in the verdict, the contrasts, the bars, or the stop line changed.
+
+**FS and a one-seed synthetic check run post hoc and report-only (ruling of the design lead,
+2026-11-27, set before any post hoc fit).** The maintainer asked for the runs after seeing the
+verdict (row 7, not supported), because the transfer-step channel may be so noisy that it hides the
+gain of P(reverse flow) alone. The timing gate had dropped FS and YT on cost.
+
+**The one-seed check replaced the synthetic arm YS and the three-seed oracle YO, and its stopping
+rule was chosen before any post hoc fit.** After the first scored fits, the finding that all six
+synthetic fits of the main run (Y0, and YU at seeds 0 to 2) stored pass 1 led the manager to replace
+YS and YO by one pre-registered check. In those six fits the validation loss, the mixture negative
+log-likelihood plus the sign binary cross-entropy, rose from pass 1 while the training loss fell,
+the patience of 20 stopped each fit at pass 21, and the sign head's own validation cross-entropy
+stayed flat (0.116 to 0.122). The check is three fits at seed 0 only, named Y0b, YUb, and YOb. Y0b
+and YUb are the same forecasters as Y0 and YU. YOb is the oracle-history forecaster, which reads the
+true sign and the true unmetered solar output of the history half-hours strictly before the origin,
+with no untangler and the transfer-step channel absent. The three fits are stopped on the sign
+head's own validation binary cross-entropy: the stored network is the pass with the lowest
+validation sign cross-entropy, the patience of 20 counts passes on that loss alone, and the fit has
+at most 40 passes. Every other setting is unchanged (the learning rate, the weight decay, the batch
+size, the gradient clipping, and the loss weights), so each network still trains on the sum of the
+mixture negative log-likelihood and the sign cross-entropy, and only the stopping and storing
+criterion changes. YS is dropped because FS on the real folds already asks the question of P(reverse
+flow) alone.
+
+**The post hoc fits cost about 10.5 GPU-process-hours in all, under the absolute stop line of 12.**
+The cost is about 1.5 GPU-process-hours for FS (24 fits) and about 1.8 for the three synthetic fits
+(roughly 35 minutes each), on top of the main chain's 7.2 hours, against a cost cap of 11.9. If the
+check shows that the history signals matter, seeds 1 and 2 are not run without the maintainer's
+decision. The stage `posthoc` fits FS first, then Y0b, YUb, and YOb, and does not start a fit when
+the running total of measured hours plus the fit's expected hours would pass the cap. The last arm
+started is the first skipped, and the stage then ends with exit code 3.
+
+**Four post hoc contrasts are read, each labelled post hoc.** P1 is FS minus FU and P2 is FS minus
+M\*, on the CRPS of D8 with the month-block bootstrap and t widening of C1. P3 is YOb minus Y0b and
+P4 is YUb minus Y0b, on the Brier score of the sign, as point differences only, labelled "single
+seed, post hoc, no interval claim". Beside them, the report lists each synthetic arm's stored pass,
+its validation sign cross-entropy, and its Brier score on the test half-hours, with Y0 and YU of the
+main run (pass 1 stored). The verdict, the counted contrasts, the bars, and the tables do not
+change.
+
+**The attention cases all come from fold 2026-05, and M\* is drawn through F0r.** The pipeline of
+experiment 713 fixes its fold when it is imported, so a process opens one fold (the first attempt
+failed on an assertion that named folds 2026-05 and 2025-11, `failure_attention.json`). The stage
+runs on the CPU, builds the dataset of FU and of M\* one at a time to keep within the host limit of
+14 GB, and checks that both arms draw from the same origins.
+
+**The synthetic ENS coverage was not computed.** The base days of the synthetic world take their
+target weather from the ENS runs of the real date of each base day. The summaries come from
+experiment 607 (the ENS summaries from 2024-04 onwards) plus the summaries that experiment 707 (the
+ENS backfill pretraining) back-filled for 2020-10-15 to 2024-03-31, so no download was needed. Base
+days before 2020-10-15 hold no ensemble run and are coverage-gap data. The `synthetic_coverage`
+entry of `scores/verdict.json` reads `not computed`, and the page quotes no share. The line stops at
+row 0 if more than half the test segments lack runs, and the check left out 8 of 64.
+
+**D8 has 0 logged load-shift events with forecasts at both their start and end in the scored rows,
+so the plan's event plots could not be drawn.** The series stage found 0 such events
+(`scores/series_stage.json`), so no event panel exists. The figures `series_real.svg` and
+`series_channels.svg` show a winter and a summer origin and one origin with and without the channels
+instead, and the R10 slices inside events and after events hold no half-hours.
+
+**All six synthetic fits stored the first-pass network, which limits what C3 and C4 can show.** All
+six synthetic fits (Y0 and YU, seeds 0 to 2) stored the network of pass 1: the validation loss (the
+mixture negative log-likelihood plus the sign cross-entropy) rose from the first pass while the
+training loss kept falling, and a patience of 20 passes stopped each fit at pass 21. So C3 and C4
+compare one-pass networks, and the C4 null says nothing about whether history signals could help.
+The cause is a stopping rule on a validation loss that the sign term does not dominate. Verdict row
+7 comes from the real-fold contrasts C1 and C2, which are unaffected. The plan's validation loss is
+the sum of the mixture negative log-likelihood and the sign head's cross-entropy, each with weight
+1.0. The negative log-likelihood of the validation bank is lowest at pass 1 in every fit and rises
+afterwards, so the sum is lowest at pass 1, while the sign head's own validation cross-entropy is
+lowest at passes 1 to 4. The page cannot say whether a later stop on the sign alone would change C4.
+The post hoc one-seed check, which stops on the sign head's own validation cross-entropy, was set
+before any post hoc fit to speak to this question.
+
+**Plan items that were not done.** FS and YT were dropped, so R1, R2, and R5 are void. The synthetic
+gallery panels G10, G11, and G13 draw the pass or fail of each item of their written lists as bar
+charts, and not the layouts and the series that the plan described; G12, G14, and G15 draw the
+panels of the plan. The share of absent flags per fold in FU and in FU-S, which the plan said to
+print, is not in the report. The base-day guard counts in `scores/pre_fit_guards.json` are not
+interpreted here. The real-day panels of the untangled channels are in `PRIVATE/gallery2/` and are
+not published.
+
+**The synthetic fits are on a world with no load transfers, and the transfer signal of FU reads a
+detector that finds 7.7% of simulated steps.** The transfer-step channel is near zero in the
+synthetic world, so C3 and C4 test the sign channel alone. The transfer step that FU reads on real
+days comes from a detector that experiment 732 found finds 7.7% of the simulated steps of 5 points
+or more, so a null C1 says little about whether a good transfer signal would help.
+
+**Anonymisation.** The page shows no engine size, no connection date, no distance, no register
+entry, no series identifier, and no generator time series. D8 is a substation and is named.
+Forecasts of D8's reading appear on calendar dates, and no real-day untangled channel is drawn. The
+base dates of the synthetic samples appear only in the private log, and the page draws the synthetic
+series without dates. The panels of `PRIVATE/gallery2/` are not published: the history and placebo
+panels show real-day untangled channels, and the synthetic panels show the real base-day reading
+beside the injected series.
 
 ## Synthetic world gallery
 
@@ -1371,9 +1458,8 @@ holds](gallery_g10.svg)
 holds](gallery_g13.svg)
 
 **G12: the ensemble forecast tracks the observed sky.** The correlation between the ENS shortwave of
-the base date's 00Z run and the CAMS sky of the same target half-hours is 0.957 at lead day 1, 0.953
-at lead day 2, 0.907 at lead day 10, and 0.886 at lead day 14, falling with the lead day and staying
-well above zero.
+the base date's 00Z run and the CAMS sky of the same target half-hours is 0.957 at lead day 1 and
+0.886 at lead day 14, falling with the lead day and staying well above zero.
 
 ![G12: correlation by lead day between the ENS shortwave and the CAMS sky of the same target
 half-hours](gallery_g12.svg)
@@ -1406,10 +1492,9 @@ month and hour, and every single window of source S1 (a real farm's metered outp
 ### Architecture
 
 - The real-fold arms are experiment 713's network (width 64, two axial blocks, the similar-day
-  read-out, and the three-component mixture head; about 130,000 parameters), loaded from M\*'s
-  stored stage 1 state of the same fold and seed, with the history path and the read-out path of
-  "The forecaster and its history rows" (about 2,600 new parameters, all starting at zero effect,
-  and gated by the per-token presence flag).
+  read-out, and the three-component mixture head), loaded from M\*'s stored stage 1 state of the
+  same fold and seed, with the history path and the read-out path of "The forecaster and its history
+  rows", whose new parameters all start at zero effect and are gated by the per-token presence flag.
 - The history rows of ages 2 to 15 carry the folded reading, its visibility flag, and the two used
   untangled channels (P(X<0) and the transfer-step probability, with the solar output set to zero
   and its flag off) with their presence flag. The target row reads the ENS 00Z run of the origin day
