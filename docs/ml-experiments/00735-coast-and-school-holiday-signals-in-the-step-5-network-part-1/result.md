@@ -8,7 +8,7 @@ title: >-
 theme: demand-inputs
 also_relevant_to:
   - production-reference-and-best-guess
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -76,7 +76,7 @@ decision_rule: >-
   a point estimate between 0 and -0.02; (5) `not supported` when the intervals of C1 at both groups,
   of C4, and of C5 lie inside -0.05 to +0.05; (6) `inconclusive` otherwise. The family stays at 6
   readings and 99.17% even if arms are dropped. Every reading in October 2026 and in July to
-  September 2026 is pre-named and decides nothing. Numbers before the final scoring are interim.
+  September 2026 is pre-named and decides nothing.
 benchmark: >-
   R0 (arm 9a replayed from experiment 677's stored stage-1 weights); experiment 677's stored
   `k1_5w_sp1` forecasts as the reference row `stored`; the manual heuristic and climatology from
@@ -88,24 +88,179 @@ metric: >-
   the median, q01, q05, q95, and q99 coverage and pinball loss, by holiday window, weather split,
   group, and Primary, at days 1 to 10 (headline) and in every demand-v2 lead band from 0.5 hours to
   14 days.
+verdict: inconclusive
+best_arm: >-
+  None. Each arm that carries a real school or coast signal (`S`, `SKW`, and `SE`) scored slightly
+  worse than the control `R0` on the school windows. The arm closest to its permuted twin is `SE`
+  (the coast term in the substation embedding), which is within 0.01 points of capacity of `SEP`
+  (C5 -0.005, 99.17% interval -0.047 to
+  +0.013, 3 seeds, 8 refit months, 4 coastal Primaries).
+headline: >-
+  Adding the school-holiday columns to the step-5 neural network did not lower its CRPS in the
+  weeks around
+  school holidays: the change in the continuous ranked probability score (CRPS) is +0.051 points of
+  capacity at the six signed-MW Primaries (99.17%
+  interval -0.012 to +0.177) and +0.083 at the eight MVA-only Primaries (-0.026 to +0.233), where a
+  positive number is worse. The school columns were worse than a calendar shifted by 21 days by
+  +0.052 and +0.074 (C2). The coast and weather columns were worse than their permuted twin by
+  +0.052 at the 4 coastal Primaries (C4, -0.056 to +0.160). The coast term in the embedding made no
+  difference (C5 -0.005, -0.047 to +0.013). No planned interval on the 8 held-in refit months lay
+  wholly below zero, so the verdict is `inconclusive`. In October 2026, which no verdict reads, the
+  coast and weather columns beat their
+  permuted twin by 0.16 points at the 4 coastal Primaries (95% interval -0.31 to -0.04), from one
+  half-term.
+lessons: >-
+  The step-5 neural network already carries what the school columns would add, or the 8 held-in
+  refit
+  months hold too few independent school holidays to show a difference: the placebo calendar scored
+  the same as the control (SP minus R0 -0.001 at the six, +0.009 at the eight), while the real
+  calendar scored worse by 0.05 to 0.08. The worst school window was the first weekend of a school
+  holiday (+0.33 at the six, +0.39 at the eight, against the control). The coast signal changed
+  nothing as a term in the embedding. As input columns it made the 4 coastal Primaries slightly
+  worse
+  in the 8 held-in months but better in October 2026. The 99.17% intervals on the 8 held-in refit
+  months are about 0.2 points wide, because those months hold about 5 school holidays.
+take_home_message: >-
+  Telling the substation forecast network when Lincolnshire's schools are on holiday, or how close
+  each substation is to the coast, did not lower its error around school holidays in the 8 refit
+  months that decide the verdict: the school columns were slightly worse (+0.05 to +0.08 points of
+  capacity, not distinguishable from zero). In October 2026, which does not count towards the
+  verdict, the coast and weather columns did lower the error at the 4 coastal substations by 0.16
+  points, so that half-term is worth a second look with a longer record.
+advice:
+  - >-
+    Do not rely on school-holiday columns in the step-5 neural network's mixer for the Lincolnshire
+    Primaries on this evidence: they scored +0.05 to +0.08 points of capacity worse than the
+    control on school
+    windows (C1).
+  - >-
+    Read the first weekend of a school holiday first when testing a holiday
+    input, because the school columns were worst there, +0.33 to +0.39 points against the control
+    (the first-weekend reading in the Verdict section).
+  - >-
+    Score a coast or holiday input against a permuted or shifted twin trained in the same refits,
+    because the
+    shifted calendar matched the control to within 0.01 points while the real calendar did not (SP
+    minus R0, C2).
+  - >-
+    Read the October 2026 half-term again once the months from November 2026 to the February 2027
+    half-term have
+    been scored, because the coast and weather columns gained 0.16 points at the 4 coastal Primaries
+    there from one half-term (SKW minus SKWP, a reading that decides nothing).
+  - >-
+    Design an experiment about school holidays so that each scored period holds more than 5
+    independent school holidays, because the 99.17% intervals of C1, C2, and C4 are 0.2 to 0.3
+    points wide against effects
+    of 0.05 points of capacity (the table in the Verdict section).
+production_status: not-for-production
+adopted_in: none
 ---
 
-<!-- Draft plan for experiment 735, revised 2026-11-27. The opening, figures, and results sections
-are written after the run. -->
-
-**This experiment asks whether the Primaries' step-5 demand network forecasts better around school
+**This experiment asked whether the Primaries' step-5 demand network forecasts better around school
 holidays if it is told when Lincolnshire's schools are on holiday, and whether it forecasts the
 seaside Primaries better if it is also told how close each Primary is to the coast.** The step-5
 network is the neural network that forecasts the power drawn at 16 Primary substations in
-Lincolnshire up to 14 days ahead, and it is the first production demand network for them. On
-Saturday 2026-10-24, the first day of the October half-term, the network under-forecast four
-Primaries near the coast by 10 to 19 points of capacity. A colleague suggested a "coastal" flag,
-because seaside resorts may react to holidays differently from inland towns. We will retrain the
-network with school-holiday columns, with the coast distance added in two different ways, and with
-placebo versions of each signal. We then compare the error in the weeks around each school holiday
-and bank holiday, at the coastal and inland Primaries, and on warm and cold holiday days.
+Lincolnshire up to 14 days ahead. On Saturday 2026-10-24, the first day of the October half-term,
+the network under-forecast four Primaries near the coast by 10 to 19 points of capacity, and a
+colleague suggested a "coastal" flag. We retrained the network from the frozen stage-1 weights of
+experiment 677 (building up the candidate demand network one component at a time) with
+school-holiday
+columns, with the coast distance added as input columns and as a term in the substation embedding,
+and with a placebo version of each signal. We scored the weeks around each school holiday and bank
+holiday at the coastal and inland Primaries.
 
-## Plan
+## Verdict
+
+**The verdict is `inconclusive`: no school-holiday or coast arm scored better than the control, and
+every planned interval on the 8 held-in refit months includes zero.** CRPS (the continuous ranked
+probability score of the 11-level
+quantile forecast) is in points of capacity, where one point is 1% of a Primary's capacity, and a
+lower score is better. Every contrast below is the arm minus its reference, at days 1 to 10, on the
+rows of the school windows (7 days before, the holiday block, and 7 days after) of the 8 held-in
+refit months (2025-11 to 2026-06, valid times before 2026-07-01), so a positive number is worse.
+Intervals are 99.17% (95% with a Bonferroni correction for 6 readings) from a two-level bootstrap
+over refit months, seeds, and 7-day blocks.
+
+| Reading | Arm minus reference | Six signed-MW Primaries | Eight MVA-only Primaries | 4 coastal Primaries |
+|---|---|---|---|---|
+| C1 | school columns (`S`) minus control (`R0`) | +0.051 (-0.012 to +0.177) | +0.083 (-0.026 to +0.233) | not read |
+| C2 | `S` minus shifted-calendar placebo (`SP`) | +0.052 (-0.043 to +0.159) | +0.074 (-0.042 to +0.210) | not read |
+| C4 | coast and weather columns (`SKW`) minus permuted twin (`SKWP`) | not read | not read | +0.052 (-0.056 to +0.160) |
+| C5 | coast term in the embedding (`SE`) minus permuted twin (`SEP`) | not read | not read | -0.005 (-0.047 to +0.013) |
+
+**The placebos behave as they should.** `SP` minus `R0` is -0.001 at the six signed-MW Primaries
+and +0.009 at the eight MVA-only Primaries, so in these fits a calendar shifted by 21 days left the
+score unchanged, as did a permuted coast distance (`SKWP` minus `S` +0.004, `SEP` minus `S` -0.002).
+The real school calendar scored 0.05 to 0.08 points worse than the control and than the shifted
+calendar, although every planned interval includes zero.
+In the school windows the mean CRPS is, at the six signed-MW Primaries, 3.300 for `R0`, 3.351 for
+`S`, 3.299 for `SP`, 3.391 for `SKW`, 3.372 for `SKWP`, 3.349 for `SE`, and 3.349 for `SEP`; at the
+eight MVA-only Primaries it is 3.733, 3.816, 3.742, 3.855, 3.822, 3.812, and 3.815; and at the 4
+coastal Primaries (D2, D4, D9, and D19) it is 2.603, 2.709, 2.602, 2.764, 2.712, 2.702, and 2.707.
+The manual heuristic scores 4.235, 4.684, and 3.635 in the same three groups, and climatology
+scores 4.718, 5.531, and 3.802.
+
+**The school columns were worst on the first weekend of a school holiday.** Against `R0`, the
+contrast is +0.33 at the six signed-MW Primaries and +0.39 at the eight MVA-only Primaries, and
+against `SP` the intervals exclude zero at both groups (+0.35, interval 0.03 to 0.88, at the six;
++0.43, interval 0.12 to
+0.85, at the eight; 95% level). These windows were read after the first look at the results and are
+not
+corrected for the number of windows, so they do not decide the verdict. On
+ordinary days the difference is small (-0.007 and -0.024 against `R0`).
+
+**The coast and weather columns lowered the error in October 2026, which no verdict reads.** On the
+school window of October 2026 (the half-term of 2026-10-26 to 2026-10-30, with the 7 days before and
+after), `SKW` minus `SKWP` is -0.16 points at the 4 coastal Primaries (95% interval -0.31 to
+-0.04), -0.05 at the eight MVA-only Primaries (-0.10 to -0.01), and -0.03 at the six signed-MW
+Primaries (-0.07 to 0.00). In the same block the school columns moved the signed error of the
+12-to-36-hour median on 2026-10-24 to 2026-11-01 towards zero by 2.4 to 4.0 points at D9, D19, and
+D4 (`S` minus `R0`), against a prediction of at least 3 points (P6): D4 met it (3.98), D19 (2.58)
+and D9 (2.43) did not. The shifted-calendar arm `SP` moved those errors by less than 0.2 points.
+All of the October 2026 readings come from one half-term, and the clock change on 2026-10-25 falls
+in the 7 days before the half-term.
+
+**Four of the seven predictions missed, one held, one partly held, and one made no claim.** P1 (C1
+-0.03 to -0.10) and P2 (C2 -0.02 to -0.08) missed because both contrasts are positive. P3 (C4 0.00
+to -0.08) missed because C4 is +0.052. P4 (the C4 gain is at least 0.04 larger on warm, sunny
+holiday days) missed in direction: the difference is +0.143 points (-0.008 to +0.379), so the
+coast and weather columns did no better on warm, sunny days. P5 (C5 within ±0.02) held. P6 partly
+held: D4 met the threshold and D19 and D9 did not. P7 (July to September 2026) made no prediction:
+`S` minus `R0` there is +0.002 at
+the six and +0.020 at the eight.
+
+## Figures
+
+![Planned readings with their intervals](readings.svg)
+
+![Each paired difference by refit month and seed](by_fit.svg)
+
+![Signed error of the median by distance from the coast](signed_error_by_distance.svg)
+
+## Checks
+
+- **A fresh Sonnet agent re-derived C1, C2, C4, C5, the placebo readings, and the held-in row
+  selection** from the raw cell files without the scorer's code: every estimate matched
+  `readings.csv` to 1e-17, no row dated on or after 2026-07-01 entered a held-in reading, and the
+  verdict rule 6 holds. It did not re-derive the bootstrap intervals.
+- **The replay gate passed**: the worst deviation of the replayed control from experiment 677's
+  stored forecasts is 5.1e-6 of capacity, against a tolerance of 5e-4. The held-in readings use the
+  stored forecasts as `R0`; the replay runs only in October 2026.
+- **No look-ahead**: no new column reads ERA5, and W3's baseline reads only weather runs issued
+  before the forecast origin (a test and a runtime assertion).
+- **Reviews**: a Sonnet numbers review corrected four figures in this page (a rounding, a rounding,
+  a superlative, and the order of the largest per-Primary increases), and a Sonnet prose review's
+  findings were applied.
+- **Weighting of C4**: the C4 estimate (+0.052) is weighted by row. The unweighted mean over the 24
+  fits is +0.020, and C4 is negative in 4 of the 24 fits and in 1 of the 8 refit months.
+- **Not done**: the per-Primary and leave-one-out tables beyond `scores/readings.csv`, the forecast
+  series around each half-term, the loss-against-epoch figure, the production-variant check
+  (dropping the two Copernicus Atmosphere Monitoring Service columns), and part 2 (school columns in
+  the date-time encoder, where part 1 is this experiment's input columns).
+- **Per-Primary C1 readings**: D19 is +0.28, D10 +0.11, and D9 +0.10, and no Primary gains beyond
+  noise. D15 and D18, which are reported beside the counted groups, are +0.01 and +0.04.
+
+## Plan, written before the run
 
 ### What is already known
 
@@ -577,7 +732,7 @@ and
 - Stage 2 trains the mixer for up to 60 epochs without recency weights; stage 3 fine-tunes with
   recency weights and injected load shifts, with experiment 677's loss, optimiser, and validation
   weeks. Placebo arms differ only in the shifted calendar or permuted coast closeness. The run takes
-  about 5.2 GPU-process-hours.
+  5.83 GPU-process-hours.
 
 ### Measurement
 

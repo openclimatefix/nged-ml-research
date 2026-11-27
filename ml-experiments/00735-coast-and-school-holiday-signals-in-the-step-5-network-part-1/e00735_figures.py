@@ -142,12 +142,12 @@ def signed_error_by_distance(*, path: Path) -> None:
         .mark_circle(size=45)
         .encode(
             x=alt.X("coast_km:Q", title="Distance from the coast (km)"),
-            y=alt.Y("signed:Q", title="Median minus actual (points of capacity; zero is unbiased)"),
+            y=alt.Y("signed:Q", title="Error (points)"),
             color=alt.Color("arm:N", scale=alt.Scale(domain=["R0", "S", "SKW"], range=[BLUE, ORANGE, PURPLE]), legend=alt.Legend(orient="top", title=None)),
         )
         .properties(width=WIDTH, height=160)
         .facet(row=alt.Row("window:N", title=None))
-        .properties(title=alt.TitleParams("Signed error of the 12 to 36 hour median by distance from the coast", subtitle=["Dot: one Primary, held-in months. Negative is an under-forecast."]))
+        .properties(title=alt.TitleParams("Signed error of the 12 to 36 hour median by distance from the coast", subtitle=["Dot: one Primary, held-in months. Error is median minus actual, in points of capacity; negative is an under-forecast, zero is unbiased."]))
     )  # fmt: skip
     chart.save(str(path))
 
