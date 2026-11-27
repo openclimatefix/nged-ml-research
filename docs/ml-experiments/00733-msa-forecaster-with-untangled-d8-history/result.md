@@ -876,6 +876,22 @@ published page carries the coverage counts.
   percentile interval lacked.
 - **No arm without the sign head on the synthetic world,** because whether the sign head harms the
   forecast of the reading is a side question, and R6 already reads the reading's CRPS.
+- **The synthetic batches are cut from a packed bank on prefetch threads (ruling of the design lead,
+  2026-11-27, set before any experiment 733 fit exists).** On one CPU core of the full world, cutting
+  one batch of 256 samples took 0.078 seconds, so one pass of 1,008 batches over the two training
+  banks took 79 seconds, and a fit at the cap of 80 passes took 1.75 hours before any GPU work,
+  against the 0.3 hours that the projection above assumes. Most of the time was Python overhead,
+  because a batch touches about 215 segments. The bank of each split is therefore packed once per
+  process onto one day axis and one half-hour axis, which takes 0.2 seconds and adds no memory, and
+  a batch is cut in one gather: 0.028 seconds on one core, and 0.009 seconds a batch with 4 prefetch
+  threads, which is 9 seconds a pass. The batches are identical to the per-segment cut (the same
+  arrays, dtypes, and order, tested on the real scratch world), and a fit's loss history is
+  identical to the history before the change. The stopping rules (a cap of 80 passes, a patience of
+  20), every registered bar, and the stop line of 12 hours are unchanged. The timing gate still
+  projects at the cap of 80 passes, and still drops YT and then FS from the end; if the projection
+  still exceeds the stop line after the drops, the line stops at verdict row 0 and goes to the
+  manager. Precomputing every split's tensors was rejected because the history tensors of the two
+  training banks would take about 29 GB, above the 14 GB host cap.
 
 ## Method
 

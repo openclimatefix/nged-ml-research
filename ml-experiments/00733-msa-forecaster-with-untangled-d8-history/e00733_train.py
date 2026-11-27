@@ -22,7 +22,9 @@ then `numpy`).
 
 import math
 import time
-from collections.abc import Callable, Sequence
+from collections import deque
+from collections.abc import Callable, Generator, Iterable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Final
 
@@ -45,6 +47,11 @@ NEW_RATES: Final[dict[str, tuple[float, float]]] = {"u_gamma": (3e-3, 0.0)}
 NEW_DEFAULT: Final = (2e-3, tr.WEIGHT_DECAY)
 VALIDATION_LEADS_SYNTHETIC: Final = (1, 3, 6, 9)
 """Zero-based lead indices (days 2, 4, 7, and 10) of the synthetic validation loss."""
+PREFETCH_WORKERS: Final = 4
+"""Threads that cut synthetic batches ahead of the training step (the slot has 6 cores, and the
+main thread drives the GPU)."""
+PREFETCH_DEPTH: Final = 8
+"""Batches cut ahead of the training step, at about 35 MB each."""
 
 
 class NonFiniteLossError(RuntimeError):
@@ -550,6 +557,46 @@ def train_stage(  # noqa: PLR0912
 # --------------------------------------------------------------------------- the synthetic loop
 
 
+def prefetched[T, R](
+    *, items: Iterable[T], make: Callable[[T], R], workers: int | None = None,
+    depth: int = PREFETCH_DEPTH,
+) -> Generator[R]:  # fmt: skip
+    """Yield `make(item)` for each item in order, computing up to `depth` of them ahead on threads.
+
+    The results come in the order of `items`, and `make` must not share mutable state between items,
+    so the sequence equals `(make(item) for item in items)`. An exception raised by `make` is raised
+    where the result would have been yielded. Closing the generator drops the results not yet taken.
+
+    Args:
+        items: The inputs, consumed lazily.
+        make: Builds one result from one item (a read-only gather from shared arrays).
+        workers: The number of threads (1 or less computes in the calling thread); `None` is
+            `PREFETCH_WORKERS`.
+        depth: The most results cut ahead.
+
+    Yields:
+        The results, in order.
+    """
+    workers = PREFETCH_WORKERS if workers is None else workers
+    if workers <= 1:
+        for item in items:
+            yield make(item)
+        return
+    pending: deque[Future[R]] = deque()
+    source = iter(items)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        try:
+            for item in source:
+                pending.append(pool.submit(make, item))
+                if len(pending) >= depth:
+                    yield pending.popleft().result()
+            while pending:
+                yield pending.popleft().result()
+        finally:
+            for future in pending:
+                future.cancel()
+
+
 def synthetic_arrays_to_inputs(*, batch: sy.SynthBatch, device: str) -> model.UntInputs:
     """Return the `UntInputs` of a synthetic batch on `device`."""
     a = batch.arrays
@@ -583,8 +630,9 @@ def synthetic_loss(
 
 
 def synthetic_validation(
-    *, net: model.UntangledNet, segments: Sequence[sy.SegmentArrays], index: sy.SampleIndex,
-    d8_index: int, target_std: float, mode: str, device: str, batch_size: int = 256,
+    *, net: model.UntangledNet, segments: Sequence[sy.SegmentArrays] | sy.PackedBank,
+    index: sy.SampleIndex, d8_index: int, target_std: float, mode: str, device: str,
+    batch_size: int = 256,
 ) -> tuple[float, float, float]:  # fmt: skip
     """Return the validation loss, its mixture part, and its sign part.
 
@@ -595,11 +643,15 @@ def synthetic_validation(
     tot = nll = bce = 0.0
     n = 0
     with torch.no_grad():
-        for start in range(0, len(rows), batch_size):
-            sel = rows[start : start + batch_size]
-            b = sy.gather_batch(
-                segments=segments, index=index, rows=sel, d8_index=d8_index, target_std=target_std, mode=mode
-            )  # fmt: skip
+        sels = [rows[start : start + batch_size] for start in range(0, len(rows), batch_size)]
+        batches = prefetched(
+            items=sels,
+            make=lambda sel: sy.gather_batch(
+                segments=segments, index=index, rows=sel, d8_index=d8_index, target_std=target_std,
+                mode=mode,
+            ),
+        )  # fmt: skip
+        for sel, b in zip(sels, batches, strict=True):
             t, a, c = synthetic_loss(net=net, batch=b, device=device)
             tot += float(t.cpu()) * len(sel)
             nll += float(a.cpu()) * len(sel)
@@ -612,9 +664,9 @@ def synthetic_validation(
 def train_synthetic(
     *,
     net: model.UntangledNet,
-    train_segments: Sequence[sy.SegmentArrays],
+    train_segments: Sequence[sy.SegmentArrays] | sy.PackedBank,
     train_index: sy.SampleIndex,
-    val_segments: Sequence[sy.SegmentArrays],
+    val_segments: Sequence[sy.SegmentArrays] | sy.PackedBank,
     val_index: sy.SampleIndex,
     seed: int,
     mode: str,
@@ -653,6 +705,10 @@ def train_synthetic(
         The per-pass history, with the stored pass marked.
     """
     started = time.monotonic()
+    if not isinstance(train_segments, sy.PackedBank):
+        train_segments = sy.pack_segments(segments=train_segments)
+    if not isinstance(val_segments, sy.PackedBank):
+        val_segments = sy.pack_segments(segments=val_segments)
     hist = History(stage=0)
     torch.manual_seed(
         seed * 7 + core.GENERATOR_SEED
@@ -666,13 +722,18 @@ def train_synthetic(
         rng = np.random.default_rng([733, seed, epoch])
         order = rng.permutation(len(train_index))
         total, count = 0.0, 0
-        for batch_no, start in enumerate(range(0, len(order), batch_size)):
-            sel = order[start : start + batch_size]
+        sels = [order[start : start + batch_size] for start in range(0, len(order), batch_size)]
+
+        def cut(item: tuple[int, np.ndarray], epoch: int = epoch) -> sy.SynthBatch:
+            batch_no, sel = item
             masks = dropout_masks(seed=seed, stage=0, epoch=epoch, batch=batch_no, n=len(sel))
-            b = sy.gather_batch(
+            return sy.gather_batch(
                 segments=train_segments, index=train_index, rows=sel, d8_index=d8_index,
                 target_std=target_std, mode=mode, mask_history=masks,
             )  # fmt: skip
+
+        stream = prefetched(items=list(enumerate(sels)), make=cut)
+        for sel, b in zip(sels, stream, strict=False):
             loss, _, _ = synthetic_loss(net=net, batch=b, device=device)
             opt.zero_grad()
             loss.backward()
@@ -683,6 +744,7 @@ def train_synthetic(
             step += 1
             if max_steps is not None and step >= max_steps:
                 break
+        stream.close()
         hist.train.append(total / max(count, 1))
         val, v_nll, v_bce = synthetic_validation(
             net=net, segments=val_segments, index=val_index, d8_index=d8_index,

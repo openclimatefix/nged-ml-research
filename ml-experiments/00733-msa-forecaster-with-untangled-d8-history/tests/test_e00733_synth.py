@@ -388,3 +388,120 @@ def test_a_non_finite_gathered_channel_is_refused() -> None:
     idx = sy.enumerate_samples(segments=[seg])
     with pytest.raises(sy.SynthError, match="not finite"):
         sy.gather_batch(segments=[seg], index=idx, rows=np.arange(3), d8_index=0, target_std=1.0)
+
+
+# --------------------------------------------------------------------------- the packed bank
+
+
+def _world_with_rerun() -> list[sy.SegmentArrays]:
+    """Three segments of different lengths, one with missing days, every one with re-run outputs."""
+    segs = [
+        make_segment(n_days=40, seed=0),
+        make_segment(n_days=33, seed=1, missing_days=(5, 20)),
+        make_segment(n_days=52, seed=2),
+    ]
+    rng = np.random.default_rng(9)
+    for seg in segs:
+        n = seg.n_days
+        seg.u_rerun = rng.random((n, 2, 48, 3)).astype(np.float32)
+        seg.u_rerun_ok = rng.random((n, 2, 48)) < 0.7
+    return segs
+
+
+def _assert_same_batch(*, a: sy.SynthBatch, b: sy.SynthBatch) -> None:
+    assert a.arrays.keys() == b.arrays.keys()
+    for name, x in a.arrays.items():
+        y = b.arrays[name]
+        assert x.dtype == y.dtype, name
+        assert np.array_equal(x, y, equal_nan=x.dtype.kind == "f"), name
+    for name in ("target_z", "sign_truth", "history_x_neg"):
+        x, y = getattr(a, name), getattr(b, name)
+        assert x.dtype == y.dtype
+        assert np.array_equal(x, y, equal_nan=True), name
+
+
+@pytest.mark.parametrize("with_rerun", [True, False])
+def test_the_packed_bank_gives_the_same_batches_as_the_segment_list(with_rerun: bool) -> None:
+    """Every channel mode, with and without the dropout masks, gives identical arrays and dtypes."""
+    segs = _world_with_rerun()
+    if not with_rerun:
+        for seg in segs:
+            seg.u_rerun = seg.u_rerun_ok = None
+    index = sy.enumerate_samples(segments=segs)
+    rng = np.random.default_rng(3)
+    picks = [rng.permutation(len(index))[:64] for _ in range(3)] + [np.arange(40)]
+    masks = (rng.random(64) < 0.4, rng.random(64) < 0.4)
+    wanted = {}
+    for mode in sy.CHANNEL_MODES:
+        for i, rows in enumerate(picks):
+            m = masks if len(rows) == 64 else None
+            wanted[mode, i] = sy.gather_batch(
+                segments=segs, index=index, rows=rows, d8_index=3, target_std=0.7, mode=mode,
+                mask_history=m,
+            )  # fmt: skip
+    bank = sy.pack_segments(segments=segs)
+    for (mode, i), want in wanted.items():
+        rows = picks[i]
+        m = masks if len(rows) == 64 else None
+        got = sy.gather_batch(
+            segments=bank, index=index, rows=rows, d8_index=3, target_std=0.7, mode=mode,
+            mask_history=m,
+        )  # fmt: skip
+        _assert_same_batch(a=want, b=got)
+
+
+def test_packing_keeps_the_values_of_every_segment_and_adds_no_copy() -> None:
+    """After packing, each segment array is a view of the bank with its old values."""
+    segs = _world_with_rerun()
+    before = [seg.top_weather.copy() for seg in segs]
+    bank = sy.pack_segments(segments=segs)
+    for seg, old in zip(segs, before, strict=True):
+        assert np.array_equal(seg.top_weather, old)
+        assert np.shares_memory(seg.top_weather, bank.top_weather)
+    assert bank.top_weather.shape[0] == sum(seg.n_days for seg in segs)
+
+
+def test_the_packed_bank_still_refuses_a_target_row_outside_its_segment() -> None:
+    """A lead index whose target row runs past the segment raises, as in the segment list."""
+    segs = _world_with_rerun()
+    index = sy.enumerate_samples(segments=segs)
+    bank = sy.pack_segments(segments=segs)
+    bad = sy.SampleIndex(index.seg[:1], np.array([segs[0].n_days - 1]), np.array([sy.N_LEAD - 1]))
+    with pytest.raises(sy.SynthError):
+        sy.gather_batch(segments=bank, index=bad, rows=np.array([0]), d8_index=3, target_std=1.0)
+
+
+def test_packing_refuses_mixed_rerun_outputs() -> None:
+    """Some segments with re-run outputs and others without cannot share one bank."""
+    segs = _world_with_rerun()
+    segs[1].u_rerun = segs[1].u_rerun_ok = None
+    with pytest.raises(sy.SynthError):
+        sy.pack_segments(segments=segs)
+
+
+def test_the_real_scratch_world_gives_identical_batches_on_the_packed_path() -> None:
+    """On the stored validation bank of the scratch root, the packed path equals the list path."""
+    import os
+
+    import e00733_world as world
+
+    root = os.environ.get("E733_SCRATCH_ROOT")
+    if not root or not Path(root, "world", "validation.pkl").exists():
+        pytest.skip("no scratch world: set E733_SCRATCH_ROOT to a built scratch root")
+    segs, _ = world.read_world(root=Path(root), kind="validation")
+    index = sy.enumerate_samples(segments=segs)
+    rng = np.random.default_rng(1)
+    picks = [rng.permutation(len(index))[:256] for _ in range(4)]
+    masks = (rng.random(256) < 0.3, rng.random(256) < 0.3)
+    want = [
+        sy.gather_batch(
+            segments=segs, index=index, rows=r, d8_index=3, target_std=0.7, mask_history=masks
+        )
+        for r in picks
+    ]
+    bank = sy.pack_segments(segments=segs)
+    for r, w in zip(picks, want, strict=True):
+        got = sy.gather_batch(
+            segments=bank, index=index, rows=r, d8_index=3, target_std=0.7, mask_history=masks
+        )
+        _assert_same_batch(a=w, b=got)

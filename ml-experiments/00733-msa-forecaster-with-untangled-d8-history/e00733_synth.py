@@ -534,7 +534,7 @@ class OriginTimes:
 
 def gather_batch(
     *,
-    segments: Sequence[SegmentArrays],
+    segments: Sequence[SegmentArrays] | PackedBank,
     index: SampleIndex,
     rows: np.ndarray,
     d8_index: int,
@@ -544,8 +544,11 @@ def gather_batch(
 ) -> SynthBatch:
     """Cut the batch of samples `rows` out of the segments' arrays.
 
+    A `PackedBank` in place of the list of segments takes the fast path, which returns the same
+    arrays as the list does (`pack_segments` and the identity test say so).
+
     Args:
-        segments: The segments' arrays.
+        segments: The segments' arrays, or their packed form.
         index: The split's samples.
         rows: The positions in `index` of the batch.
         d8_index: The Primary index of D8 (the forecaster's embedding of the synthetic series).
@@ -564,6 +567,11 @@ def gather_batch(
     if mode not in CHANNEL_MODES:
         msg = f"unknown channel mode {mode}"
         raise SynthError(msg)
+    if isinstance(segments, PackedBank):
+        return _gather_packed(
+            bank=segments, index=index, rows=rows, d8_index=d8_index, target_std=target_std,
+            mode=mode, mask_history=mask_history,
+        )  # fmt: skip
     b = len(rows)
     out: dict[str, np.ndarray] = {
         k: np.zeros(s, dtype=dt)
@@ -669,43 +677,270 @@ def _gather_segment(
     out["hist_u"][pos], out["hist_u_ok"][pos] = u, u_ok
 
 
+# --------------------------------------------------------------------------- the packed bank
+
+PACKED_DAY_FIELDS: Final = (
+    "present", "top_weather", "top_spread", "top_datetime", "top_day_type", "top_run_init_us",
+    "top_run_avail_us", "top_other_valid_us", "top_c_grid", "top_filled", "u_rerun", "u_rerun_ok",
+)  # fmt: skip
+"""The `SegmentArrays` fields whose first axis is the dense day axis."""
+PACKED_SLOT_FIELDS: Final = (
+    "reading_z", "x_neg", "solar_points", "u_raw", "u_ok", "hist_weather", "hist_datetime",
+    "day_type",
+)  # fmt: skip
+"""The `SegmentArrays` fields whose first axis is the dense half-hour (slot) axis."""
+
+
+@dataclass
+class PackedBank:
+    """Every segment of a split on one dense day axis and one slot axis, so a batch is one gather.
+
+    A batch of 256 samples touches about 215 segments, so the per-segment gather spends most of its
+    time in Python overhead. The packed bank holds each array of `SegmentArrays` once, with the
+    segments one after another, and the batch is cut out of it in a single pass. The segments of
+    the list are rebound to views of the packed arrays, so the bank adds no memory.
+
+    Attributes:
+        n_days: `(n_segments,)` the number of dense days of each segment.
+        day_base: `(n_segments,)` the position of each segment's first day on the packed day axis.
+        slot_base: `(n_segments,)` the position of each segment's first slot on the packed slot axis.
+        present: `(total_days,)` as in `SegmentArrays`, concatenated.
+        reading_z: `(total_slots,)` as in `SegmentArrays`, concatenated.
+        x_neg: `(total_slots,)`.
+        solar_points: `(total_slots,)`.
+        u_raw: `(total_slots, 3)`.
+        u_ok: `(total_slots,)`.
+        hist_weather: `(total_slots, 21)`.
+        hist_datetime: `(total_slots, 21)`.
+        day_type: `(total_slots,)`.
+        top_weather: `(total_days, 14, 48, 21)`.
+        top_spread: `(total_days, 14, 48, 7)`.
+        top_datetime: `(total_days, 14, 48, 21)`.
+        top_day_type: `(total_days, 14, 48)`.
+        top_run_init_us: `(total_days,)`.
+        top_run_avail_us: `(total_days,)`.
+        top_other_valid_us: `(total_days,)`.
+        top_c_grid: `(total_days,)`.
+        top_filled: `(total_days, 14, 48)`.
+        u_rerun: `(total_days, 2, 48, 3)`, or None when no segment holds re-run outputs.
+        u_rerun_ok: `(total_days, 2, 48)`, or None with `u_rerun`.
+    """
+
+    n_days: np.ndarray
+    day_base: np.ndarray
+    slot_base: np.ndarray
+    present: np.ndarray
+    reading_z: np.ndarray
+    x_neg: np.ndarray
+    solar_points: np.ndarray
+    u_raw: np.ndarray
+    u_ok: np.ndarray
+    hist_weather: np.ndarray
+    hist_datetime: np.ndarray
+    day_type: np.ndarray
+    top_weather: np.ndarray
+    top_spread: np.ndarray
+    top_datetime: np.ndarray
+    top_day_type: np.ndarray
+    top_run_init_us: np.ndarray
+    top_run_avail_us: np.ndarray
+    top_other_valid_us: np.ndarray
+    top_c_grid: np.ndarray
+    top_filled: np.ndarray
+    u_rerun: np.ndarray | None = None
+    u_rerun_ok: np.ndarray | None = None
+
+
+def pack_segments(*, segments: Sequence[SegmentArrays]) -> PackedBank:
+    """Pack the segments' arrays onto one day axis and one slot axis, and rebind the segments.
+
+    Each field is concatenated once and each segment's array is then replaced by a view of its
+    slice, so the old copy is freed and the memory stays at one copy. Values are unchanged.
+
+    Args:
+        segments: The segments of one split.
+
+    Returns:
+        The packed bank.
+
+    Raises:
+        SynthError: When a segment has no origin-time record, or only some segments hold re-run
+            outputs.
+    """
+    if not segments:
+        msg = "cannot pack zero segments"
+        raise SynthError(msg)
+    for seg in segments:
+        seg.check_shapes()
+    n_days = np.array([seg.n_days for seg in segments], dtype=np.int64)
+    day_base = np.concatenate([[0], np.cumsum(n_days)[:-1]]).astype(np.int64)
+    slot_base = day_base * STEPS
+    rerun = {seg.u_rerun is not None and seg.u_rerun_ok is not None for seg in segments}
+    if len(rerun) != 1:
+        msg = "some segments hold re-run outputs and others do not, so they cannot be packed"
+        raise SynthError(msg)
+    fields = [*PACKED_DAY_FIELDS, *PACKED_SLOT_FIELDS]
+    if rerun == {False}:
+        fields = [f for f in fields if f not in ("u_rerun", "u_rerun_ok")]
+    packed: dict[str, np.ndarray] = {}
+    for name in fields:
+        parts = [getattr(seg, name) for seg in segments]
+        joined = np.concatenate(parts)
+        base = day_base if name in PACKED_DAY_FIELDS else slot_base
+        length = n_days if name in PACKED_DAY_FIELDS else n_days * STEPS
+        del parts
+        for seg, start, n in zip(segments, base, length, strict=True):
+            setattr(seg, name, joined[start : start + n])
+        packed[name] = joined
+    return PackedBank(n_days=n_days, day_base=day_base, slot_base=slot_base, **packed)
+
+
+def _masked_rows(*, table: np.ndarray, flat: np.ndarray, inside: np.ndarray) -> np.ndarray:
+    """Return `table[flat]` as float32 with the rows outside the segment zeroed (one copy)."""
+    rows = table[flat].astype(np.float32, copy=False)
+    rows *= inside[..., None]
+    return rows
+
+
+def _gather_packed(
+    *,
+    bank: PackedBank,
+    index: SampleIndex,
+    rows: np.ndarray,
+    d8_index: int,
+    target_std: float,
+    mode: str,
+    mask_history: tuple[np.ndarray, np.ndarray] | None,
+) -> SynthBatch:
+    """Cut a batch out of a packed bank, giving the arrays that `_gather_segment` gives.
+
+    Every position is worked out on the segment's own axis, clipped to the segment exactly as the
+    per-segment gather clips it, and then moved to the packed axis by the segment's base.
+
+    Args:
+        bank: The packed bank.
+        index: The split's samples.
+        rows: The positions in `index` of the batch.
+        d8_index: The Primary index of D8.
+        target_std: D8's target standard deviation.
+        mode: One of `CHANNEL_MODES`.
+        mask_history: The two dropout masks of a training batch, or None.
+
+    Returns:
+        The batch.
+
+    Raises:
+        SynthError: When a target row lies outside its segment, or a gathered channel value is not
+            finite.
+    """
+    b = len(rows)
+    seg = index.seg[rows]
+    d = index.origin_day[rows].astype(np.int64)
+    k = index.lead_index[rows].astype(np.int64)
+    n_slots = (bank.n_days[seg] * STEPS)[:, None, None]
+    day0 = bank.day_base[seg]
+    slot0 = bank.slot_base[seg][:, None, None]
+    times = OriginTimes(
+        c_grid=bank.top_c_grid[day0 + d],
+        target_grid=bank.top_c_grid[day0 + d][:, None] + STEPS * k[:, None] + np.arange(STEPS),
+        filled=bank.top_filled[day0 + d, k],
+        run_init_us=bank.top_run_init_us[day0 + d],
+        run_avail_us=bank.top_run_avail_us[day0 + d],
+        other_valid_us=bank.top_other_valid_us[day0 + d],
+    )
+    hs = history_slots(origin_day=d)
+    inside = (hs >= 0) & (hs < n_slots)
+    hs_c = np.clip(hs, 0, n_slots - 1)
+    flat = slot0 + hs_c
+    day_of = np.clip(hs // STEPS, 0, (bank.n_days[seg] - 1)[:, None, None])
+    exists = (inside & bank.present[day0[:, None, None] + day_of]).all(axis=2)
+    vis = visible_slots(origin_day=d, slots=hs) & inside & exists[:, :, None]
+    reading = bank.reading_z[flat]
+    finite = np.isfinite(reading) & vis
+    ts = target_slots(origin_day=d, lead_index=k)
+    if ts.min() < 0 or (ts >= n_slots[:, :, 0]).any():
+        msg = "a target row lies outside its segment"
+        raise SynthError(msg)
+    flat_t = bank.slot_base[seg][:, None] + ts
+    u, u_ok = _channels(
+        seg=bank, slots=hs_c, ok=finite, mode=mode, target_std=target_std, origin_day=d,
+        flat_slots=flat, rerun_day=day0 + d,
+    )  # fmt: skip
+    if not np.isfinite(u).all():
+        msg = "a gathered channel value is not finite"
+        raise SynthError(msg)
+    out: dict[str, np.ndarray] = {
+        "row_exists": exists,
+        "hist_visible": finite,
+        "hist_power": np.where(finite, reading, 0.0).astype(np.float32, copy=False),
+        "hist_weather": _masked_rows(table=bank.hist_weather, flat=flat, inside=inside),
+        "hist_datetime": _masked_rows(table=bank.hist_datetime, flat=flat, inside=inside),
+        "day_type_hist": bank.day_type[flat].astype(np.int64, copy=False),
+        "top_weather": bank.top_weather[day0 + d, k].astype(np.float32, copy=False),
+        "top_spread": bank.top_spread[day0 + d, k].astype(np.float32, copy=False),
+        "top_datetime": bank.top_datetime[day0 + d, k].astype(np.float32, copy=False),
+        "day_type_top": bank.top_day_type[day0 + d, k].astype(np.int64, copy=False),
+        "hist_u": u,
+        "hist_u_ok": u_ok,
+    }
+    times.assert_origin_time_weather()
+    if mask_history is not None:
+        _apply_masks(out=out, masks=mask_history)
+    out["primary"] = np.full(b, d8_index, dtype=np.int64)
+    out["lead_day"] = index.lead_index[rows].astype(np.int64)
+    return SynthBatch(
+        arrays=out,
+        target_z=bank.reading_z[flat_t].astype(np.float32),
+        sign_truth=bank.x_neg[flat_t].astype(np.float32),
+        history_x_neg=np.where(vis, bank.x_neg[flat], np.nan).astype(np.float32),
+    )
+
+
 def _channels(
     *,
-    seg: SegmentArrays,
+    seg: SegmentArrays | PackedBank,
     slots: np.ndarray,
     ok: np.ndarray,
     mode: str,
     target_std: float,
     origin_day: np.ndarray,
+    flat_slots: np.ndarray | None = None,
+    rerun_day: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the `(N, 14, 48, 3)` channels and `(N, 14, 48)` flag of `N` samples' histories.
 
-    In the forecaster's input units.
+    In the forecaster's input units. `slots` and `origin_day` are positions on each sample's own
+    segment. A packed bank also passes `flat_slots`, the same slots on the packed axis, and
+    `rerun_day`, the origin days on the packed day axis; both default to the segment's own.
     """
+    flat = slots if flat_slots is None else flat_slots
     if mode == "absent":
         return np.zeros((*ok.shape, core.N_CHANNELS), np.float32), np.zeros_like(ok)
     if mode == "true":
-        have = ok & np.isfinite(seg.x_neg[slots])
+        have = ok & np.isfinite(seg.x_neg[flat])
         u = np.stack(
             [
-                np.nan_to_num(seg.x_neg[slots]),
-                solar_unit(points=seg.solar_points[slots], target_std=target_std),
+                np.nan_to_num(seg.x_neg[flat]),
+                solar_unit(points=seg.solar_points[flat], target_std=target_std),
                 np.zeros(slots.shape),
             ],
             axis=-1,
         )
     else:
-        have = ok & seg.u_ok[slots]
-        raw = seg.u_raw[slots].copy()
+        have = ok & seg.u_ok[flat]
+        raw = seg.u_raw[flat]
         if seg.u_rerun is not None and seg.u_rerun_ok is not None:
             od = origin_day[:, None, None]
+            rd = od if rerun_day is None else rerun_day[:, None, None]
             token_day = slots // STEPS
             age_days = od - token_day
             use = (age_days == 1) | (age_days == 2)
-            k = np.clip(2 - age_days, 0, 1)
-            hh = slots % STEPS
-            raw = np.where(use[..., None], seg.u_rerun[od, k, hh], raw)
-            have = np.where(use, ok & seg.u_rerun_ok[od, k, hh], have)
+            r = np.flatnonzero(use.any(axis=(0, 2)))  # the history rows a re-run can replace
+            if len(r):
+                k = np.clip(2 - age_days[:, r], 0, 1)
+                hh = slots[:, r] % STEPS
+                raw[:, r] = np.where(use[:, r, :, None], seg.u_rerun[rd, k, hh], raw[:, r])
+                have[:, r] = np.where(use[:, r], ok[:, r] & seg.u_rerun_ok[rd, k, hh], have[:, r])
         u = np.stack(
             [raw[..., 0], solar_unit(points=raw[..., 1], target_std=target_std), raw[..., 2]],
             axis=-1,
