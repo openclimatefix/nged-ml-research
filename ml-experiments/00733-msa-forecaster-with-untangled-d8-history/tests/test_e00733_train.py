@@ -448,3 +448,68 @@ def test_the_prefetch_stream_is_closed_when_the_loss_raises(
     assert len(streams) == 1
     assert streams[0].gi_frame is None  # a closed (finished) generator holds no frame
     assert threading.active_count() == before
+
+
+# --------------------------------------------------------------------------- the stopping criterion of the b-arms
+
+
+def _scripted_validation(
+    monkeypatch: pytest.MonkeyPatch, *, nll: list[float], bce: list[float]
+) -> None:
+    """Replace the validation pass by a scripted history: pass `k` returns `(nll + bce, nll, bce)`."""
+    calls = iter(range(len(nll)))
+
+    def scripted(**_: object) -> tuple[float, float, float]:
+        k = next(calls)
+        return nll[k] + bce[k], nll[k], bce[k]
+
+    monkeypatch.setattr(tn, "synthetic_validation", scripted)
+
+
+def _train_scripted(*, stop_on: str, patience: int = 20) -> tn.History:
+    segs, idx = _world()
+    net = model.UntangledNet(seed=0, sign_head=True, clim_logit=-1.5)
+    return tn.train_synthetic(
+        net=net, train_segments=segs, train_index=idx, val_segments=segs, val_index=idx,
+        seed=0, mode="absent", d8_index=3, target_std=1.0, device="cpu", max_epochs=40,
+        patience=patience, batch_size=48, stop_on=stop_on,
+    )  # fmt: skip
+
+
+def test_the_sign_bce_criterion_stores_the_pass_of_the_lowest_sign_bce(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the mixture NLL rising from pass 1 and the BCE lowest at pass 4, pass 4 is stored."""
+    n = 40
+    nll = [1.0 + 0.5 * k for k in range(n)]
+    bce = [0.5, 0.4, 0.3, 0.1] + [0.2] * (n - 4)
+    _scripted_validation(monkeypatch, nll=nll, bce=bce)
+    hist = _train_scripted(stop_on=core.STOP_ON_SIGN_BCE)
+    assert hist.stored_pass == 4
+    assert len(hist.val) == 4 + 20 and not hist.cap_hit, (
+        "the patience of 20 counts passes after pass 4"
+    )
+    _scripted_validation(monkeypatch, nll=nll, bce=bce)
+    total = _train_scripted(stop_on=core.STOP_ON_TOTAL)
+    assert total.stored_pass == 1 and len(total.val) == 21
+
+
+def test_the_patience_of_the_sign_bce_criterion_counts_the_bce_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A total loss that keeps falling through a flat BCE does not extend the run."""
+    n = 40
+    nll = [2.0 - 0.04 * k for k in range(n)]
+    bce = [0.3, 0.1] + [0.2] * (n - 2)
+    _scripted_validation(monkeypatch, nll=nll, bce=bce)
+    hist = _train_scripted(stop_on=core.STOP_ON_SIGN_BCE, patience=5)
+    assert hist.stored_pass == 2 and len(hist.val) == 7
+    _scripted_validation(monkeypatch, nll=nll, bce=bce)
+    total = _train_scripted(stop_on=core.STOP_ON_TOTAL, patience=5)
+    assert total.stored_pass == n and total.cap_hit
+
+
+def test_an_unknown_stopping_criterion_is_refused() -> None:
+    """Only the total loss and the sign BCE are criteria."""
+    with pytest.raises(ValueError, match="stop_on"):
+        _train_scripted(stop_on="nll")

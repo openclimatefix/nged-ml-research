@@ -1,20 +1,25 @@
 # ruff: noqa: E501
-"""Experiment 733: the post hoc readings P1 to P6 of the arms FS, YS, and YO (no torch).
+"""Experiment 733: the post hoc readings P1 to P4 of the arms FS, Y0b, YUb, and YOb (no torch).
 
-The maintainer asked for the fits of FS and YS after seeing the verdict, and the manager added the
-oracle YO, so every reading here is post hoc and report-only. FS, YS, and YO are read from the post
-hoc data folder
-(`posthoc/<name of the data folder>`); FU, M*, Y0, and YU are read from the main data folder, which
-this module never writes. The six contrasts use the machinery of the counted contrasts C1 and C4:
-the month-block bootstrap widened by a t ratio on the real folds, the two-way bootstrap on the
-synthetic world, and the same level (`core.LEVEL`).
+The maintainer asked for the fits of FS after seeing the verdict. The finding that all six
+synthetic fits of the main run stored pass 1 led the manager to add one pre-registered check on the
+synthetic world, set before any post hoc fit: Y0b, YUb, and YOb are the forecasters Y0, YU, and the
+oracle (the true sign and solar output of the history half-hours before the origin), each fitted
+once, at seed 0, and stopped on the sign head's own validation binary cross-entropy. Every
+reading here is post hoc and report-only. FS, Y0b, YUb, and YOb are read from the post hoc data
+folder (`posthoc/<name of the data folder>`); FU, M*, Y0, and YU are read from the main data
+folder, which this module never writes.
 
-- P1: FS minus FU, CRPS of D8 on the real folds.
-- P2: FS minus M*, CRPS of D8 on the real folds.
-- P3: YS minus Y0, Brier score of the sign on the synthetic world.
-- P4: YS minus YU, Brier score of the sign on the synthetic world.
-- P5: YO minus Y0, Brier score of the sign on the synthetic world.
-- P6: YO minus YU, Brier score of the sign on the synthetic world.
+- P1: FS minus FU, CRPS of D8 on the real folds. The month-block bootstrap, widened by a t ratio,
+  gives its interval, at the level of the counted contrast C1.
+- P2: FS minus M*, CRPS of D8 on the real folds, read as P1.
+- P3: YOb minus Y0b, Brier score of the sign on the synthetic world, single seed.
+- P4: YUb minus Y0b, Brier score of the sign on the synthetic world, single seed.
+
+P3 and P4 are point differences only: one seed gives no interval and no claim of significance.
+Beside them, the report lists each synthetic arm's stored pass, its validation sign cross-entropy at that
+pass, and its Brier score on the scored test half-hours, for Y0b, YUb, and YOb and for seed 0 of Y0
+and YU of the main run.
 
 The stage `posthoc_score` writes `posthoc/readings.json`, `posthoc/report.md`, and
 `posthoc/posthoc_contrasts.svg`, and nothing else.
@@ -23,12 +28,13 @@ The stage `posthoc_score` writes `posthoc/readings.json`, `posthoc/report.md`, a
 import argparse
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Final
 
 import e00733_baselines as baselines
 import e00733_core as core
+import e00733_fit as fit
 import e00733_scoring as scoring
 import e00733_scoring_synth as ss
 import e00733_stages as st
@@ -45,12 +51,15 @@ REAL_SPECS: Final = {
     "P2": (("FS", None), ("M*", None)),
 }
 """The real-fold contrasts: the arm and its reference, each as (arm, variant)."""
-SYNTHETIC_SPECS: Final = {
-    "P3": ("YS", "Y0"), "P4": ("YS", "YU"), "P5": ("YO", "Y0"), "P6": ("YO", "YU"),
-}  # fmt: skip
-"""The synthetic contrasts: the arm and its reference."""
+SYNTHETIC_SPECS: Final = {"P3": ("YOb", "Y0b"), "P4": ("YUb", "Y0b")}
+"""The synthetic contrasts: the arm and its reference, both from the post hoc folder."""
+SYNTHETIC_TABLE_ARMS: Final = (
+    ("Y0", "main"), ("YU", "main"), ("Y0b", "posthoc"), ("YUb", "posthoc"), ("YOb", "posthoc"),
+)  # fmt: skip
+"""The synthetic arms of the stored-pass table, each with the data folder that holds it."""
+SINGLE_SEED_NOTE: Final = "single seed, post hoc, no interval claim"
 PERCENT: Final = 100.0
-MAX_REPORT_LINES: Final = 25
+MAX_REPORT_LINES: Final = 30
 
 
 def contrast_label(*, name: str) -> str:
@@ -135,67 +144,28 @@ def real_contrasts(
     return out
 
 
-def synthetic_contrasts(
-    *, root: Path, fit_root: Path, rows: str, n_resamples: int | None = None
-) -> dict[str, dict[str, Any]]:
-    """Read P3 to P6: YS and YO (post hoc folder) against Y0 and YU (main folder), sign Brier score.
+def _scored_arrays(
+    *, root: Path, root_of: Mapping[str, Path], arms: Sequence[str], rows: str
+) -> tuple[dict[str, dict[str, np.ndarray]], np.ndarray, np.ndarray]:
+    """Return the seed 0 archives of the arms that exist, the scored-row mask, and the true sign.
 
-    The scored half-hours are those of the counted contrast C4: lead days 2 to 10 of the test bank
-    that hold a sign. A contrast whose arm lacks a seed on test rows is `void`, and the reason
-    names the seeds held.
-
-    Args:
-        root: The data folder of the main run (read only).
-        fit_root: The data folder of the post hoc fits (read only here).
-        rows: "test" or "validation".
-        n_resamples: The bootstrap resamples (default the plan's, or 1,000 on validation rows).
-
-    Returns:
-        P3 to P6, each labelled post hoc.
+    The world (the bank's segments) is read from `root`, the data folder of the main run.
 
     Raises:
-        sc.ScoreError: When an archive holds another number of samples than the bank, or the arms
+        sc.ScoreError: When an archive holds another number of samples than the bank, or two arms
             disagree on the true sign.
     """
-    n_boot = (
-        n_resamples
-        if n_resamples is not None
-        else (core.N_RESAMPLES_SYNTHETIC if rows == "test" else ss.N_RESAMPLES_VALIDATION)
-    )
-    roots = {"YS": fit_root, "YO": fit_root, "Y0": root, "YU": root}
-    held = {a: ss.seeds_held(root=r, arm=a, rows=rows) for a, r in roots.items()}
-    any_held = {
-        a: tuple(
-            sd
-            for sd in core.SYNTHETIC_SEEDS
-            if ss.archive_path(root=r, arm=a, seed=sd, rows=rows).exists()
-        )
-        for a, r in roots.items()
-    }
-    arms = {
-        a: ss.read_arm(root=roots[a], arm=a, seeds=held[a], rows=rows) if held[a] else None
-        for a in roots
-    }
-    readable = {
-        n: pair for n, pair in SYNTHETIC_SPECS.items() if all(arms[a] is not None for a in pair)
-    }
-    out: dict[str, dict[str, Any]] = {
-        n: unread(
-            name=n,
-            reason="; ".join(
-                f"{a} holds seeds {list(any_held[a])} of {list(core.SYNTHETIC_SEEDS)}"
-                for a in pair
-                if arms[a] is None
-            ),
-        )
-        for n, pair in SYNTHETIC_SPECS.items()
-        if n not in readable
-    }
-    if not readable:
-        return out
+    present = {
+        a: arrays
+        for a in arms
+        if (arrays := ss.read_arm(
+            root=root_of[a], arm=a, seeds=core.POSTHOC_SYNTHETIC_SEEDS, rows=rows
+        )) is not None
+    }  # fmt: skip
+    if not present:
+        return {}, np.empty(0), np.empty(0)
     segments, _ = world.read_world(root=root, kind="validation" if rows == "validation" else "test")
     index = sy.enumerate_samples(segments=segments)
-    present = {a: v for a, v in arms.items() if v is not None}
     for arrays in present.values():
         if len(arrays["seg"]) != len(index):
             msg = "a stored synthetic archive holds another number of samples than the bank"
@@ -206,35 +176,102 @@ def synthetic_contrasts(
             msg = "two arms hold different true signs for the same samples"
             raise ss.sc.ScoreError(msg)
     keep = ss.scored_mask(lead_index=index.lead_index)[:, None] & np.isfinite(truth)
-    srows = ss.sc.synthetic_rows(
-        seg=index.seg, origin_day=index.origin_day, seg_month=ss.segment_months(segments=segments)
+    return present, keep, truth
+
+
+def _brier(*, p: np.ndarray, truth: np.ndarray, keep: np.ndarray) -> np.ndarray:
+    """Return the Brier score of each scored half-hour (NaN where it is not scored)."""
+    return ss.masked(values=(np.asarray(p) - truth) ** 2, keep=keep & np.isfinite(p))
+
+
+def synthetic_contrasts(*, root: Path, fit_root: Path, rows: str) -> dict[str, dict[str, Any]]:
+    """Read P3 and P4: YOb and YUb against Y0b (all in the post hoc folder), sign Brier score.
+
+    The scored half-hours are those of the counted contrast C4: lead days 2 to 10 of the bank that
+    hold a sign. Each contrast is the difference of the mean Brier score over the half-hours where
+    both arms are scored, at seed 0 alone. It has no interval, because one seed gives no estimate
+    of the variance between fits, and the entry says so. A contrast whose arm lacks the archive of
+    seed 0 is `void`, and the reason names the arm.
+
+    Args:
+        root: The data folder of the main run (read only; it holds the world).
+        fit_root: The data folder of the post hoc fits (read only here).
+        rows: "test" or "validation".
+
+    Returns:
+        P3 and P4, each labelled post hoc.
+
+    Raises:
+        sc.ScoreError: When an archive holds another number of samples than the bank, or the arms
+            disagree on the true sign.
+    """
+    names = sorted({a for pair in SYNTHETIC_SPECS.values() for a in pair})
+    present, keep, truth = _scored_arrays(
+        root=root, root_of=dict.fromkeys(names, fit_root), arms=names, rows=rows
     )
-
-    def brier(p: np.ndarray) -> np.ndarray:
-        return ss.masked(values=(np.asarray(p) - truth) ** 2, keep=keep & np.isfinite(p))
-
-    for name, (first, second) in readable.items():
-        result = ss.sc.synthetic_contrast(
-            rows=srows, first=brier(present[first]["p_neg"]), second=brier(present[second]["p_neg"]),
-            n_resamples=n_boot,
-        )  # fmt: skip
+    out: dict[str, dict[str, Any]] = {}
+    for name, (first, second) in SYNTHETIC_SPECS.items():
+        missing = [a for a in (first, second) if a not in present]
+        if missing:
+            reason = "; ".join(f"{a} holds no archive of seed 0 on {rows} rows" for a in missing)
+            out[name] = unread(name=name, reason=reason)
+            continue
+        diff = _brier(p=present[first]["p_neg"], truth=truth, keep=keep) - _brier(
+            p=present[second]["p_neg"], truth=truth, keep=keep
+        )
+        ok = np.isfinite(diff)
         out[name] = {
             "post_hoc": True, "label": contrast_label(name=name), "status": "read",
             "treatment": first, "reference": second, "metric": "brier",
-            "point": result.reading.point, "lower": result.reading.lower,
-            "upper": result.reading.upper, "kish_blocks": result.kish_blocks,
-            "kish_segments": result.kish_segments, "widening": result.widening,
-            "n_rows": result.n_rows, "n_resamples": result.n_resamples,
-            "seeds": {a_: list(held[a_]) for a_ in (first, second)}, "interim": rows != "test",
+            "point": float(diff[ok].mean()) if ok.any() else float("nan"),
+            "n_rows": int(ok.sum()), "seeds": list(core.POSTHOC_SYNTHETIC_SEEDS),
+            "note": SINGLE_SEED_NOTE, "interim": rows != "test",
         }  # fmt: skip
-    return {n: out[n] for n in SYNTHETIC_SPECS}
+    return out
+
+
+def synthetic_arm_table(*, root: Path, fit_root: Path, rows: str) -> dict[str, dict[str, Any]]:
+    """Return, for each arm of `SYNTHETIC_TABLE_ARMS`, how many passes were stored and how it scores.
+
+    The entry holds `stop_on` (the loss that picked the stored pass), `stored_pass`, `passes` (the
+    passes the fit ran), `val_sign_bce` (the validation sign cross-entropy at the stored pass),
+    and `brier` (the mean Brier score of the sign over the scored half-hours at seed 0). An arm
+    whose fit record or archive does not exist is left out.
+
+    Args:
+        root: The data folder of the main run (read only).
+        fit_root: The data folder of the post hoc fits (read only here).
+        rows: "test" or "validation".
+
+    Returns:
+        The table, by arm name.
+    """
+    root_of = {a: (fit_root if where == "posthoc" else root) for a, where in SYNTHETIC_TABLE_ARMS}
+    present, keep, truth = _scored_arrays(root=root, root_of=root_of, arms=list(root_of), rows=rows)
+    out: dict[str, dict[str, Any]] = {}
+    for arm, arrays in present.items():
+        path = fit.record_path(root=root_of[arm], arm=arm, fold=None, seed=0)
+        if not path.exists():
+            continue
+        record = json.loads(path.read_text())
+        history = record["history"]
+        stored = int(record["stored_pass"])
+        brier = _brier(p=arrays["p_neg"], truth=truth, keep=keep)
+        out[arm] = {
+            "post_hoc": True, "stop_on": record.get("stop_on", core.STOP_ON_TOTAL),
+            "stored_pass": stored, "passes": len(history["val"]),
+            "val_sign_bce": float(history["val_bce"][stored - 1]),
+            "brier": float(np.nanmean(brier)), "interim": rows != "test",
+        }  # fmt: skip
+    return out
 
 
 def posthoc_readings(
-    *, root: Path, rows: str = "test", n_resamples_real: int | None = None,
-    n_resamples_synthetic: int | None = None,
-) -> dict[str, Any]:  # fmt: skip
-    """Return the six post hoc contrasts, each labelled post hoc, with the level they share.
+    *, root: Path, rows: str = "test", n_resamples_real: int | None = None
+) -> dict[str, Any]:
+    """Return the four post hoc contrasts and the synthetic arms' stored passes, all labelled post hoc.
+
+    The level (`core.LEVEL`) is that of the two real-fold contrasts' intervals.
 
     A contrast whose arms lack the required forecasts is `void` with the reason, so a run that
     stopped at the cost cap is read as far as it went. `post_hoc_run` carries the state of the run
@@ -244,9 +281,7 @@ def posthoc_readings(
     status_path = root / st.POSTHOC_STATUS
     contrasts = {
         **real_contrasts(root=root, fit_root=fit_root, rows=rows, n_resamples=n_resamples_real),
-        **synthetic_contrasts(
-            root=root, fit_root=fit_root, rows=rows, n_resamples=n_resamples_synthetic
-        ),
+        **synthetic_contrasts(root=root, fit_root=fit_root, rows=rows),
     }
     return {
         "post_hoc": True, "rows": rows, "level": core.LEVEL, "code_version": core.CODE_VERSION,
@@ -257,6 +292,7 @@ def posthoc_readings(
             else None
         ),
         "contrasts": {n: contrasts[n] for n in (*REAL_SPECS, *SYNTHETIC_SPECS)},
+        "synthetic_arms": synthetic_arm_table(root=root, fit_root=fit_root, rows=rows),
     }  # fmt: skip
 
 
@@ -276,8 +312,21 @@ def read_line(*, name: str, entry: Mapping[str, Any]) -> str:
         )
     return (
         f"{label}, {entry['treatment']} minus {entry['reference']}, Brier score of the sign: "
-        f"{entry['point']:+.5f} (interval {entry['lower']:+.5f} to {entry['upper']:+.5f}, "
-        f"{entry['n_rows']} half-hours)."
+        f"{entry['point']:+.5f} ({SINGLE_SEED_NOTE}; {entry['n_rows']} half-hours)."
+    )
+
+
+def arm_line(*, arm: str, entry: Mapping[str, Any]) -> str:
+    """Return the report sentence on one synthetic arm's stored pass, labelled post hoc."""
+    rule = (
+        "the sign cross-entropy alone"
+        if entry["stop_on"] == core.STOP_ON_SIGN_BCE
+        else "the total loss"
+    )
+    return (
+        f"{arm} (post hoc table): stopped on {rule}; stored pass {entry['stored_pass']} of "
+        f"{entry['passes']} passes; validation sign cross-entropy {entry['val_sign_bce']:.4f}; "
+        f"Brier score of the sign {entry['brier']:.5f} (single seed, post hoc)."
     )
 
 
@@ -299,17 +348,21 @@ def render_report(*, readings: Mapping[str, Any], verdict_row: int | None) -> st
     interim = readings.get("rows") != "test"
     tag = " Every number is interim." if interim else ""
     lines = [
-        "# Post hoc readings of arms FS, YS, and YO, experiment 733",
+        "# Post hoc readings of arms FS, Y0b, YUb, and YOb, experiment 733",
         "",
         "The maintainer asked for these runs after seeing the verdict, so every number below is post hoc.",
-        "The timing gate had dropped FS (the forecaster given P(reverse flow) alone) and YT on cost.",
-        "FS and two new synthetic arms were fitted afterwards: YS (P(reverse flow) alone) and YO (the",
-        "true sign and solar output of the history, as an oracle). None is part of the verdict.",
+        "The timing gate had dropped FS (the forecaster given P(reverse flow) alone) on cost.",
+        "All six synthetic fits of the main run stored pass 1, so before any post hoc fit the manager set one check.",
+        "Y0b, YUb, and YOb (post hoc) are Y0, YU, and the oracle (the true sign and solar output of the history),",
+        "each fitted once, at seed 0, and stopped on the sign head's own validation cross-entropy (post hoc).",
         f"The verdict stays {row} whatever these readings show.",
         "A gain here is a lead for a follow-up, not a finding." + tag,
         "",
     ]
     lines += [read_line(name=n, entry=e) for n, e in readings["contrasts"].items()]
+    table = readings.get("synthetic_arms") or {}
+    if table:
+        lines += [""] + [arm_line(arm=a, entry=e) for a, e in table.items()]
     lines += ["", cost_line(cost=readings.get("cost"))]
     run = readings.get("post_hoc_run") or {}
     if run.get("state") in ("stopped", "failed") or run.get("failed"):
@@ -323,9 +376,9 @@ def render_report(*, readings: Mapping[str, Any], verdict_row: int | None) -> st
     lines += [
         "",
         (
-            "Each interval (post hoc) uses the method of the counted contrast of the same world: the "
-            "month-block bootstrap with a t widening on the real folds, and the two-way bootstrap on "
-            f"the synthetic world, at the level {PERCENT * readings['level']:.2f}%."
+            "Each interval (post hoc) of P1 and P2 uses the month-block bootstrap with a t widening, at "
+            f"the level {PERCENT * readings['level']:.2f}%. P3 and P4 have no interval: they are single-seed "
+            "point differences (post hoc)."
         ),
     ]
     if len(lines) > MAX_REPORT_LINES:
@@ -335,7 +388,10 @@ def render_report(*, readings: Mapping[str, Any], verdict_row: int | None) -> st
 
 
 def figure_rows(*, readings: Mapping[str, Any]) -> pl.DataFrame:
-    """Return the plotted rows: panel, label, point, lower, upper (real in percent of the reference)."""
+    """Return the plotted rows: panel, label, point, lower, upper (real in percent of the reference).
+
+    The synthetic rows have no interval, so their `lower` and `upper` are null.
+    """
     rows = []
     for entry in readings["contrasts"].values():
         if entry.get("status") != "read":
@@ -345,7 +401,7 @@ def figure_rows(*, readings: Mapping[str, Any]) -> pl.DataFrame:
             vals = [PERCENT * rel[k] for k in ("point", "lower", "upper")]
             panel = "real"
         else:
-            vals = [entry[k] for k in ("point", "lower", "upper")]
+            vals = [entry["point"], None, None]
             panel = "synthetic"
         rows.append(
             {
@@ -367,7 +423,9 @@ def figure_rows(*, readings: Mapping[str, Any]) -> pl.DataFrame:
 
 
 def contrast_figure(*, readings: Mapping[str, Any]) -> Any:
-    """Return the figure of the six contrasts with their intervals; every label says post hoc.
+    """Return the figure of the four contrasts; every label says post hoc.
+
+    The real contrasts carry intervals; the single-seed synthetic ones are dots without an interval.
 
     Raises:
         ValueError: When no contrast has a reading to draw.
@@ -380,10 +438,10 @@ def contrast_figure(*, readings: Mapping[str, Any]) -> Any:
         msg = "no post hoc contrast has a reading to draw"
         raise ValueError(msg)
     level = f"{PERCENT * readings['level']:.2f}%"
-    colours = {"FS": figures729.GREEN, "YS": figures729.ORANGE, "YO": figures729.PURPLE}
+    colours = {"FS": figures729.GREEN, "YUb": figures729.ORANGE, "YOb": figures729.PURPLE}
     spec = {
         "real": "Difference in CRPS at D8, post hoc (% of the reference arm's CRPS; negative: FS better)",
-        "synthetic": "Difference in sign Brier score, post hoc (negative: first arm better)",
+        "synthetic": "Difference in sign Brier score, post hoc, single seed (negative: first arm better)",
     }
     charts = []
     for panel, x_title in spec.items():
@@ -397,21 +455,25 @@ def contrast_figure(*, readings: Mapping[str, Any]) -> Any:
             scale=alt.Scale(domain=arms, range=[colours[a] for a in arms]),
         )  # fmt: skip
         base = alt.Chart(part).encode(y=alt.Y("label:N", sort=order, title=None))  # ty: ignore[unresolved-attribute]
-        bars = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("lower:Q", title=x_title), x2="upper:Q", color=colour
+        dots = base.mark_circle(size=70).encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("point:Q", title=x_title), color=colour
         )
-        dots = base.mark_circle(size=70).encode(x="point:Q", color=colour)  # ty: ignore[unresolved-attribute]
         zero = (
             alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(strokeDash=[4, 3], color="#555555")
             .encode(x="x:Q")
         )
-        charts.append(
-            (bars + dots + zero).properties(width=figures729.WIDTH_PX - 170, height=30 * len(order))
-        )
+        layers = dots + zero
+        if panel == "real":
+            bars = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
+                x="lower:Q", x2="upper:Q", color=colour
+            )
+            layers = bars + layers
+        charts.append(layers.properties(width=figures729.WIDTH_PX - 170, height=30 * len(order)))
     title = [
-        "Post hoc contrasts P1 to P6 of FS, YS, and YO, set after the verdict; report only.",
-        f"Dot: estimate. Line: {level} interval. Dashed rule: no difference.",
+        "Post hoc contrasts P1 to P4 of FS, Y0b, YUb, and YOb, set after the verdict; report only.",
+        f"Dot: estimate. Line: {level} interval (real folds only; single-seed synthetic: no interval).",
+        "Dashed rule: no difference.",
     ]
     return alt.vconcat(*charts).properties(title=alt.TitleParams(title, anchor="start"))
 
@@ -437,7 +499,7 @@ def write_outputs(*, root: Path, readings: Mapping[str, Any]) -> dict[str, Path]
 
 
 def stage_posthoc_score(args: argparse.Namespace, root: Path) -> dict[str, Any]:
-    """Run the `posthoc_score` stage: read P1 to P6 and write the three files under `posthoc/`.
+    """Run the `posthoc_score` stage: read P1 to P4 and write the three files under `posthoc/`.
 
     The stage runs after a post hoc run that ended complete, failed, or stopped (at the cost cap or
     by Ctrl-C). It reads what exists: a contrast whose arms lack all required seeds on the test
@@ -462,4 +524,6 @@ def stage_posthoc_score(args: argparse.Namespace, root: Path) -> dict[str, Any]:
     write_outputs(root=root, readings=readings)
     for name, entry in readings["contrasts"].items():
         print(read_line(name=name, entry=entry))
+    for arm, entry in readings["synthetic_arms"].items():
+        print(arm_line(arm=arm, entry=entry))
     return readings

@@ -11,7 +11,10 @@ Two loops share the batch and loss helpers:
   part of the age-3 row on 10% of training samples, and of ages 2 to 5 on another 10%.
 - `train_synthetic`: one stage on the synthetic forecasting world: AdamW at 5e-4 with weight decay
   1e-3, batch 256, gradient clip 1.0, at most 40 passes with a patience of 20 on the validation loss,
-  which is the mixture negative log-likelihood plus the sign head's cross-entropy, each with weight 1.0.
+  which is the mixture negative log-likelihood plus the sign head's cross-entropy, each with
+  weight 1.0
+  (the post hoc arms Y0b, YUb, and YOb store the pass of the lowest validation sign cross-entropy
+  alone and count the patience on it, and train on the same sum).
 
 Both loops record, for every pass, the training loss and the validation loss (`History`), and the
 pass whose state was stored, so that the loss curves are drawn from stored data and not from a log.
@@ -693,10 +696,12 @@ def train_synthetic(  # noqa: PLR0912
     patience: int = core.SYNTHETIC_PATIENCE,
     batch_size: int = core.SYNTHETIC_BATCH,
     max_steps: int | None = None,
+    stop_on: str = core.STOP_ON_TOTAL,
 ) -> History:  # fmt: skip
     """Train the synthetic forecaster in place (one stage).
 
-    The network is left at the state of the best validation loss.
+    The network is left at the state of the best validation loss, or of the lowest validation sign
+    BCE when `stop_on` is `core.STOP_ON_SIGN_BCE`.
 
     The loop trains the whole network from the random start of `net`, with the channel masks of the
     real folds applied to the channels only, and stops on the validation bank. No test row is read.
@@ -716,10 +721,22 @@ def train_synthetic(  # noqa: PLR0912
         patience: Passes without improvement before stopping.
         batch_size: The batch size.
         max_steps: Stops after this many steps (the checks run a few).
+        stop_on: `core.STOP_ON_TOTAL` stores the pass of the lowest validation loss (the sum of the
+            mixture NLL and the sign BCE) and counts the patience on that loss.
+            `core.STOP_ON_SIGN_BCE` does both on the sign head's own validation BCE; the network
+            still trains on the sum of the two losses.
 
     Returns:
         The per-pass history, with the stored pass marked.
+
+    Raises:
+        ValueError: When `stop_on` is neither of the two criteria.
     """
+    if stop_on not in (core.STOP_ON_TOTAL, core.STOP_ON_SIGN_BCE):
+        msg = (
+            f"stop_on must be {core.STOP_ON_TOTAL!r} or {core.STOP_ON_SIGN_BCE!r}, not {stop_on!r}"
+        )
+        raise ValueError(msg)
     started = time.monotonic()
     if not isinstance(train_segments, sy.PackedBank):
         train_segments = sy.pack_segments(segments=train_segments)
@@ -772,8 +789,9 @@ def train_synthetic(  # noqa: PLR0912
         hist.val.append(val)
         hist.val_nll.append(v_nll)
         hist.val_bce.append(v_bce)
-        if val < best - 1e-5:
-            best, stale, hist.stored_pass = val, 0, epoch + 1
+        criterion = v_bce if stop_on == core.STOP_ON_SIGN_BCE else val
+        if criterion < best - 1e-5:
+            best, stale, hist.stored_pass = criterion, 0, epoch + 1
             best_state = {k: v.detach().clone() for k, v in net.state_dict().items()}
         else:
             stale += 1
@@ -783,7 +801,8 @@ def train_synthetic(  # noqa: PLR0912
             break
     else:
         hist.cap_hit = True
-    hist.still_falling = hist.cap_hit and len(hist.val) > 1 and hist.val[-1] < hist.val[-2]
+    curve = hist.val_bce if stop_on == core.STOP_ON_SIGN_BCE else hist.val
+    hist.still_falling = hist.cap_hit and len(curve) > 1 and curve[-1] < curve[-2]
     if best_state is None and max_steps is None:
         msg = "the synthetic fit stored no state: no pass improved on an infinite loss"
         raise NonFiniteLossError(msg)

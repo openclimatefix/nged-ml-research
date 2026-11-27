@@ -313,8 +313,8 @@ SyntheticLoader = Callable[[str, int, str], SyntheticInputs]
 def synthetic_mode(*, arm: str) -> str:
     """Return the channel mode of a synthetic arm.
 
-    The modes are `absent` (Y0), `untangled` (YU), `true` (YT), and `p_neg` (YS, which reads P(X<0)
-    alone).
+    The modes are `absent` (Y0 and Y0b), `untangled` (YU and YUb), `true` (YT and YOb), and `p_neg`
+    (a channel subset of P(X<0) alone, which no synthetic arm reads now).
     """
     spec = core.ARMS[arm]
     if spec.where != "synthetic":
@@ -344,7 +344,7 @@ def fit_synthetic(
 
     Args:
         root: This experiment's data folder.
-        arm: Y0, YU, YT, or YS.
+        arm: Y0, YU, YT, Y0b, YUb, or YOb.
         seed: The seed.
         device: "cuda" or "cpu".
         loader: Builds the fit's inputs.
@@ -369,12 +369,14 @@ def fit_synthetic(
         net=net, train_segments=inputs.train_segments, train_index=inputs.train_index,
         val_segments=inputs.val_segments, val_index=inputs.val_index, seed=seed, mode=mode,
         d8_index=inputs.d8_index, target_std=inputs.target_std, device=device,
+        stop_on=core.ARMS[arm].stop_on,
         **({} if max_epochs is None else {"max_epochs": max_epochs}),
     )  # fmt: skip
     save_state(state=net.state_dict(), path=network_path(root=root, arm=arm, fold=None, seed=seed))
     record = {
         "code_version": core.CODE_VERSION, "arm": arm, "fold": None, "seed": seed,
-        "device": device, "mode": mode, "history": history.as_dict(),
+        "device": device, "mode": mode, "stop_on": core.ARMS[arm].stop_on,
+        "history": history.as_dict(),
         "stored_pass": history.stored_pass, "cap_hit": history.cap_hit,
         "still_falling": history.still_falling, "n_train": len(inputs.train_index),
         "n_val": len(inputs.val_index), "seconds": round(time.monotonic() - started, 1),

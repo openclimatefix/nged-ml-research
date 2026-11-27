@@ -678,18 +678,20 @@ nights. The slices are report-only, and C1's sign depends on December 2025.
 
 ## Post hoc runs requested after the verdict
 
-**After seeing the verdict, the maintainer asked for two further fits, and the page reports them as
+**After seeing the verdict, the maintainer asked for further fits, and the page reports them as
 report-only readings that change no verdict.** The first is FS, the forecaster that reads P(reverse
-flow) alone, on the real folds. The second is a synthetic arm YS, the forecaster of reverse flow
-that reads P(reverse flow) alone, on the synthetic world. The maintainer's reason is that the
-transfer-step signal is poor (recall of 7.7% on the simulated steps of 5 points or more in
-experiment
-732) and may destroy a gain from P(reverse flow) alone. The timing gate dropped FS on cost, so R1
-     (FS minus M\*) and R2 (FU minus FS) are void in the table above, and the fits are requested to
-     fill that gap.
+flow) alone, on the real folds. The maintainer's reason is that the transfer-step signal is poor
+(recall of 7.7% on the simulated steps of 5 points or more in experiment 732) and may destroy a
+gain from P(reverse flow) alone. The timing gate dropped FS on cost, so R1 (FS minus M\*) and R2
+(FU minus FS) are void in the table above, and the fits are requested to fill that gap. The second
+is a one-seed check on the synthetic world: Y0b, YUb, and YOb are the forecasters Y0, YU, and the
+oracle, fitted at seed 0 and stopped on the sign head's own validation cross-entropy, because all
+six synthetic fits of the main run stored pass 1. The ruling in "What changed from the plan and
+what limits the page" gives the stopping rule and the cost.
 
-**Neither fit has run when this page is written.** The fits use the plan's recipe and bars. They add
-no counted contrast and no Bonferroni correction, and every interval is read at 98.75%.
+**Neither set of fits has run when this page is written.** The fits use the plan's recipe and bars.
+They add no counted contrast and no Bonferroni correction, and every interval of the real folds is
+read at 98.75%. The synthetic check reports point differences only.
 
 POSTHOC_RESULTS_PENDING
 
@@ -779,6 +781,39 @@ and had computed R9 and R10 as void for want of FS. The ruling was made after th
 any R9 or R10 value was read: R9 and R10 now read FU and M\*, each records the arms it read and the
 arm the gate dropped, and the figures name the missing arm. R1 and R2 (which need FS) and R5 (which
 needs YT) stay void. Nothing in the verdict, the contrasts, the bars, or the stop line changed.
+
+**FS and a one-seed synthetic check run post hoc and report-only (ruling of the design lead,
+2026-11-27, set before any post hoc fit).** The maintainer asked for the runs after seeing the
+verdict (row 7, not supported), because the transfer-step channel may be so noisy that it hides the
+gain of P(reverse flow) alone. The timing gate had dropped FS and YT on cost. After the first scored
+fits, the finding that all six synthetic fits of the main run (Y0, and YU at seeds 0 to 2) stored
+pass 1 led the manager to replace the synthetic arm YS and the three-seed oracle YO by one
+pre-registered check. In those six fits the validation loss, the mixture negative log-likelihood
+plus the sign binary cross-entropy, rose from pass 1 while the training loss fell, the patience of
+20 stopped each fit at pass 21, and the sign head's own validation cross-entropy stayed flat (0.116
+to 0.122). The check is three fits at seed 0 only, named Y0b, YUb, and YOb. They are the same
+forecasters as Y0, YU, and the oracle. The oracle reads the true sign and the true unmetered solar
+output of the history half-hours strictly before the origin, with no untangler and the transfer-step
+channel absent. The three fits are stopped on the sign head's own validation binary cross-entropy:
+the stored network is the pass with the lowest validation sign cross-entropy, the patience of 20
+counts passes on that loss alone, and the fit has at most 40 passes. Every other setting is
+unchanged (the learning rate, the weight decay, the batch size, the gradient clipping, and the loss
+weights), so each network still trains on the sum of the mixture negative log-likelihood and the
+sign cross-entropy, and only the stopping and storing criterion changes. This is the one stopping
+rule, chosen before any post hoc fit. YS is dropped because FS on the real folds already asks the
+question of P(reverse flow) alone. The cost is about 1.5 GPU-process-hours for FS (24 fits) and
+about 1.8 for the three synthetic fits (roughly 35 minutes each). With the main chain's 7.2 hours,
+the total comes to about 10.5, against the absolute stop line of 12 and a cost cap of 11.9. If the
+check shows that the history signals matter, seeds 1 and 2 are not run without the maintainer's
+decision. The stage `posthoc` fits FS first, then Y0b, YUb, and YOb, and does not start a fit when
+the running total of measured hours plus the fit's expected hours would pass the cap; the last
+arm started is the first skipped, and the stage then ends with exit code 3. Four contrasts are
+read, each labelled post hoc. P1 is FS minus FU and P2 is FS minus M\*, on the CRPS of D8 with the
+month-block bootstrap and t widening of C1. P3 is YOb minus Y0b and P4 is YUb minus Y0b, on the
+Brier score of the sign, as point differences only, labelled "single seed, post hoc, no interval
+claim". Beside them, the report lists each synthetic arm's stored pass, its validation sign
+cross-entropy, and its Brier score on the test half-hours, with Y0 and YU of the main run (pass 1
+stored). The verdict, the counted contrasts, the bars, and the tables do not change.
 
 **The attention cases all come from fold 2026-05, and M\* is drawn through F0r.** The pipeline of
 experiment 713 fixes its fold when it is imported, so a process opens one fold (the first attempt

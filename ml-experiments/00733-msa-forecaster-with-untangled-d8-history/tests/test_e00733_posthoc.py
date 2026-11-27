@@ -27,34 +27,62 @@ from test_e00733_scoring_synth import world_root  # noqa: F401
 pytest.importorskip("torch")
 
 
-# --------------------------------------------------------------------------- the arm YS
+# --------------------------------------------------------------------------- the post hoc arms
 
 
-def test_ys_is_a_post_hoc_arm_outside_the_chain() -> None:
-    """YS reads P(X<0) alone on the synthetic world, seeds 0 to 2, and is no family of the chain."""
-    spec = core.ARMS["YS"]
-    assert spec.post_hoc and spec.where == "synthetic" and spec.sign_head and not spec.counted
-    assert spec.channels and spec.channel_subset == ("p_neg",) and spec.seeds == (0, 1, 2)
-    assert "YS" not in st.FAMILIES and "YS" not in core.FIT_ORDER
-    assert "YS" not in core.REPORT_ONLY_ARMS and core.POST_HOC_ARMS == ("YO", "FS", "YS")
-    assert st.family_jobs(family="YS") == [("YS", None, s) for s in (0, 1, 2)]
+def test_the_b_arms_are_post_hoc_synthetic_arms_outside_the_chain() -> None:
+    """Y0b, YUb, and YOb are one-seed synthetic arms that stop on the sign BCE and join no chain family."""
+    for name in ("Y0b", "YUb", "YOb"):
+        spec = core.ARMS[name]
+        assert spec.post_hoc and spec.where == "synthetic" and spec.sign_head and not spec.counted
+        assert spec.seeds == (0,) and spec.stop_on == core.STOP_ON_SIGN_BCE
+        assert name not in st.FAMILIES and name not in core.FIT_ORDER
+        assert name not in core.REPORT_ONLY_ARMS and name not in core.DROP_ORDER
+        assert st.family_jobs(family=name) == [(name, None, 0)]
+    assert core.ARMS["YUb"].channels and core.ARMS["YOb"].true_channels
+    assert not core.ARMS["Y0b"].channels and not core.ARMS["Y0b"].true_channels
+    assert core.POST_HOC_ARMS == ("FS", "Y0b", "YUb", "YOb")
+    assert st.POSTHOC_FAMILIES == core.POST_HOC_ARMS
+    assert {a for a, s_ in core.ARMS.items() if s_.post_hoc} == {"Y0b", "YUb", "YOb"}
+    assert "YS" not in core.ARMS and "YO" not in core.ARMS
     assert st.family_jobs(family="FS") == [
         ("FS", f, s) for f in core.ALL_FOLDS for s in core.PLACEBO_SEEDS
     ]  # fmt: skip
 
 
-def test_yo_is_a_post_hoc_oracle_arm_outside_the_chain() -> None:
-    """YO reads the true sign and solar output of the history on the synthetic world, seeds 0 to 2."""
-    spec = core.ARMS["YO"]
-    assert spec.post_hoc and spec.where == "synthetic" and spec.sign_head and not spec.counted
-    assert spec.true_channels and not spec.channels and spec.seeds == (0, 1, 2)
-    assert "YO" not in st.FAMILIES and "YO" not in core.FIT_ORDER
-    assert st.family_jobs(family="YO") == [("YO", None, s) for s in (0, 1, 2)]
-    assert st.POSTHOC_FAMILIES == ("YO", "FS", "YS")
+def test_the_main_arms_keep_stopping_on_the_total_loss() -> None:
+    """Every arm of the main chain stops on the sum of the two losses, as before."""
+    assert {n for n, a in core.ARMS.items() if a.stop_on == core.STOP_ON_SIGN_BCE} == {
+        "Y0b", "YUb", "YOb",
+    }  # fmt: skip
 
 
-def test_ys_changes_neither_the_projection_nor_the_timing_gate() -> None:
-    """The projected hours count the 92 real and 9 synthetic fits of the chain, as before YS."""
+def test_the_b_arm_names_do_not_collide_with_the_main_arms_files() -> None:
+    """No job name, record, or prediction folder of a b-arm equals one of the main arms, in any case."""
+    main = [a for a, spec in core.ARMS.items() if not spec.post_hoc]
+    b_arms = [a for a, spec in core.ARMS.items() if spec.post_hoc]
+    names = {
+        a: [fit.job_name(arm=a, fold=f, seed=s) for f in (core.ARMS[a].folds or (None,)) for s in core.SYNTHETIC_SEEDS]
+        for a in (*main, *b_arms)
+    }  # fmt: skip
+    main_files = {n.lower() for a in main for n in names[a]}
+    b_files = [n.lower() for a in b_arms for n in names[a]]
+    assert not main_files & set(b_files)
+    assert len(set(b_files)) == len(b_files)
+    assert "y0b_s0" in b_files and "y0_s0" in main_files
+    sets = {
+        st_
+        for a in b_arms
+        for s in core.SYNTHETIC_SEEDS
+        if (st_ := ss.store.set_name(arm=a, fold=None, seed=s))
+    }
+    assert not sets & {
+        ss.store.set_name(arm=a, fold=None, seed=s) for a in main for s in core.SYNTHETIC_SEEDS
+    }
+
+
+def test_the_b_arms_change_neither_the_projection_nor_the_timing_gate() -> None:
+    """The projected hours count the 92 real and 9 synthetic fits of the chain only."""
     hours = core.projected_hours(seconds_per_real_fit=100.0, seconds_per_synthetic_fit=1000.0)
     assert hours == pytest.approx((92 * 100.0 + 9 * 1000.0) / 3600.0)
     decision = st.timing_decision(
@@ -63,44 +91,24 @@ def test_ys_changes_neither_the_projection_nor_the_timing_gate() -> None:
         peak_gpu_gb=3.0,
         peak_rss_gb=8.0,
     )
-    assert "YS" not in decision["dropped"] and "YS" not in decision["not_fitted"]
+    for name in ("Y0b", "YUb", "YOb"):
+        assert name not in decision["dropped"] and name not in decision["not_fitted"]
 
 
-def test_the_synthetic_mode_of_ys_is_p_neg_alone() -> None:
-    """Y0, YU, YT, and YS each have their own mode."""
-    modes = {a: fit.synthetic_mode(arm=a) for a in ("Y0", "YU", "YT", "YS", "YO")}
-    assert modes == {"Y0": "absent", "YU": "untangled", "YT": "true", "YS": "p_neg", "YO": "true"}
-
-
-def test_ys_inputs_hold_p_neg_and_flag_the_other_channels_absent_where_yu_holds_all_three() -> None:
-    """On the same segments and rows, YS and YU read the same P(X<0) and the same flags, and YS has
-    the solar and transfer-step channels at zero, as FS has them on the real folds."""
-    segs = [make_segment(n_days=40, seed=1), make_segment(n_days=45, seed=2)]
-    idx = sy.enumerate_samples(segments=segs)
-    rows = np.arange(0, 60, 3)
-    gathered = {
-        arm: sy.gather_batch(
-            segments=segs, index=idx, rows=rows, d8_index=0, target_std=2.0,
-            mode=fit.synthetic_mode(arm=arm),
-        ).arrays
-        for arm in ("YU", "YS")
+def test_the_synthetic_mode_of_each_b_arm_is_that_of_its_main_arm() -> None:
+    """Y0b reads no channel, YUb the untangled channels, and YOb the true sign and solar output."""
+    modes = {a: fit.synthetic_mode(arm=a) for a in ("Y0", "YU", "YT", "Y0b", "YUb", "YOb")}
+    assert modes == {
+        "Y0": "absent", "YU": "untangled", "YT": "true", "Y0b": "absent", "YUb": "untangled",
+        "YOb": "true",
     }  # fmt: skip
-    yu, ys = gathered["YU"], gathered["YS"]
-    assert yu["hist_u_ok"].any() and np.array_equal(yu["hist_u_ok"], ys["hist_u_ok"])
-    assert (yu["hist_u"][..., 0][yu["hist_u_ok"]] > 0).any()
-    assert np.array_equal(yu["hist_u"][..., 0], ys["hist_u"][..., 0])
-    for channel in (1, 2):
-        assert (yu["hist_u"][..., channel] != 0).any(), "YU holds this channel"
-        assert not ys["hist_u"][..., channel].any(), "YS flags this channel absent"
-    for name in ("hist_power", "hist_weather", "top_weather", "hist_visible"):
-        assert np.array_equal(yu[name], ys[name]), name
 
 
-@pytest.mark.parametrize("arm", ["YU", "YS", "YO"])
-def test_the_origin_time_weather_assertion_runs_for_yu_ys_and_yo(
+@pytest.mark.parametrize("arm", ["YU", "YUb", "YOb"])
+def test_the_origin_time_weather_assertion_runs_for_yu_and_the_b_arms(
     arm: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Every synthetic batch asserts that the weather is that of the origin time, YS and YO as YU."""
+    """Every synthetic batch asserts that the weather is that of the origin time."""
     calls: list[int] = []
     real = sy.OriginTimes.assert_origin_time_weather
 
@@ -131,8 +139,8 @@ def _perturbed(
     return replace(seg, x_neg=x, solar_points=solar)
 
 
-def test_yo_reads_the_true_channels_of_history_half_hours_before_the_origin_only() -> None:
-    """Perturbing the truth at and after the origin leaves YO's input tensors unchanged, perturbing a
+def test_yob_reads_the_true_channels_of_history_half_hours_before_the_origin_only() -> None:
+    """Perturbing the truth at and after the origin leaves YOb's input tensors unchanged, perturbing a
     visible history half-hour changes them, and the channels are the true sign and solar output."""
     seg = make_segment(n_days=40, seed=4)
     idx = sy.enumerate_samples(segments=[seg])
@@ -140,7 +148,7 @@ def test_yo_reads_the_true_channels_of_history_half_hours_before_the_origin_only
     rows = np.flatnonzero((idx.origin_day == day) & (idx.lead_index == lead))
     assert len(rows) == 1
     origin = day * sy.STEPS + 24
-    mode = fit.synthetic_mode(arm="YO")
+    mode = fit.synthetic_mode(arm="YOb")
 
     def gather(s: sy.SegmentArrays) -> dict[str, np.ndarray]:
         return sy.gather_batch(
@@ -190,59 +198,91 @@ def test_yo_reads_the_true_channels_of_history_half_hours_before_the_origin_only
 # --------------------------------------------------------------------------- the readings
 
 
-def _fit_root_with_ys(root: Path) -> Path:
-    """Copy YU's archive to YS's and YO's place in the post hoc folder, so both equal YU."""
+B_ARMS = ("y0b_s0", "yub_s0", "yob_s0")
+
+
+def _fit_root_with_b_arms(root: Path, *, skip: tuple[str, ...] = ()) -> Path:
+    """Copy YU's archive to each b-arm's place in the post hoc folder, so every b-arm equals YU."""
     fit_root = st.posthoc_fit_root(root=root)
-    for arm in ("ys_s0", "yo_s0"):
-        shutil.copytree(root / "predictions" / "yu_s0", fit_root / "predictions" / arm)
+    for arm in B_ARMS:
+        if arm not in skip:
+            shutil.copytree(root / "predictions" / "yu_s0", fit_root / "predictions" / arm)
     return fit_root
 
 
-def test_synthetic_contrasts_read_ys_from_the_post_hoc_folder(world_root: Path) -> None:  # noqa: F811
-    """P3 equals C4's reading when YS equals YU, P4 is zero, and both carry the post hoc label."""
-    fit_root = _fit_root_with_ys(world_root)
-    got = ph.synthetic_contrasts(
-        root=world_root, fit_root=fit_root, rows="validation", n_resamples=50
+def test_synthetic_contrasts_read_the_b_arms_from_the_post_hoc_folder_as_point_differences(
+    world_root: Path,  # noqa: F811
+) -> None:
+    """With every b-arm equal to YU, P3 and P4 are zero, carry the single-seed note, and have no interval."""
+    fit_root = _fit_root_with_b_arms(world_root)
+    got = ph.synthetic_contrasts(root=world_root, fit_root=fit_root, rows="validation")
+    assert set(got) == {"P3", "P4"} and all(v["post_hoc"] is True for v in got.values())
+    assert got["P3"]["treatment"] == "YOb" and got["P3"]["reference"] == "Y0b"
+    assert got["P4"]["treatment"] == "YUb" and got["P4"]["reference"] == "Y0b"
+    assert got["P3"]["point"] == pytest.approx(got["P4"]["point"])
+    assert not {"lower", "upper"} & set(got["P3"]) and got["P3"]["seeds"] == [0]
+    assert got["P3"]["note"] == "single seed, post hoc, no interval claim"
+    assert "post hoc" in got["P3"]["label"] and "post hoc" in got["P4"]["label"]
+    # b-arms equal YU, so the reference Y0b equals YU too and every difference is zero
+    assert got["P3"]["point"] == pytest.approx(0.0) and got["P4"]["n_rows"] > 0
+
+
+def test_a_missing_b_arm_leaves_only_its_contrasts_unread(world_root: Path) -> None:  # noqa: F811
+    """Without the YOb archive, P3 says so and P4 is read."""
+    fit_root = _fit_root_with_b_arms(world_root, skip=("yob_s0",))
+    got = ph.synthetic_contrasts(root=world_root, fit_root=fit_root, rows="validation")
+    assert [got[n]["status"] for n in ("P3", "P4")] == ["void", "read"]
+    assert "YOb" in got["P3"]["reason"]
+    none = ph.synthetic_contrasts(root=world_root, fit_root=world_root / "empty", rows="validation")
+    assert {v["status"] for v in none.values()} == {"void"} and "Y0b" in none["P4"]["reason"]
+
+
+def _write_record(*, root: Path, arm: str, stored: int, val_bce: list[float], stop_on: str) -> None:
+    """Write a minimal synthetic fit record under `root` (the fields the table reads)."""
+    st.write_json(
+        path=fit.record_path(root=root, arm=arm, fold=None, seed=0),
+        payload={
+            "arm": arm, "stored_pass": stored, "stop_on": stop_on,
+            "history": {"val": [1.0] * len(val_bce), "val_bce": val_bce},
+        },
+    )  # fmt: skip
+
+
+def test_the_stored_pass_table_lists_each_arm_beside_the_main_runs_y0_and_yu(
+    world_root: Path,  # noqa: F811
+) -> None:
+    """Each arm's stored pass, passes run, validation sign BCE at the stored pass, and Brier score are read."""
+    fit_root = _fit_root_with_b_arms(world_root)
+    for arm in ("Y0", "YU"):
+        _write_record(
+            root=world_root, arm=arm, stored=1, val_bce=[0.116] + [0.12] * 20, stop_on="total"
+        )
+    for arm in ("Y0b", "YUb", "YOb"):
+        _write_record(
+            root=fit_root,
+            arm=arm,
+            stored=4,
+            val_bce=[0.3, 0.2, 0.15, 0.1, 0.12, 0.13],
+            stop_on="sign_bce",
+        )
+    table = ph.synthetic_arm_table(root=world_root, fit_root=fit_root, rows="validation")
+    assert set(table) == {"Y0", "YU", "Y0b", "YUb", "YOb"}
+    assert table["YU"]["stored_pass"] == 1 and table["YU"]["passes"] == 21
+    assert table["YU"]["val_sign_bce"] == pytest.approx(0.116)
+    assert table["YOb"]["stored_pass"] == 4 and table["YOb"]["passes"] == 6
+    assert (
+        table["YOb"]["val_sign_bce"] == pytest.approx(0.1) and table["YOb"]["stop_on"] == "sign_bce"
     )
-    main = ss.synthetic_readings(root=world_root, rows="validation", n_resamples=50)
-    assert set(got) == {"P3", "P4", "P5", "P6"} and all(v["post_hoc"] is True for v in got.values())
-    assert got["P3"]["point"] == pytest.approx(main["contrasts"]["C4"].reading.point)
-    assert got["P3"]["lower"] == pytest.approx(main["contrasts"]["C4"].reading.lower)
-    assert got["P3"]["upper"] == pytest.approx(main["contrasts"]["C4"].reading.upper)
-    assert got["P4"]["point"] == pytest.approx(0.0) and "post hoc" in got["P4"]["label"]
-    assert got["P3"]["treatment"] == "YS" and got["P3"]["reference"] == "Y0"
-    assert got["P4"]["reference"] == "YU" and got["P3"]["seeds"]["YS"] == [0]
-    assert got["P5"]["point"] == pytest.approx(got["P3"]["point"])
-    assert got["P6"]["point"] == pytest.approx(0.0) and got["P6"]["treatment"] == "YO"
-    assert got["P5"]["reference"] == "Y0" and "post hoc" in got["P5"]["label"]
-
-
-def test_a_missing_arm_leaves_only_its_contrasts_unread(world_root: Path) -> None:  # noqa: F811
-    """With YS but no YO archive, P3 and P4 are read, and P5 and P6 say which arm is missing."""
-    fit_root = _fit_root_with_ys(world_root)
-    shutil.rmtree(fit_root / "predictions" / "yo_s0")
-    got = ph.synthetic_contrasts(
-        root=world_root, fit_root=fit_root, rows="validation", n_resamples=50
+    assert 0.0 < table["Y0b"]["brier"] < 1.0 and table["Y0b"]["brier"] == pytest.approx(
+        table["YUb"]["brier"]
     )
-    assert [got[n]["status"] for n in ("P3", "P4", "P5", "P6")] == [
-        "read",
-        "read",
-        "void",
-        "void",
-    ]
-    assert "YO" in got["P5"]["reason"]
-
-
-def test_synthetic_contrasts_are_unread_without_the_ys_archive(world_root: Path) -> None:  # noqa: F811
-    """No YS archive leaves P3 and P4 unread with the reason, never a number."""
-    got = ph.synthetic_contrasts(
-        root=world_root,
-        fit_root=st.posthoc_fit_root(root=world_root),
-        rows="validation",
-        n_resamples=50,
+    assert all(v["post_hoc"] is True for v in table.values())
+    line = ph.arm_line(arm="YOb", entry=table["YOb"])
+    assert (
+        "stored pass 4 of 6 passes" in line
+        and "sign cross-entropy alone" in line
+        and "post hoc" in line
     )
-    assert {v["status"] for v in got.values()} == {"void"} and "YS" in got["P3"]["reason"]
-    assert "YO" in got["P5"]["reason"]
 
 
 def test_real_contrasts_read_fs_from_the_post_hoc_folder_and_the_rest_from_the_main_folder(
@@ -298,32 +338,39 @@ def _canned(*, rows: str = "test") -> dict[str, Any]:
     }  # fmt: skip
     syn = lambda name, p: {  # noqa: E731
         "post_hoc": True, "label": ph.contrast_label(name=name), "status": "read",
-        "treatment": "YS" if name in ("P3", "P4") else "YO",
-        "reference": "Y0" if name in ("P3", "P5") else "YU", "metric": "brier",
-        "point": p, "lower": p - 0.001, "upper": p + 0.001, "n_rows": 999,
+        "treatment": "YOb" if name == "P3" else "YUb", "reference": "Y0b", "metric": "brier",
+        "point": p, "n_rows": 999, "seeds": [0], "note": ph.SINGLE_SEED_NOTE,
+    }  # fmt: skip
+    arm = lambda stop_on, stored, passes: {  # noqa: E731
+        "post_hoc": True, "stop_on": stop_on, "stored_pass": stored, "passes": passes,
+        "val_sign_bce": 0.117, "brier": 0.0391,
     }  # fmt: skip
     return {
         "post_hoc": True, "rows": rows, "level": core.LEVEL,
-        "contrasts": {"P1": real("P1", 0.02), "P2": real("P2", -0.01), "P3": syn("P3", -0.002), "P4": syn("P4", 0.001), "P5": syn("P5", -0.003), "P6": syn("P6", -0.001)},
-        "cost": {"main_chain": 7.2, "per_arm": {"YO": 1.6, "FS": 1.5, "YS": 1.6}, "posthoc": 4.7, "running_total": 11.9},
+        "contrasts": {"P1": real("P1", 0.02), "P2": real("P2", -0.01), "P3": syn("P3", -0.002), "P4": syn("P4", 0.001)},
+        "synthetic_arms": {"Y0": arm("total", 1, 21), "YU": arm("total", 1, 21), "Y0b": arm("sign_bce", 6, 26), "YUb": arm("sign_bce", 9, 29), "YOb": arm("sign_bce", 12, 32)},
+        "cost": {"main_chain": 7.2, "per_arm": {"FS": 1.5, "Y0b": 0.6, "YUb": 0.6, "YOb": 0.6}, "posthoc": 3.3, "running_total": 10.5},
     }  # fmt: skip
 
 
 def test_the_report_is_short_plain_and_labels_every_number_post_hoc() -> None:
-    """At most 25 lines, the verdict stays, and each line that holds a digit says post hoc."""
+    """At most 30 lines, the verdict stays, and each line that holds a digit says post hoc."""
     text = ph.render_report(readings=_canned(), verdict_row=7)
     lines = text.splitlines()
-    assert len(lines) <= 25
+    assert len(lines) <= 30
     assert "after seeing the verdict" in text and "The verdict stays row 7 whatever" in text
     assert "dropped FS" in text and "a lead for a follow-up, not a finding" in text
+    assert "stored pass 1" in text and "all six synthetic fits" in text.lower().replace("\n", " ")
     for line in lines:
         if any(ch.isdigit() for ch in line) and "verdict stays" not in line:
             assert "post hoc" in line.lower(), line
-    assert (
-        "post hoc fits cost 4.70 GPU-process-hours" in text and "YO 1.60, FS 1.50, YS 1.60" in text
-    )
-    assert "running total is 11.90, against the stop line of 12" in text
-    assert all(f"P{i} (post hoc)" in text for i in range(1, 7))
+    assert "post hoc fits cost 3.30 GPU-process-hours" in text
+    assert "FS 1.50, Y0b 0.60, YUb 0.60, YOb 0.60" in text
+    assert "running total is 10.50, against the stop line of 12" in text
+    assert all(f"P{i} (post hoc)" in text for i in range(1, 5)) and "P5" not in text
+    assert text.count("single seed, post hoc, no interval claim") == 2
+    p3_line = next(line for line in lines if line.startswith("P3 (post hoc)"))
+    assert "significant" not in text.lower() and "interval (" not in p3_line
     unread = _canned()
     unread["contrasts"]["P1"] = ph.unread(
         name="P1", reason="a stored forecast of the plan is missing"
@@ -332,11 +379,16 @@ def test_the_report_is_short_plain_and_labels_every_number_post_hoc() -> None:
 
 
 def test_the_figure_says_post_hoc_in_every_label_and_the_title() -> None:
-    """Each contrast label and the title carry the words post hoc."""
+    """Each contrast label and the title carry the words post hoc, and the synthetic dots have no interval."""
     data = ph.figure_rows(readings=_canned())
-    assert data.height == 6 and all("post hoc" in x for x in data["label"].to_list())
+    assert data.height == 4 and all("post hoc" in x for x in data["label"].to_list())
+    synthetic = data.filter(pl.col("panel") == "synthetic")
+    assert synthetic.height == 2 and synthetic["lower"].null_count() == 2
     spec = json.dumps(ph.contrast_figure(readings=_canned()).to_dict())
-    assert spec.count("post hoc") >= 6 and "Post hoc contrasts P1 to P6 of FS, YS, and YO" in spec
+    assert (
+        spec.count("post hoc") >= 4
+        and "Post hoc contrasts P1 to P4 of FS, Y0b, YUb, and YOb" in spec
+    )
     assert f"{100 * core.LEVEL:.2f}% interval" in spec
 
 
@@ -366,10 +418,10 @@ def test_the_stage_writes_three_files_under_posthoc_and_nothing_else(
 
 
 def test_the_post_hoc_smoke_takes_only_the_post_hoc_arms() -> None:
-    """`--arms FS,YS` is accepted, and an arm of the chain or an unknown arm is refused."""
-    assert smokerun.parse_arms(text="FS,YS") == ("FS", "YS")
-    assert smokerun.parse_arms(text="YO,FS,YS") == ("YO", "FS", "YS")
-    for bad in ("FU", "FS,YU", "", "Z", "YT"):
+    """`--arms FS,Y0b,YUb,YOb` is accepted, and an arm of the chain or an unknown arm is refused."""
+    assert smokerun.parse_arms(text="FS,Y0b,YUb,YOb") == ("FS", "Y0b", "YUb", "YOb")
+    assert smokerun.parse_arms(text="YOb") == ("YOb",)
+    for bad in ("FU", "FS,YU", "", "Z", "YT", "YS", "YO"):
         with pytest.raises(smokerun.rt.RuntimeError733):
             smokerun.parse_arms(text=bad)
 
@@ -393,14 +445,16 @@ def test_the_post_hoc_smoke_writes_its_record_inside_the_scratch_folder_only(
     monkeypatch.setattr(pr, "predict_job", lambda **kw: [tmp_path / f"{kw['arm']}.out"])
     monkeypatch.setattr(smokerun, "read_stored_step", lambda **_: lambda arm, path: 5)
     before = sorted(p for p in root.rglob("*"))
-    args = argparse.Namespace(scratch=str(tmp_path / "scratch"), device="cpu", arms="YO,FS,YS")
+    args = argparse.Namespace(
+        scratch=str(tmp_path / "scratch"), device="cpu", arms="FS,Y0b,YUb,YOb"
+    )
     record = smokerun.stage_smoke(args, root)
     assert (
         record["pass"] is True
         and record["post_hoc"] is True
-        and record["arms"] == ["YO", "FS", "YS"]
+        and record["arms"] == ["FS", "Y0b", "YUb", "YOb"]
     )
-    assert ran == [("YO", None), ("FS", core.ARMS["FS"].folds[0]), ("YS", None)]
+    assert ran == [("FS", core.ARMS["FS"].folds[0]), ("Y0b", None), ("YUb", None), ("YOb", None)]
     written = tmp_path / "scratch" / root.name / smokerun.POSTHOC_SMOKE_FILE
     assert json.loads(written.read_text())["pass"] is True
     assert sorted(root.rglob("*")) == before
@@ -430,42 +484,29 @@ def test_a_stopped_run_is_read_as_far_as_it_went(
     world_root: Path,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """With the status `stopped` and YS at seeds 0 and 1 only, P3 and P4 are void and name the seeds
-    held, and P1, P2, P5, and P6 are computed; the report says what is missing."""
+    """With the status `stopped` and YOb missing, P3 is void and names YOb, and the others are computed."""
     fit_root = st.posthoc_fit_root(root=world_root)
     for arm in ("Y0", "YU"):
-        for seed in core.SYNTHETIC_SEEDS:
-            _copy_archive(
-                src_root=world_root, src_arm=arm, dst_root=world_root, dst_arm=arm, seed=seed
-            )
-    for seed in core.SYNTHETIC_SEEDS:
-        _copy_archive(src_root=world_root, src_arm="YU", dst_root=fit_root, dst_arm="YO", seed=seed)
-    for seed in (0, 1):
-        _copy_archive(src_root=world_root, src_arm="YU", dst_root=fit_root, dst_arm="YS", seed=seed)
+        _copy_archive(src_root=world_root, src_arm=arm, dst_root=world_root, dst_arm=arm, seed=0)
+    for arm in ("Y0b", "YUb"):
+        _copy_archive(src_root=world_root, src_arm="YU", dst_root=fit_root, dst_arm=arm, seed=0)
     st.write_posthoc_status(
         root=world_root,
         state="stopped",
         reason=st.COST_CAP_MESSAGE,
-        skipped=[{"job": "YS_s2"}],
+        skipped=[{"job": "YOb_s0"}],
         failed=[],
     )
     canned = _canned()["contrasts"]
     monkeypatch.setattr(ph, "real_contrasts", lambda **_: {"P1": canned["P1"], "P2": canned["P2"]})
-    readings = ph.posthoc_readings(root=world_root, rows="test", n_resamples_synthetic=50)
+    readings = ph.posthoc_readings(root=world_root, rows="test")
     status = {n: e["status"] for n, e in readings["contrasts"].items()}
-    assert status == {
-        "P1": "read",
-        "P2": "read",
-        "P3": "void",
-        "P4": "void",
-        "P5": "read",
-        "P6": "read",
-    }
-    assert "YS holds seeds [0, 1] of [0, 1, 2]" in readings["contrasts"]["P3"]["reason"]
+    assert status == {"P1": "read", "P2": "read", "P3": "void", "P4": "read"}
+    assert "YOb holds no archive of seed 0" in readings["contrasts"]["P3"]["reason"]
     assert readings["post_hoc_run"]["state"] == "stopped"
     text = ph.render_report(readings=readings, verdict_row=7)
-    assert "ended stopped" in text and "P3 (post hoc) was not read: YS holds seeds [0, 1]" in text
-    assert len(text.splitlines()) <= 25
+    assert "ended stopped" in text and "P3 (post hoc) was not read: YOb holds no archive" in text
+    assert len(text.splitlines()) <= 30
 
 
 def test_the_scratch_folder_of_the_post_hoc_smoke_may_not_lie_in_or_contain_the_data_folder(
@@ -475,7 +516,7 @@ def test_the_scratch_folder_of_the_post_hoc_smoke_may_not_lie_in_or_contain_the_
     root = tmp_path / "data" / "00733-x"
     (root / "scores").mkdir(parents=True)
     for scratch in (root / "scratch", root, tmp_path / "data", tmp_path):
-        args = argparse.Namespace(scratch=str(scratch), device="cpu", arms="YS")
+        args = argparse.Namespace(scratch=str(scratch), device="cpu", arms="YOb")
         with pytest.raises(st.GuardError):
             smokerun.stage_smoke_arms(args, root)
     assert not (root / "scratch").exists()
