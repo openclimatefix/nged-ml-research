@@ -285,10 +285,11 @@ weights and the noise scales fixed, and the page never calls it a Laplace approx
   temperature of 45 degrees gives exactly the AC capacity, where clipping before the derate would
   give 0.92 of it. The interpolation test checks a half-hour at the half-hour mark against the mean
   of its two neighbours.
-- **Interval.** The 80% interval of each quarter's capacity is the central 80% of the conditional
-  Gaussian posterior, with its variance multiplied by `(1 + r) / (1 - r)`, where `r` is the median
-  lag-1 autocorrelation of the whitened daylight residuals within each day. Bar B2 tests the
-  coverage.
+- **Interval.** The 80% interval of each quarter's capacity is the central 80% of a Gaussian
+  around the posterior mean, whose variance is the sandwich variance of the Student-t fit
+  ([Amendment 3](#amendment-3-to-the-plan-of-experiment-737-2026-11-28)) multiplied by
+  `(1 + r) / (1 - r)`, where `r` is the median lag-1 autocorrelation of the whitened daylight
+  residuals within each day. Bar B2 tests the coverage.
 - **Switching events.** The fit treats a switching event as step noise. The Student-t weights and
   the flat quarterly level absorb part of a step, and the page reports how far a 30-day transfer
   moves the capacity (P5, bar B7). The fit masks no event. Masking the called events is stage 4 of
@@ -760,7 +761,8 @@ page reports the count of scored quarters per Primary, and the dropped half-hour
 
 - The fit is a Bayesian linear regression with a Student-t likelihood (4 degrees of freedom), whose
   weights and daylight and night scales come from at most 30 expectation-maximisation iterations,
-  and a conditional Gaussian posterior at the converged weights.
+  and the posterior mean is the converged coefficients. Their variance is the sandwich variance of
+  the penalised Student-t likelihood (Amendment 3).
 - The inputs are the cleaned signed power, the CAMS irradiance (reliability 0.9 or more), the ERA5
   2 m temperature and 10 m wind speed, the solar position, and the calendar. Nothing else enters.
 - The solar term is `studies.pv_physics`' plane-of-array model for three orientations at the fixed
@@ -806,6 +808,20 @@ page reports the count of scored quarters per Primary, and the dropped half-hour
   ratio of 1.15).
 
 ### Limits
+
+**The posterior covariance `(X' W X)^-1` understates the variance when the noise is Gaussian, and
+the sandwich variance corrects that.** The Student-t density's daylight scale (0.287) is smaller
+than the Gaussian standard deviation of the noise in gate G1 (0.349), so the covariance at the
+converged weights is too small by about 1.5 times in variance (the ratio 0.349 squared over 0.287
+squared). On 42 Gaussian draws of the G1 series, the reported standard deviation was 0.87 of the
+empirical standard deviation of the capacity estimates, and the 80% interval covered 0.71 of the
+truth. The sandwich variance of [Amendment 3](#amendment-3-to-the-plan-of-experiment-737-2026-11-28)
+removes the mismatch without a tuned constant. It does not remove the ridge and prior shrinkage,
+which pulls each estimate about 0.3 standard deviations below the truth and keeps the coverage
+slightly under the nominal 0.80. It also ignores the uncertainty in the estimated noise scales.
+The sandwich variance is derived for independent rows, and the lag-1 inflation is the only
+correction for autocorrelation. Bar B2 on the injected worlds, whose noise is the real record's,
+is the test of both.
 
 **The baseline's ridge penalty shrinks the fitted capacity downwards, and the tuning chooses the
 ridge scale to limit that.** The 405 baseline columns explain 79% of the variance of the solar
@@ -1106,3 +1122,73 @@ the growth standard deviation on the tuning seeds, and both values are fixed bef
 fit. Gates G1 and G1b keep their thresholds, so the tuned ridge scale makes G1 pass only if the
 recovery lies within the bar, and no bar moves. The ridge scale is one more tuned value, and the
 page reports that the tuning and the scored worlds share the real history.
+
+## Amendment 3 to the plan of experiment 737 (2026-11-28)
+
+**Date:** 2026-11-28. The amendment applies before any scored fit. It follows the first run of
+gate G1 at the tuned values (ridge scale 0.1, growth standard deviation 0.15 MW a quarter), which
+recovered the capacity but failed the coverage bar.
+
+### Reason
+
+**Gate G1 recovered the capacity and failed its coverage bar, because the posterior variance of the
+Student-t fit is too small when the noise is Gaussian.** The recovery passed: the largest gap
+between the mean fitted and the injected capacity was 1.14% of the mean capacity against the bar of
+3%, and the recovered share was 0.994 (G1b passed at 0.990). The 80% interval covered 0.718 of the
+truth against the bar of 0.75 to 0.85. The fit's noise density is Student-t with 4 degrees of
+freedom, and its daylight scale on G1's series is 0.287 against the true Gaussian standard
+deviation of 0.349. The covariance `(X' W X)^-1` of the converged weights assumes the Student-t
+noise, so it understates the variance by about `(0.349 / 0.287)^2 = 1.48` when the noise is
+Gaussian.
+
+**The check on the G1 series confirms the diagnosis.** On the 100 stored G1 draws, the reported
+standard deviation (the mean over quarters) was 0.0235 MW against the empirical standard deviation
+of the fitted capacities of 0.0271 MW. On 42 fresh Gaussian draws of the G1 construction (seeds
+737900 to 737941, with the stored reference's noise scales), the reported-over-empirical ratio and
+the coverage of the 80% interval were these.
+
+| Variance | Reported sd over empirical sd | Coverage of the 80% interval |
+|---|---|---|
+| `(X' W X)^-1` (before the amendment) | 0.87 | 0.705 |
+| Scaled by the Gaussian-consistent ratio of the mean squared daylight residual to the squared Student-t scale (about 1.45) | 1.05 | 0.787 |
+| Sandwich with the weighted least-squares information `X' W X` | 0.75 | 0.634 |
+| Sandwich with the observed information of the Student-t likelihood | 1.06 | 0.796 |
+
+On 12 Student-t draws (the G1b construction), the same four variances gave ratios of 1.02, 1.44,
+0.82, and 1.12, and coverages of 0.741, 0.931, 0.648, and 0.810. The scalar scaling therefore
+inflates the interval by 44% when the noise is Student-t, and the sandwich with the weighted
+least-squares information understates the variance in both settings, because it treats the weights
+as fixed when they depend on the residuals.
+
+### What changes
+
+1. **The reported variance is the sandwich variance of the penalised Student-t likelihood.** The
+   score of row `i` is `psi_i x_i`, with `psi_i = 5 r_i / (4 sigma_i^2 + r_i^2)`, where `r_i` is
+   the residual and `sigma_i` the noise scale of the row's class. The variance of the capacities is
+   the capacity block of `A^-1 B A^-1`, with `A` the observed information
+   `sum_i psi'_i x_i x_i' + P` (`P` holds the ridge precision of the baseline and the precision of
+   the capacity prior) and `B = sum_i psi_i^2 x_i x_i'`. The matrix `B` has no prior term, because
+   the prior is not random. When the noise is Student-t, `A` and `B` agree and the result is the
+   usual posterior variance. When the noise is Gaussian, they differ, and the result is the
+   variance that the estimator has.
+2. **The correction has no constant.** It comes from the theory of M-estimators (the Huber and
+   White sandwich), and no value in it was chosen from the coverage of any world. The scalar
+   scaling and the weighted least-squares sandwich of the table above were rejected on their
+   behaviour in the two noise settings, not on their coverage in the G1 bar alone.
+3. **Every arm that reports an interval uses it.** Arms A, F, Qt, Ad, Af, O, and R read their
+   standard deviations from the same fit function, so all of them change. Arm Q reports none.
+4. **The lag-1 autocorrelation inflation stays as it is.** The variance is multiplied by
+   `(1 + r) / (1 - r)` after the sandwich is computed. When the observed information is not
+   positive definite, the fit falls back to the covariance `(X' W X)^-1` and records that it did.
+5. **The tuned values, the code hash, and the stored results of the real folder are stale.** The
+   code hash changes, so the review marker, the frozen code, the gates, the tuning, and G1 and G1b
+   run again before any scored fit.
+
+### What does not change
+
+**The amendment changes no bar, no arm, no contrast, and no verdict rule.** The G1 coverage bar
+stays 0.75 to 0.85, and the recovery bar stays 3%. The bars B1 to B7, the contrasts C1 and C2, the
+arms, the worlds, the seeds, and the verdict table are as registered. The correction is derived
+from theory and not from any scored world, so bar B2, the pooled coverage on the injected worlds
+with the real record's noise, remains the honest test of it. If B2 fails, the page reports the
+failure.

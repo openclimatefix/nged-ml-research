@@ -137,10 +137,20 @@ def test_flat_and_independent_priors() -> None:
     assert qt.group.tolist() == list(range(N_QUARTERS))
 
 
-def _synthetic(*, truth_per_quarter: np.ndarray, outliers: bool, seed: int = 0) -> dict:
-    """Build a regression problem whose answer is the quarterly capacity `truth_per_quarter`."""
+def _synthetic(
+    *,
+    truth_per_quarter: np.ndarray,
+    outliers: bool,
+    seed: int = 0,
+    days_per_quarter: int = 30,
+    noise_kind: str = "gaussian",
+) -> dict:
+    """Build a regression problem whose answer is the quarterly capacity `truth_per_quarter`.
+
+    `noise_kind` is `"gaussian"` (standard deviation 0.05) or `"student_t"` (4 degrees of freedom,
+    scale 0.05).
+    """
     rng = np.random.default_rng(seed)
-    days_per_quarter = 30
     n = N_QUARTERS * days_per_quarter * 48
     rows = np.arange(n)
     day = rows // 48
@@ -150,7 +160,11 @@ def _synthetic(*, truth_per_quarter: np.ndarray, outliers: bool, seed: int = 0) 
     quarter = day // days_per_quarter
     base = np.column_stack([np.ones(n), np.cos(2 * np.pi * hour / 24.0)])
     beta = np.array([0.5, 0.2])
-    noise = rng.normal(0.0, 0.05, size=n)
+    noise = (
+        0.05 * rng.standard_t(4.0, size=n)
+        if noise_kind == "student_t"
+        else rng.normal(0.0, 0.05, size=n)
+    )
     if outliers:
         spikes = rng.random(n) < 0.01
         noise[spikes] += rng.choice([-1.0, 1.0], size=int(spikes.sum())) * 2.0
@@ -218,9 +232,51 @@ def test_posterior_matches_a_dense_solve_of_the_weighted_normal_equations() -> N
     gram[n_base:, n_base:] += prior.precision
     rhs = x.T @ (lam * data["y"])
     rhs[n_base:] += prior.precision @ prior.mean
-    cov = np.linalg.inv(gram)
+    solution = np.linalg.solve(gram, rhs)
+    assert result.capacity == pytest.approx(solution[n_base:], abs=1e-6)
+    # The standard deviation is the sandwich A^-1 B A^-1 of the Student-t score, computed densely.
+    resid = data["y"] - x @ solution
+    scale2 = 4.0 * sigma**2
+    denom = scale2 + resid**2
+    psi = 5.0 * resid / denom
+    dpsi = 5.0 * (scale2 - resid**2) / denom**2
+    info = x.T @ (x * dpsi[:, None])
+    info[:n_base, :n_base] += np.eye(n_base) * 1e-6 / start_day**2
+    info[n_base:, n_base:] += prior.precision
+    inverse = np.linalg.inv(info)
+    cov = inverse @ (x.T @ (x * (psi**2)[:, None])) @ inverse
+    assert result.sandwich
     assert result.sd == pytest.approx(np.sqrt(np.diag(cov)[n_base:]), rel=1e-6)
-    assert result.capacity == pytest.approx(np.linalg.solve(gram, rhs)[n_base:], abs=1e-6)
+
+
+def _sd_ratio(*, noise_kind: str, draws: int = 300) -> float:
+    """Return the mean reported sd over the empirical sd of the capacity estimates of the draws."""
+    estimates, reported = [], []
+    for seed in range(draws):
+        data = _synthetic(
+            truth_per_quarter=np.full(N_QUARTERS, 3.0),
+            outliers=False,
+            seed=seed,
+            days_per_quarter=6,
+            noise_kind=noise_kind,
+        )
+        result = fit.fit_student_t(
+            prior=fit.flat_prior(), ridge_abs=1e-6, autocorrelation=False, **data
+        )
+        estimates.append(result.capacity[0])
+        reported.append(result.sd[0])
+    return float(np.mean(reported) / np.std(estimates, ddof=1))
+
+
+def test_reported_sd_matches_the_empirical_sd_on_gaussian_noise() -> None:
+    # The Student-t scale is smaller than the Gaussian standard deviation, so the covariance
+    # (X' W X)^-1 would understate the sd here by about 20%. The sandwich does not.
+    assert _sd_ratio(noise_kind="gaussian") == pytest.approx(1.0, abs=0.10)
+
+
+def test_reported_sd_is_not_inflated_on_student_t_noise() -> None:
+    assert _sd_ratio(noise_kind="student_t") <= 1.15
+    assert _sd_ratio(noise_kind="student_t") >= 0.85
 
 
 def test_lag1_inflation_is_one_for_white_noise_and_large_for_an_ar1_series() -> None:

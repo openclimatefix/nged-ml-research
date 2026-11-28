@@ -5,8 +5,11 @@ The model of arm A is linear in its coefficients. The power of half-hour `i` is
 `e_i` follows a Student-t density with 4 degrees of freedom, written as a scale mixture. The
 expectation-maximisation loop sets each row's weight to `(4 + 1) / (4 + (r / sigma)^2)`, solves the
 weighted normal equations with the Gaussian priors added, and sets each class's scale to the
-weighted root mean square of its residuals. The posterior at the converged weights is Gaussian,
-and its capacity block comes from the Cholesky factor of the normal equations.
+weighted root mean square of its residuals. The posterior mean is the converged coefficients. The
+posterior covariance is the sandwich covariance `A^-1 B A^-1` of the penalised Student-t
+log-likelihood (`sandwich_capacity_covariance`), because the covariance `(X' W X)^-1` of the
+converged weights understates the variance when the noise is lighter-tailed than the Student-t
+density.
 
 The priors: every baseline coefficient has a zero-mean Gaussian prior whose precision is the ridge
 penalty of `studies.pv_separation` times a tuned ridge scale. The capacities follow a Gaussian
@@ -138,12 +141,14 @@ class FitResult:
     Attributes:
         theta: The coefficients: the baseline columns, then the capacity columns.
         capacity: The posterior mean of each quarter's capacity, megawatts (not cut at zero).
-        sd: The posterior standard deviation of each quarter's capacity, with the autocorrelation
-            inflation applied.
+        sd: The standard deviation of each quarter's capacity from the sandwich covariance, with
+            the autocorrelation inflation applied.
         n_iter: The expectation-maximisation iterations used.
         converged: Whether the loop stopped on its tolerance.
         state: The final weights and scales.
-        infl: The multiplier `(1 + r) / (1 - r)` on the posterior variance.
+        infl: The multiplier `(1 + r) / (1 - r)` on the capacity variance.
+        sandwich: Whether the sandwich covariance was used (False when the observed information
+            was not positive definite and the covariance `(X' W X)^-1` stood in).
         evidence: The Gaussian log evidence at the final weights (NaN unless asked for).
         seconds: The wall time of the fit.
     """
@@ -155,6 +160,7 @@ class FitResult:
     converged: bool
     state: EmState
     infl: float
+    sandwich: bool
     evidence: float
     seconds: float
 
@@ -240,6 +246,7 @@ class _EmRun:
     factor: tuple
     lam: np.ndarray
     used_sigma_day: float
+    used_sigma_night: float
     state: EmState
     n_iter: int
     converged: bool
@@ -307,6 +314,7 @@ def _run_em(
             factor=factor,
             lam=lam,
             used_sigma_day=sigma_day,
+            used_sigma_night=sigma_night,
             state=EmState(weights=weights, sigma_day=new_day, sigma_night=new_night),
             n_iter=it,
             converged=converged,
@@ -354,6 +362,51 @@ def _log_evidence(
         + 0.5 * np.log(run.lam).sum()
         - 0.5 * len(resid) * np.log(2.0 * np.pi)
     )
+
+
+def sandwich_capacity_covariance(
+    *,
+    x: np.ndarray,
+    resid: np.ndarray,
+    sigma: np.ndarray,
+    precision: np.ndarray,
+    n_base: int,
+) -> np.ndarray | None:
+    """Return the capacity block of the sandwich covariance of the penalised Student-t fit.
+
+    The fit maximises the Student-t log-likelihood plus the Gaussian log priors. Its score for row
+    `i` is `psi_i x_i` with `psi_i = (DOF + 1) r_i / (DOF sigma_i^2 + r_i^2)`. The covariance of
+    the estimate is `A^-1 B A^-1`, where `A` is the observed information
+    `sum_i psi'_i x_i x_i' + precision` and `B` is `sum_i psi_i^2 x_i x_i'`. The matrix `B` has no
+    prior term, because the prior is not random. When the noise really is Student-t, `A` and `B`
+    agree and the covariance is the usual posterior covariance. When the noise is Gaussian, they
+    differ, and the covariance is the variance that the Student-t estimator really has.
+
+    Args:
+        x: The regression matrix (baseline columns, then the capacity columns).
+        resid: The residual of each row at the estimate.
+        sigma: The noise scale that the last solve used for each row.
+        precision: The prior precision of every column (ridge on the baseline, the capacity prior
+            on the capacities), including the scale `1 / sigma_day^2` of the ridge.
+        n_base: The number of baseline columns.
+
+    Returns:
+        The covariance of the capacity columns, or `None` when `A` is not positive definite.
+    """
+    scale2 = DOF * sigma**2
+    denom = scale2 + resid**2
+    psi = (DOF + 1.0) * resid / denom
+    dpsi = (DOF + 1.0) * (scale2 - resid**2) / denom**2
+    info = (x * dpsi[:, None]).T @ x + precision
+    try:
+        factor = cho_factor(info, lower=True, check_finite=False)
+    except np.linalg.LinAlgError:
+        return None
+    selector = np.zeros((x.shape[1], x.shape[1] - n_base))
+    selector[n_base:, :] = np.eye(x.shape[1] - n_base)
+    left = cho_solve(factor, selector, check_finite=False)
+    score_outer = (x * (psi**2)[:, None]).T @ x
+    return left.T @ score_outer @ left
 
 
 def fit_student_t(
@@ -415,11 +468,19 @@ def fit_student_t(
         start=init,
         max_iter=max_iter,
     )
-    selector = np.zeros((n_base + k, k))
-    selector[n_base:, :] = np.eye(k)
-    cov = cho_solve(run.factor, selector, check_finite=False)[n_base:, :]
     resid = y - x @ run.theta
-    sigma_used = np.where(daylight, run.used_sigma_day, run.state.sigma_night)
+    sigma_used = np.where(daylight, run.used_sigma_day, run.used_sigma_night)
+    precision = np.zeros((n_base + k, n_base + k))
+    precision[np.arange(n_base), np.arange(n_base)] = ridge_abs / run.used_sigma_day**2
+    precision[n_base:, n_base:] = prior.precision
+    cov = sandwich_capacity_covariance(
+        x=x, resid=resid, sigma=sigma_used, precision=precision, n_base=n_base
+    )
+    sandwich = cov is not None
+    if cov is None:
+        selector = np.zeros((n_base + k, k))
+        selector[n_base:, :] = np.eye(k)
+        cov = cho_solve(run.factor, selector, check_finite=False)[n_base:, :]
     z = np.sqrt(run.state.weights) * resid / sigma_used
     infl = lag1_inflation(z=z, rows=rows, day=day, daylight=daylight) if autocorrelation else 1.0
     group = prior.group
@@ -431,6 +492,7 @@ def fit_student_t(
         converged=run.converged,
         state=run.state,
         infl=infl,
+        sandwich=sandwich,
         evidence=(
             _log_evidence(run=run, resid=resid, prior=prior, ridge_abs=ridge_abs, n_base=n_base)
             if evidence
