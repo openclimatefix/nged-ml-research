@@ -12,8 +12,10 @@ from __future__ import annotations
 
 from typing import Final
 
+import e00738_score as score_mod
 import e00738_survival as surv
 import numpy as np
+import polars as pl
 
 N_PATHS: Final[int] = 51
 SHARE_TOLERANCE: Final[float] = 0.02
@@ -21,6 +23,8 @@ QUANTILE_TOLERANCE_POINTS: Final[float] = 0.5
 CRPS_TOLERANCE_POINTS: Final[float] = 0.05
 HORIZON_DAYS: Final[float] = 10.0
 T_MAX_DAYS: Final[float] = 1.0e4
+MAX_CHECK_ROWS: Final[int] = 2000
+STEPS_PER_ROW: Final[int] = 48
 
 
 def isf(*, curve: surv.SurvivalFunction, s: np.ndarray) -> np.ndarray:
@@ -176,3 +180,98 @@ def passes(*, ended_gap: float, quantile_gap: float, crps_gap: float) -> bool:
         and quantile_gap <= QUANTILE_TOLERANCE_POINTS
         and crps_gap <= CRPS_TOLERANCE_POINTS
     )
+
+
+def check_frames(
+    *,
+    arm: pl.DataFrame,
+    base: pl.DataFrame,
+    diag: pl.DataFrame,
+    curve: surv.SurvivalFunction,
+    max_rows: int = MAX_CHECK_ROWS,
+) -> dict[str, float]:
+    """Run the member-path check on the rows of a mixture arm where A1 sees a shift.
+
+    One row is one (Primary, origin, lead day): 48 half-hourly valid times. The arm's stored
+    quantiles, `M1`'s stored quantiles, and the actuals come from the panel files, and A1's age and
+    the signed depth from the diagnostics file of the arm.
+
+    Args:
+        arm: The arm's forecast frame of a panel, sorted by the keys.
+        base: `M1`'s forecast frame of the same panel, with the same keys.
+        diag: The arm's diagnostics frame (`time_series_id`, `origin_us`, `lead_day`, `age`,
+            `depth_share`).
+        curve: The survival curve that the arm was fitted with.
+        max_rows: At most this many rows are checked, evenly spaced.
+
+    Returns:
+        The means over the checked rows: `ended_gap`, `quantile_gap`, `crps_gap` (points of
+        capacity), the report-only `energy_score` and `variogram_score` of the 51 paths against the
+        actual half-hours of the day, the largest `ended_gap`, and the number of rows checked.
+    """
+    qcols = [f"q{n}" for n in ("01", "05", "10", "25", "40", "50", "60", "75", "90", "95", "99")]
+    assert arm.height == base.height
+    assert arm.height % STEPS_PER_ROW == 0
+    n = arm.height // STEPS_PER_ROW
+
+    def blocks(frame: pl.DataFrame, col: str) -> np.ndarray:
+        return frame[col].to_numpy().reshape(n, STEPS_PER_ROW)
+
+    tsid = blocks(arm, "time_series_id")[:, 0]
+    origin_us = (
+        arm["power_fcst_init_time"].dt.epoch("us").to_numpy().reshape(n, STEPS_PER_ROW)[:, 0]
+    )
+    lead = blocks(arm, "lead_day")[:, 0]
+    y = blocks(arm, "actual").astype(float)
+    q_arm = arm.select(qcols).to_numpy().reshape(n, STEPS_PER_ROW, 11).astype(float)
+    q_base = base.select(qcols).to_numpy().reshape(n, STEPS_PER_ROW, 11).astype(float)
+    found = {
+        (int(t), int(o), int(k)): (float(a), float(d))
+        for t, o, k, a, d in zip(
+            diag["time_series_id"].to_list(),
+            diag["origin_us"].to_list(),
+            diag["lead_day"].to_list(),
+            diag["age"].to_list(),
+            diag["depth_share"].to_list(),
+            strict=True,
+        )
+    }
+    rows = [
+        i
+        for i in range(n)
+        if found.get((int(tsid[i]), int(origin_us[i]), int(lead[i])), (0.0, 0.0))[0] > 0
+        and np.isfinite(y[i]).all()
+    ]
+    if len(rows) > max_rows:
+        rows = [rows[j] for j in np.linspace(0, len(rows) - 1, max_rows).astype(int)]
+    assert rows, "no row has a shift that A1 sees: nothing to check"
+    acc: dict[str, list[float]] = {
+        k: [] for k in ("ended_gap", "quantile_gap", "crps_gap", "energy_score", "variogram_score")
+    }
+    for i in rows:
+        age, depth = found[(int(tsid[i]), int(origin_us[i]), int(lead[i]))]
+        leads = (STEPS_PER_ROW * int(lead[i]) + np.arange(STEPS_PER_ROW)) / STEPS_PER_ROW
+        p = surv.ratio(curve=curve, age_days=np.full(STEPS_PER_ROW, age), lead_days=leads)
+        got = check_origin(
+            base_q=q_base[i],
+            arm_q=q_arm[i],
+            depth=depth,
+            age_days=age,
+            lead_days=leads,
+            curve=curve,
+            p_arm=p,
+        )
+        paths, _ = paths_at_leads(
+            base_q=q_base[i], depth=depth, age_days=age, lead_days=leads, curve=curve
+        )
+        acc["ended_gap"].append(got["ended_gap"])
+        acc["quantile_gap"].append(got["quantile_gap"])
+        ensemble_crps = float(fair_crps(paths=paths, y=y[i]).mean()) * 100.0
+        quantile_crps = float(score_mod.crps_points(y=y[i], q=q_arm[i]).mean())
+        acc["crps_gap"].append(abs(ensemble_crps - quantile_crps))
+        acc["energy_score"].append(energy_score(paths=paths.T, y=y[i]))
+        acc["variogram_score"].append(variogram_score(paths=paths.T, y=y[i]))
+    out = {k: float(np.mean(v)) for k, v in acc.items()}
+    out["ended_gap_max"] = float(np.max(acc["ended_gap"]))
+    out["rows"] = float(len(rows))
+    return out

@@ -127,12 +127,8 @@ def run_job(
     """
     os.environ["E00667_PHASE"] = "predict"
     panel.assert_713_code()
-    import e00578_common as k578  # ty: ignore[unresolved-import]
-    import e00713_arms as arms713  # ty: ignore[unresolved-import]
-    import e00713_inputs as inp  # ty: ignore[unresolved-import]
     import e00738_fit as fit
     import torch  # ty: ignore[unresolved-import]
-    from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
     pending = [
         a
@@ -145,18 +141,10 @@ def run_job(
     ]
     if not pending:
         return
-    pipe = inp.load_pipeline(
-        month=month, phase="predict", chain_root=inp.chain_root_of_seed(seed=seed)
-    )
-    data = inp.build_fold_data(pipe=pipe, device=device)
-    saved = (
-        arms713.root(data_dir=ML_EXPERIMENTS_DATA_DIR) / "work" / "standardiser" / f"{month}.sha256"
-    )
-    assert saved.exists(), "the standardiser fingerprint is missing"
-    assert saved.read_text() == data.fingerprint, "standardiser differs from the training phase"
+    data = fit.load_fold_data(month=month, phase="predict", seed=seed, device=device)
     nb_of, capacity, is_mw = fit.fold_world()
     del nb_of, capacity
-    sites = k578.sites().sort("primary")
+    sites = fit.site_table()
     ids = sites["time_series_id"].to_numpy()
     native = data.test_origin_idx
     assert native is not None

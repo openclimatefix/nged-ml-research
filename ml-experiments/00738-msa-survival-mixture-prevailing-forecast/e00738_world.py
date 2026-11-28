@@ -39,6 +39,8 @@ IN_FORCE: Final[tuple[str, ...]] = ("far", "middle", "near")
 FAR_DAYS: Final[float] = 10.0
 MIDDLE_DAYS: Final[float] = 1.0
 POST_END_DAYS: Final[float] = 7.0
+POOLED_LEAD_DAYS: Final[tuple[float, ...]] = tuple(1.0 + 0.5 * i for i in range(18))
+"""Leads (days after the origin) that pool the scored rows: lead days 1 to 9 span 1 to 10 days."""
 REAL_TRANSFERS_FILE: Final[str] = (
     "00101-ro-nc-detector-on-real-hand-filtered-switching-events/events_real.parquet"
 )
@@ -503,7 +505,7 @@ def true_delta_at(*, shift: Shift, valid_idx: np.ndarray) -> np.ndarray:
 def simulate_stratum_shares(
     *,
     n_months: int = 8,
-    lead_days: tuple[float, ...] = (1.5, 3.5, 5.5, 7.5, 9.5),
+    lead_days: tuple[float, ...] = POOLED_LEAD_DAYS,
     month_start_idx: int = 40_000,
 ) -> dict[str, float]:
     """Return the stratum shares of the scoring worlds, over origins on days 0 to 29 of a month.

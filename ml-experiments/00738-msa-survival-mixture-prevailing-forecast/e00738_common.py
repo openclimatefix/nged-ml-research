@@ -126,10 +126,12 @@ EXPECTED_SHARES: Final[dict[str, float]] = {
     "near": 0.015,
     "ended_24h": 0.015,
     "ended_1_7": 0.088,
-    "event_free": 0.225,
-    "onset_ahead": 0.17,
+    "event_free": 0.29,
+    "onset_ahead": 0.10,
 }
-"""The stratum shares that the plan simulated, over origins on days 0 to 29 of a month."""
+"""The stratum shares of the scored rows: origins on days 0 to 29, leads of 1 to 10 days."""
+EXPECTED_SHARES_LEAD_10: Final[dict[str, float]] = {"event_free": 0.225, "onset_ahead": 0.17}
+"""The two shares that differ when every row sits at a lead of 10 days."""
 
 # --- Fits --------------------------------------------------------------------------------------
 HEAD_LR: Final[float] = 1e-3
@@ -175,6 +177,9 @@ EXIT_FAILED: Final[int] = 3
 EXIT_CHAIN_FAILED: Final[int] = 5
 """Exit code of a failed chain, and of the gate's second failure."""
 EXIT_GPU_BUSY: Final[int] = 75
+"""Exit code of a launcher that finds the GPU busy (no job started)."""
+EXIT_REMEDY: Final[int] = 6
+"""Exit code of the gate's first failure: the remedy flag is set and `gate-remedy` runs next."""
 GPU_BACKOFF_SECONDS: Final[int] = 300
 MEMORY_MAX_GB: Final[int] = 16
 
@@ -267,5 +272,22 @@ GROUP_OF_PRIMARY: Final[dict[str, tuple[str, ...]]] = {
     "eight_no_d8": tuple(p for p in EIGHT_MVA if p != NEVER_DRAWN),
     "short_history_two": REPORT_ONLY_PRIMARIES,
 }
-EXIT_REMEDY: Final[int] = 6
-"""Exit code of the gate's first failure: the remedy flag is set and `gate-remedy` runs next."""
+
+
+PASS_CAP_ENV: Final[str] = "E00738_PASS_CAP"
+"""An environment variable that replaces the pass cap of every fit (the smoke test sets it to 1)."""
+
+
+def pass_cap(*, remedy: bool) -> int:
+    """Return the cap on training passes of a fit.
+
+    Args:
+        remedy: Whether the gate's remedy applies (cap 120 instead of 60).
+
+    Returns:
+        The value of `E00738_PASS_CAP` when set, else `REMEDY_PASS_CAP` or `PASS_CAP`.
+    """
+    override = os.environ.get(PASS_CAP_ENV)
+    if override is not None:
+        return int(override)
+    return REMEDY_PASS_CAP if remedy else PASS_CAP

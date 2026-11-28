@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from collections.abc import Callable
@@ -21,6 +22,7 @@ from typing import Any, Final
 
 import e00738_common as common
 import e00738_phases as phases
+import numpy as np
 
 STAGES: Final[tuple[str, ...]] = (
     "phase0",
@@ -36,6 +38,7 @@ STAGES: Final[tuple[str, ...]] = (
     "predict",
     "score",
     "members",
+    "protocol",
     "report",
     "figures",
 )
@@ -120,17 +123,13 @@ def task_predict(*, month: str, seed: int, device: str) -> None:
     pred.run_job(month=month, seed=seed, device=device)
 
 
-def load_fold(*, month: str, phase: str, device: str):  # noqa: ANN201
+def load_fold(*, month: str, phase: str, device: str) -> tuple[Any, Any, np.ndarray]:
     """Return (data, 713 world, is_mw) of a fold in the given phase; the phase variable is read at import."""
-    import os
-
     os.environ["E00667_PHASE"] = phase
-    import e00713_inputs as inp  # ty: ignore[unresolved-import]
     import e00713_train as tr  # ty: ignore[unresolved-import]
     import e00738_fit as fit
 
-    pipe = inp.load_pipeline(month=month, phase=phase, chain_root=inp.chain_root_of_seed(seed=0))
-    data = inp.build_fold_data(pipe=pipe, device=device)
+    data = fit.load_fold_data(month=month, phase=phase, seed=0, device=device)
     tw = tr.World(
         source=data.source,
         cutoff_idx=data.cutoff_idx,
@@ -167,19 +166,31 @@ def task_curves(*, month: str) -> None:
 
 
 def task_strata_check() -> None:
-    """Check the simulated stratum shares against the plan's (far, middle, near, ended; and the event-free split at a lead of 10 days)."""
+    """Compare the simulated stratum shares with the expected ones, at the pooled leads and at 10 days.
+
+    The scored rows span leads of 1 to 10 days, so the expected shares are those at the pooled leads.
+    The event-free and onset-ahead shares depend on the lead, because the valid time moves with it.
+    The shares at a lead of 10 days (the plan's first figures) are written beside them.
+    """
     import e00738_world as world
 
-    s = world.simulate_stratum_shares(lead_days=(10.0,))
+    pooled = world.simulate_stratum_shares()
+    at_10 = world.simulate_stratum_shares(lead_days=(10.0,))
     bad = {}
     for k, want in common.EXPECTED_SHARES.items():
         tol = (
             common.STRATUM_TOLERANCE_END if k in {"near", "ended_24h"} else common.STRATUM_TOLERANCE
         )
-        if abs(s[k] - want) > tol:
-            bad[k] = (s[k], want)
+        if abs(pooled[k] - want) > tol:
+            bad[k] = (pooled[k], want)
     common.atomic_json(
-        obj={"simulated": s, "expected": common.EXPECTED_SHARES, "off": bad},
+        obj={
+            "simulated_pooled_leads": pooled,
+            "simulated_lead_10_days": at_10,
+            "expected": common.EXPECTED_SHARES,
+            "expected_lead_10_days": common.EXPECTED_SHARES_LEAD_10,
+            "off": bad,
+        },
         path=common.OUT / "checks" / "strata_shares.json",
     )
     if bad:
@@ -374,7 +385,7 @@ def stage_smoke_fit(*, args: argparse.Namespace) -> None:
     """One pass of every arm on the real device and the real files; scratch output only."""
     require_scratch()
     phases.require_stage(stage="smoke")
-    common.PASS_CAP = common.REMEDY_PASS_CAP = 1  # one epoch of every arm
+    os.environ[common.PASS_CAP_ENV] = "1"  # one pass of every arm
     import e00738_fit as fit
 
     for arm in common.FIT_ARMS:
@@ -418,8 +429,6 @@ def stage_smoke_collect() -> None:
 
 def require_scratch() -> None:
     """Stop unless `E00738_OUT` names a scratch folder (the smoke test never writes to the data folder)."""
-    import os
-
     if "E00738_OUT" not in os.environ:
         sys.exit("refusing to run the smoke test outside a scratch folder: set E00738_OUT")
 
@@ -632,9 +641,9 @@ def m1_seed_spread(*, month: str) -> float:
 
 def site_labels():  # noqa: ANN201
     """Return the 16 Primaries' labels and `time_series_id`s in index order."""
-    import e00578_common as k578  # ty: ignore[unresolved-import]
+    import e00738_fit as fit
 
-    sites = k578.sites().sort("primary")
+    sites = fit.site_table()
     return sites["label"].to_list(), sites["time_series_id"].to_numpy()
 
 
@@ -685,17 +694,90 @@ def stage_score(*, args: argparse.Namespace) -> None:
         mark(name="score")
 
 
+MEMBER_PANELS: Final[tuple[str, ...]] = ("pass00", "pass01", "pass02", "pass03")
+
+
 def stage_members(*, args: argparse.Namespace) -> None:
-    """The 51-path check is run on the screen predictions of S*, and its three assertions are written."""
+    """Run the 51-path check on `LM` over the screen folds and write `checks/members.json`.
+
+    The check needs a mixture arm with one fitted curve, so it runs on `LM`. `LR` learns its hazards
+    from the features of each sample, which no stored file holds, and `LD` is not a mixture. The
+    result applies to the chosen arm only when that arm is `LM`; the file says which.
+    """
     del args
     phases.require_stage(stage="score")
-    sstar = json.loads((common.OUT / "sstar.json").read_text())["s_star"]
-    print(
-        "member-path check for",
-        sstar,
-        "reads its stored quantiles and A1 ages; see e00738_members.check_origin",
-        flush=True,
+    import e00738_fit as fit
+    import e00738_members as members
+    import e00738_predict as pred
+    import e00738_survival as surv
+    import polars as pl
+    import torch  # ty: ignore[unresolved-import]
+
+    star = json.loads((common.OUT / "sstar.json").read_text())["s_star"]
+    per_fold: dict[str, dict[str, float]] = {}
+    for month in common.SCREEN_FOLDS:
+        saved = torch.load(
+            common.fit_paths(arm="LM", month=month, seed=0)["state"], map_location="cpu"
+        )
+        c = saved["curve"]
+        curve = surv.Curve(family=c["family"], params=tuple(c["params"]), nll=float(c["nll"]))
+        rows = []
+        for name in MEMBER_PANELS:
+            arm_path = pred.panel_path(arm="LM", month=month, seed=0, name=name)
+            result = members.check_frames(
+                arm=pl.read_parquet(arm_path),
+                base=pl.read_parquet(
+                    pred.panel_path(arm=common.ARM_M1, month=month, seed=0, name=name)
+                ),
+                diag=pl.read_parquet(arm_path.with_name(f"{name}_diag.parquet")),
+                curve=curve,
+            )
+            rows.append(result)
+        weight = np.array([r["rows"] for r in rows])
+        per_fold[month] = {
+            k: float(np.average([r[k] for r in rows], weights=weight))
+            for k in rows[0]
+            if k != "rows"
+        } | {"rows": float(weight.sum())}
+    pooled = {
+        k: float(
+            np.average(
+                [v[k] for v in per_fold.values()], weights=[v["rows"] for v in per_fold.values()]
+            )
+        )
+        for k in next(iter(per_fold.values()))
+        if k != "rows"
+    }
+    passed = members.passes(
+        ended_gap=pooled["ended_gap"],
+        quantile_gap=pooled["quantile_gap"],
+        crps_gap=pooled["crps_gap"],
     )
+    common.atomic_json(
+        obj={
+            "arm_checked": "LM",
+            "s_star": star,
+            "applies_to_s_star": star == "LM",
+            "per_fold": per_fold,
+            "pooled": pooled,
+            "passed": passed,
+        },
+        path=common.OUT / "checks" / "members.json",
+    )
+    print("member-path check on LM:", json.dumps(pooled, indent=1), "passed:", passed, flush=True)
+    del fit
+    if not passed:
+        sys.exit(common.EXIT_FAILED)
+
+
+def stage_protocol(*, args: argparse.Namespace) -> None:
+    """Score the real record of every arm by experiment 713's evaluation protocol (four scenarios)."""
+    del args
+    phases.require_stage(stage="score")
+    import e00738_protocol as protocol
+
+    folder = protocol.run()
+    print("protocol tables written to", folder, flush=True)
 
 
 def stage_report() -> None:
@@ -760,6 +842,7 @@ def dispatch(*, args: argparse.Namespace) -> None:
         "predict": lambda: stage_predict(args=args),
         "score": lambda: stage_score(args=args),
         "members": lambda: stage_members(args=args),
+        "protocol": lambda: stage_protocol(args=args),
         "report": stage_report,
         "figures": stage_figures,
     }

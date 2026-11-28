@@ -16,7 +16,7 @@ import os
 import resource
 import time
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00738_common as common
 import e00738_panel as panel
@@ -74,6 +74,51 @@ def fold_curve(*, month: str, seed: int, cutoff_idx: int, is_mw: np.ndarray) -> 
     return surv.fit_curve(durations_days=np.array(durations))
 
 
+def load_fold_data(*, month: str, phase: str, seed: int, device: str) -> Any:
+    """Return experiment 713's `FoldData` of a fold in a phase, after the standardiser check.
+
+    Args:
+        month: The fold month.
+        phase: `train` (cleaned power is NaN from the month's start) or `predict`.
+        seed: The seed, which selects the chain of pre-trained encoders.
+        device: The device.
+
+    Returns:
+        The `FoldData`.
+    """
+    import e00713_arms as arms713  # ty: ignore[unresolved-import]
+    import e00713_inputs as inp  # ty: ignore[unresolved-import]
+    from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+    pipe = inp.load_pipeline(month=month, phase=phase, chain_root=inp.chain_root_of_seed(seed=seed))
+    data = inp.build_fold_data(pipe=pipe, device=device)
+    saved = (
+        arms713.root(data_dir=ML_EXPERIMENTS_DATA_DIR) / "work" / "standardiser" / f"{month}.sha256"
+    )
+    assert saved.exists(), "the standardiser fingerprint is missing"
+    assert saved.read_text() == data.fingerprint, f"the standardiser differs in the {phase} phase"
+    return data
+
+
+def site_table() -> Any:
+    """Return the 16 Primaries' `primary`, `label`, and `time_series_id`, sorted by `primary`."""
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+
+    return k578.sites().sort("primary")
+
+
+def new_w0_model(*, month: str, seed: int, device: str) -> Any:
+    """Return `W0`'s network: experiment 713's `M1` architecture at `M1`'s stored stage 1 state."""
+    import e00713_arms as arms713  # ty: ignore[unresolved-import]
+    import e00713_fit as fit713  # ty: ignore[unresolved-import]
+    from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+    spec = arms713.resolve(arm="M1", data_dir=ML_EXPERIMENTS_DATA_DIR)
+    model = fit713.new_model(spec=spec, seed=seed, month=month, device=device)
+    model.load_state_dict(m1_state(month=month, seed=seed, stage=1, device=device))
+    return model
+
+
 def m1_state(*, month: str, seed: int, stage: int, device: str) -> dict:
     """Read a stored `M1` state of experiment 713 (read only)."""
     import torch  # ty: ignore[unresolved-import]
@@ -125,9 +170,7 @@ def save_state_atomic(*, state: dict, path: Path) -> None:
     tmp.rename(path)
 
 
-def fit_job(  # noqa: PLR0915 - one linear recipe: load, build, fit, check, store
-    *, arm: str, month: str, seed: int, device: str, remedy: bool = False
-) -> None:
+def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = False) -> None:
     """Fit one arm on one fold and one seed, and write the state and the log.
 
     Args:
@@ -139,29 +182,16 @@ def fit_job(  # noqa: PLR0915 - one linear recipe: load, build, fit, check, stor
     """
     os.environ["E00667_PHASE"] = "train"
     code713 = panel.assert_713_code()
-    import e00713_arms as arms713  # ty: ignore[unresolved-import]
-    import e00713_fit as fit713  # ty: ignore[unresolved-import]
-    import e00713_inputs as inp  # ty: ignore[unresolved-import]
-    import e00713_model as mdl  # ty: ignore[unresolved-import]
     import e00713_train as tr  # ty: ignore[unresolved-import]
     import e00738_train as train738
     import torch  # ty: ignore[unresolved-import]
-    from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
     torch.set_num_threads(1)
     paths = common.fit_paths(arm=arm, month=month, seed=seed)
     if paths["state"].exists() and paths["log"].exists():
         return
     started = time.time()
-    pipe = inp.load_pipeline(
-        month=month, phase="train", chain_root=inp.chain_root_of_seed(seed=seed)
-    )
-    data = inp.build_fold_data(pipe=pipe, device=device)
-    saved = (
-        arms713.root(data_dir=ML_EXPERIMENTS_DATA_DIR) / "work" / "standardiser" / f"{month}.sha256"
-    )
-    assert saved.exists(), "the standardiser fingerprint is missing"
-    assert saved.read_text() == data.fingerprint, "the standardiser changed"
+    data = load_fold_data(month=month, phase="train", seed=seed, device=device)
     tw = tr.World(
         source=data.source,
         cutoff_idx=data.cutoff_idx,
@@ -189,9 +219,7 @@ def fit_job(  # noqa: PLR0915 - one linear recipe: load, build, fit, check, stor
         "start": time.strftime("%FT%TZ", time.gmtime(started)),
     }
     if arm == common.ARM_W0:
-        spec = arms713.resolve(arm="M1", data_dir=ML_EXPERIMENTS_DATA_DIR)
-        model = fit713.new_model(spec=spec, seed=seed, month=month, device=device)
-        model.load_state_dict(m1_state(month=month, seed=seed, stage=1, device=device))
+        model = new_w0_model(month=month, seed=seed, device=device)
         logs = train738.fit_w0(model=model, tw=tw, clean=data.clean, is_mw=is_mw, seed=seed)
         log["stages"] = [dataclasses.asdict(s) for s in logs]
         log["passes"] = sum(s.passes for s in logs)
@@ -238,13 +266,12 @@ def fit_job(  # noqa: PLR0915 - one linear recipe: load, build, fit, check, stor
     log["peak_host_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
     if device.startswith("cuda"):
         log["peak_gpu_mb"] = torch.cuda.max_memory_allocated() / 2**20
-    del mdl
     save_state_atomic(state=state, path=paths["state"])
     paths["log"].parent.mkdir(parents=True, exist_ok=True)
     common.atomic_json(obj=log, path=paths["log"])
 
 
-def load_for_prediction(*, arm: str, month: str, seed: int, data: object, device: str):  # noqa: ANN201
+def load_for_prediction(*, arm: str, month: str, seed: int, data: Any, device: str):  # noqa: ANN201
     """Return (network, model function) of an arm for the prediction phase.
 
     Args:
@@ -271,7 +298,7 @@ def load_for_prediction(*, arm: str, month: str, seed: int, data: object, device
             net.load_state_dict(torch.load(path, map_location=device))
         net.eval()
 
-        def plain(inp_: object) -> tuple[object, dict[str, np.ndarray]]:
+        def plain(inp_: Any) -> tuple[object, dict[str, np.ndarray]]:
             return mdl.standardised_quantiles(out=net(inp_).out), {}  # ty: ignore[invalid-argument-type]
 
         return net, plain
@@ -286,7 +313,7 @@ def load_for_prediction(*, arm: str, month: str, seed: int, data: object, device
         arm=arm,
         month=month,
         seed=seed,
-        target_std=data.target_std,  # ty: ignore[unresolved-attribute]
+        target_std=data.target_std,
         noise=float(saved["noise"]),
         curve=curve,
         device=device,
@@ -294,9 +321,9 @@ def load_for_prediction(*, arm: str, month: str, seed: int, data: object, device
     head.level_head.load_state_dict(saved["level_head"])
     head.eval()
 
-    def level(inp_: object) -> tuple[object, dict[str, np.ndarray]]:
-        lo = head.level_forward(inp_)  # ty: ignore[invalid-argument-type]
-        limit = head.depth_limit[inp_.primary]  # ty: ignore[unresolved-attribute]
+    def level(inp_: Any) -> tuple[object, dict[str, np.ndarray]]:
+        lo = head.level_forward(inp_)
+        limit = head.depth_limit[inp_.primary]
         depth_share = (lo.depth * common.LEVEL_DEPTH_LIMIT / limit).detach().cpu().numpy()
         diag = {
             "age": lo.age.detach().cpu().numpy(),
