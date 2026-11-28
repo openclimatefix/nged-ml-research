@@ -54,6 +54,41 @@ def with_months(*, kw: CommonArgs, months: tuple[str, ...]) -> CommonArgs:
     )
 
 
+def with_scope(*, kw: CommonArgs, months: tuple[str, ...], seeds: tuple[int, ...]) -> CommonArgs:
+    """Return the shared arguments with different months and seeds."""
+    return CommonArgs(
+        tables=kw["tables"],
+        months=months,
+        seeds=seeds,
+        labels=kw["labels"],
+        n_resamples=kw["n_resamples"],
+    )
+
+
+def arm_cells(
+    *, arm: str, months: tuple[str, ...], seeds: tuple[int, ...], drop_ld: bool
+) -> list[tuple[str, int]]:
+    """Return the (month, seed) cells in which an arm has forecasts after the cut list.
+
+    Args:
+        arm: The arm.
+        months: The scored months.
+        seeds: The scored seeds.
+        drop_ld: Whether the cut list dropped `LD` outside the screen.
+
+    Returns:
+        Every cell, except that `LD` keeps only the screen folds at the screen seed when cut.
+    """
+    return [
+        (m, s)
+        for m in months
+        for s in seeds
+        if not (
+            drop_ld and arm == "LD" and not (m in common.SCREEN_FOLDS and s == common.SCREEN_SEED)
+        )
+    ]
+
+
 def contrast(
     *,
     tables: Tables,
@@ -180,6 +215,7 @@ def compute_report(
     seeds: tuple[int, ...] = common.SEEDS,
     invalid: bool = False,
     n_resamples: int = common.N_RESAMPLES,
+    drop_ld: bool = False,
 ) -> dict:
     """Return every reading of the page.
 
@@ -191,6 +227,8 @@ def compute_report(
         seeds: The seeds.
         invalid: Whether a leakage test, the oracle, the reproduction, or the gate failed.
         n_resamples: Bootstrap resamples (tests lower it).
+        drop_ld: Whether the cut list dropped `LD` outside the screen. Every reading that involves
+            `LD` then uses the screen folds at the screen seed only.
 
     Returns:
         A dict of readings, the verdict state, and the verdict.
@@ -202,6 +240,15 @@ def compute_report(
         "labels": labels,
         "n_resamples": n_resamples,
     }
+    ld_kw = (
+        with_scope(
+            kw=kw,
+            months=tuple(m for m in months if m in common.SCREEN_FOLDS),
+            seeds=(common.SCREEN_SEED,),
+        )
+        if drop_ld
+        else kw
+    )
     c1 = contrast(**kw, a=s_star, b=common.ARM_M1, wld="train_family", slc="in_force")
     c2 = contrast(**kw, a=s_star, b="LP", wld="train_family", slc="in_force")
     c3 = contrast(**kw, a=s_star, b=common.ARM_W0, wld="train_family", slc="in_force")
@@ -285,7 +332,7 @@ def compute_report(
             r=contrast(**kw, a="LR", b="LM", wld="held_out", slc="in_force")
         ),
         "LM_minus_LD": reading_dict(
-            r=contrast(**kw, a="LM", b="LD", wld="train_family", slc="in_force")
+            r=contrast(**ld_kw, a="LM", b="LD", wld="train_family", slc="in_force")
         ),
         "C1_scaled": reading_dict(
             r=contrast(
@@ -310,7 +357,13 @@ def compute_report(
     }
     for sel in ("LD", "LM", "LR"):
         report["report_only"][f"{sel}_C1"] = reading_dict(
-            r=contrast(**kw, a=sel, b=common.ARM_M1, wld="train_family", slc="in_force")
+            r=contrast(
+                **(ld_kw if sel == "LD" else kw),
+                a=sel,
+                b=common.ARM_M1,
+                wld="train_family",
+                slc="in_force",
+            )
         )
     report["by_group"] = {
         g: {
@@ -332,7 +385,13 @@ def compute_report(
     }
     report["by_stratum"] = {
         s: {
-            arm: contrast(**kw, a=arm, b=common.ARM_M1, wld="train_family", slc=s).point
+            arm: contrast(
+                **(ld_kw if arm == "LD" else kw),
+                a=arm,
+                b=common.ARM_M1,
+                wld="train_family",
+                slc=s,
+            ).point
             for arm in common.FIT_ARMS
         }
         for s in ("far", "middle", "near", "ended_24h", "ended_1_7", "event_free", "onset_ahead")
@@ -377,16 +436,22 @@ def compute_report(
     prims = score.primary_indices(group="all14", labels=labels)
     first = months[0]
     report["scale_factors"] = {
-        arm: float(np.mean([tables[(m, s)][arm]["scale_factor"] for m in months for s in seeds]))
+        arm: float(
+            np.mean(
+                [
+                    tables[cell][arm]["scale_factor"]
+                    for cell in arm_cells(arm=arm, months=months, seeds=seeds, drop_ld=drop_ld)
+                ]
+            )
+        )
         for arm in common.ALL_ARMS
     }
     report["follow_share"] = {}
     for arm in common.FIT_ARMS:
         num, den = (
             sum(
-                tables[(m, s)][arm]["train_family"]["far"][key][prims].sum()
-                for m in months
-                for s in seeds
+                tables[cell][arm]["train_family"]["far"][key][prims].sum()
+                for cell in arm_cells(arm=arm, months=months, seeds=seeds, drop_ld=drop_ld)
             )
             for key in ("follow_num", "follow_den")
         )
@@ -394,12 +459,12 @@ def compute_report(
     report["departure_share_real"] = {
         arm: float(
             sum(
-                tables[(m, s)][arm]["real"]["all"]["departs"][prims].sum()
-                for m in months
-                for s in seeds
+                tables[cell][arm]["real"]["all"]["departs"][prims].sum()
+                for cell in arm_cells(arm=arm, months=months, seeds=seeds, drop_ld=drop_ld)
             )
             / sum(
-                tables[(m, s)][arm]["real"]["all"]["n"][prims].sum() for m in months for s in seeds
+                tables[cell][arm]["real"]["all"]["n"][prims].sum()
+                for cell in arm_cells(arm=arm, months=months, seeds=seeds, drop_ld=drop_ld)
             )
         )
         for arm in common.FIT_ARMS

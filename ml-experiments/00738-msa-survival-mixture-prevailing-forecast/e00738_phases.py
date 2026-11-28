@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import resource
+import shutil
 import subprocess
 import sys
 import time
@@ -248,6 +249,20 @@ def gpu_busy() -> bool:
     return bool(other_compute_processes(listing=listing, own_pids={os.getpid(), os.getppid()}))
 
 
+def require_gpu_free(*, busy: Callable[[], bool] | None = None) -> None:
+    """Exit with code 75 when another session's process is on the GPU, before any job starts.
+
+    A launcher calls this once. Between the jobs of one chain the chain waits instead
+    (`wait_for_gpu`), and the wait counts as GPU time.
+
+    Args:
+        busy: Whether the GPU is busy (`gpu_busy` by default; replaced in tests).
+    """
+    if (busy if busy is not None else gpu_busy)():
+        print("refusing to start: the GPU is busy (exit 75)", file=sys.stderr, flush=True)
+        sys.exit(common.EXIT_GPU_BUSY)
+
+
 def wait_for_gpu(
     *,
     stage: str,
@@ -297,6 +312,87 @@ def write_failure(*, name: str, exc: BaseException, kind: str = "task") -> None:
     )
 
 
+def archive_failures(*, out: Path | None = None, folder_code: Path | None = None) -> list[str]:
+    """Move the failure records of tasks that have since finished into `failed/archive/`.
+
+    A task that failed once and finished on a rerun leaves a record behind, and `require_finished`
+    refuses while any record is left in `failed/`. The archive keeps the record and the traceback.
+
+    Args:
+        out: The output folder (`OUT` by default).
+        folder_code: The code folder whose hash a done marker must hold (this file's by default).
+
+    Returns:
+        The names of the tasks whose records were moved.
+    """
+    root = out if out is not None else common.OUT
+    folder = root / "failed"
+    moved: list[str] = []
+    if not folder.exists():
+        return moved
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    for path in sorted(folder.glob("*.json")):
+        task = json.loads(path.read_text()).get("task")
+        if task is not None and is_done(name=task, out=root, folder=folder_code):
+            (folder / "archive").mkdir(exist_ok=True)
+            shutil.move(path, folder / "archive" / f"{path.stem}_{stamp}.json")
+            moved.append(task)
+    return moved
+
+
+def archive_stage_failures(*, stage: str, out: Path | None = None) -> None:
+    """Move the failure records of a stage that has now finished into `failed/archive/`."""
+    root = out if out is not None else common.OUT
+    folder = root / "failed"
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    for path in sorted(folder.glob(f"stage_{stage}_worker_*.json")) if folder.exists() else []:
+        (folder / "archive").mkdir(exist_ok=True)
+        shutil.move(path, folder / "archive" / f"{path.stem}_{stamp}.json")
+
+
+def child_env(
+    *, month: str | None = None, phase: str | None = None, extra: dict[str, str] | None = None
+) -> dict[str, str]:
+    """Return the environment of a child process that runs one fit or predict job.
+
+    Experiment 713's pipeline reads `E00667_MONTH` and `E00667_PHASE` once, when it is imported, so
+    a job runs in a child process whose environment already holds its own month and phase.
+
+    Args:
+        month: The fold month.
+        phase: `train` or `predict`.
+        extra: More variables for the child only (such as the smoke test's pass cap).
+
+    Returns:
+        A copy of this process's environment with the extra variables set.
+    """
+    env = dict(os.environ)
+    if month is not None:
+        env["E00667_MONTH"] = month
+    if phase is not None:
+        env["E00667_PHASE"] = phase
+    env.update(extra or {})
+    return env
+
+
+def run_child(*, argv: list[str], env: dict[str, str]) -> None:
+    """Run a command in a child process and raise when it fails, with the tail of its stderr.
+
+    Args:
+        argv: The command.
+        env: The child's environment.
+
+    Raises:
+        RuntimeError: When the child exits with a non-zero code.
+    """
+    done = subprocess.run(argv, env=env, stderr=subprocess.PIPE, text=True, check=False)
+    if done.stderr:
+        print(done.stderr, file=sys.stderr, end="", flush=True)
+    if done.returncode != 0:
+        msg = f"child process {argv[1:]} exited with code {done.returncode}: {done.stderr[-2000:]}"
+        raise RuntimeError(msg)
+
+
 def run_task(
     *,
     name: str,
@@ -337,12 +433,19 @@ def run_task(
         return False
     finally:
         common.time_log(stage=stage, task=name, start=start, device=device)
-    peak_gb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2
+    peak_gb = (
+        max(
+            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+            resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
+        )
+        / 1024**2
+    )
     path = done_path(name=name)
     path.parent.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%FT%TZ", time.gmtime())
     path.write_text(f"code_hash={code_hash(folder=folder)} {stamp} peak_rss_gb={peak_gb:.2f}\n")
     print(f"peak resident memory of this worker so far: {peak_gb:.2f} GB", flush=True)
+    archive_failures(folder_code=folder)
     return True
 
 
@@ -391,6 +494,7 @@ def require_finished(*, names: list[str], out: Path | None = None) -> None:
             record exists.
     """
     root = out if out is not None else common.OUT
+    archive_failures(out=root)
     unfinished = [n for n in names if not is_done(name=n, out=root)]
     failures = (
         sorted(p.name for p in (root / "failed").glob("*.json"))

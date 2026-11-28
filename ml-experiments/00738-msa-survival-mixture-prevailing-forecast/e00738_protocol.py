@@ -90,19 +90,30 @@ def scenario_table(*, scores: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def default_arms() -> tuple[str, ...]:
+    """Return the arms of the protocol tables: every arm, except `LD` when the cut list drops it.
+
+    The tables score the half-hours that all arms share, so an arm that exists only in the 4 screen
+    folds would shrink them to those folds.
+    """
+    drop_ld = common.read_cuts()["drop_ld"]
+    return tuple(a for a in common.ALL_ARMS if not (a == "LD" and drop_ld))
+
+
 def run(
     *,
     months: tuple[str, ...] = common.FOLDS,
-    seeds: tuple[int, ...] = common.SEEDS,
-    arms: tuple[str, ...] = common.ALL_ARMS,
+    seeds: tuple[int, ...] | None = None,
+    arms: tuple[str, ...] | None = None,
     out: Path | None = None,
 ) -> Path:
     """Score the real record of every arm by the protocol and write the tables.
 
     Args:
         months: The fold months.
-        seeds: The seeds.
-        arms: The arms.
+        seeds: The seeds (those that the cut list leaves, by default).
+        arms: The arms (every arm by default, except `LD` when the cut list drops it: the shared
+            half-hours would shrink to the 4 screen folds that `LD` was fitted on).
         out: The output folder (`OUT/protocol` by default).
 
     Returns:
@@ -118,6 +129,8 @@ def run(
     from studies.eval_protocol import metrics
     from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
+    seeds = seeds if seeds is not None else common.active_seeds()
+    arms = arms if arms is not None else default_arms()
     folder = out if out is not None else common.OUT / "protocol"
     folder.mkdir(parents=True, exist_ok=True)
     series = adapter.series_table()

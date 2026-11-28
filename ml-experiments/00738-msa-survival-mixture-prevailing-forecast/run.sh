@@ -23,8 +23,14 @@
 #   - at least 25 GB available at launch, and one-minute load below 24, or the wrapper refuses;
 #   - the venv's Python called directly (never `uv run` inside the scope), with this folder and the
 #     folders of the recipe experiments, 647, 650, 652, 654, 713, and 726 on PYTHONPATH. Set
-#     E00738_713_DIR to the frozen checkout of experiment 713's folder (commit 7c29114a8) and it
-#     goes first, because the stored fits carry that checkout's code hash;
+#     E00738_713_DIR to experiment 713's folder in the frozen checkout (commit 7c29114a8), and the
+#     recipe folders beside it come first, because the stored fits carry the code hash of that
+#     checkout, which covers those folders;
+#   - PYTHONDONTWRITEBYTECODE=1, so that the frozen checkout stays clean.
+# The smoke stages (smoke-fit, smoke-predict, smoke-collect) need E00738_OUT set to a scratch folder.
+# They write all their output there, read phase0.done and the review marker from the data folder,
+# and smoke-collect writes smoke.ok to both folders, which screen-fits needs in the data folder.
+# Copy nothing by hand.
 # Set DATA_PATH_INTERNAL first (CLAUDE.md, "Running an experiment"). The three NGED_S3_* variables
 # default to dummy values because the contracts package reads them at import. The stages after
 # gates need the review marker and code hash that `e00738_run.py` checks. Nothing is written
@@ -32,7 +38,7 @@
 # `scratch` path component).
 set -euo pipefail
 if [ "${1:-}" != "--go" ] || [ -z "${2:-}" ]; then
-    sed -n '2,32p' "$0" >&2
+    sed -n '2,38p' "$0" >&2
     echo "refusing to run: pass --go and a stage (nothing was started)" >&2
     exit 64
 fi
@@ -55,17 +61,25 @@ if [ "$load" -ge 24 ]; then
     echo "one-minute load ${load} is 24 or above; wait" >&2
     exit 1
 fi
-paths="$here"
+recipes="11 87 377 378 381 391 397 400 402 404 407 410 418 422 425 428 435 437 448 454 470 510 511 513 515 521 545 558 559 560 562 565 568 569 572 574 578 581 632 667 668 709 647 650 652 654 713 726"
+folders_of() {  # print the recipe experiment folders under one root, in plan order
+    for n in $recipes; do
+        for d in "$1"/${n}-* "$1"/0${n}-* "$1"/00${n}-* "$1"/000${n}-*; do
+            [ -d "$d" ] && printf '%s:' "$d"
+        done
+    done
+}
+paths=""
 if [ -n "${E00738_713_DIR:-}" ]; then
     [ -d "$E00738_713_DIR" ] || { echo "E00738_713_DIR is not a folder" >&2; exit 64; }
-    paths="$E00738_713_DIR:$paths"
+    # The frozen checkout's whole `ml-experiments` folder goes first, so that every recipe module
+    # that the code hash of 713 covers comes from the frozen commit and not from this checkout.
+    paths="$E00738_713_DIR:$(folders_of "$(dirname "$E00738_713_DIR")")"
 fi
-for n in 11 87 377 378 381 391 397 400 402 404 407 410 418 422 425 428 435 437 448 454 470 510 511 513 515 521 545 558 559 560 562 565 568 569 572 574 578 581 632 667 668 709 647 650 652 654 713 726; do
-    for d in "$root"/${n}-* "$root"/0${n}-* "$root"/00${n}-* "$root"/000${n}-*; do
-        [ -d "$d" ] && paths="$paths:$d"
-    done
-done
+paths="$paths$here:$(folders_of "$root")"
+paths="${paths%:}"
 export PYTHONPATH="$paths"
+export PYTHONDONTWRITEBYTECODE=1  # keeps the frozen checkout clean
 export NGED_S3_BUCKET_URL="${NGED_S3_BUCKET_URL:-https://example.com}"
 export NGED_S3_BUCKET_ACCESS_KEY="${NGED_S3_BUCKET_ACCESS_KEY:-dummy}"
 export NGED_S3_BUCKET_SECRET="${NGED_S3_BUCKET_SECRET:-dummy}"

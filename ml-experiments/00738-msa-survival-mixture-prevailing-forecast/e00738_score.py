@@ -225,6 +225,32 @@ def net_effect(*, c: float, v: float, q: float) -> float:
     return q * c + (1.0 - q) * v
 
 
+def bootstrap_month_means(
+    *, per_month: np.ndarray, level: float, n_resamples: int = common.N_RESAMPLES
+) -> tuple[float, float]:
+    """Bound the mean of the monthly values, resampling whole months.
+
+    Each resample draws the months with replacement and takes the mean of the drawn months' values.
+    The monthly values are already averaged over the seeds, so every resample keeps all the seeds
+    and the interval holds month-to-month variation only, as the t interval does.
+
+    Args:
+        per_month: The value of each month (the seed mean of that month's mean), (n_months,).
+        level: The coverage in percent.
+        n_resamples: The number of resamples.
+
+    Returns:
+        The lower and upper percentiles.
+    """
+    from studies.bootstrap import BOOTSTRAP_SEED
+
+    gen = np.random.default_rng(BOOTSTRAP_SEED)
+    drawn = gen.integers(0, per_month.shape[0], size=(n_resamples, per_month.shape[0]))
+    out = per_month[drawn].mean(axis=1)
+    tail = (100.0 - level) / 2.0
+    return float(np.percentile(out, tail)), float(np.percentile(out, 100.0 - tail))
+
+
 def month_block_bootstrap_net(
     *,
     c_sums: np.ndarray,
@@ -235,12 +261,11 @@ def month_block_bootstrap_net(
     level: float,
     n_resamples: int = common.N_RESAMPLES,
 ) -> tuple[float, float]:
-    """Bound the net effect q C + (1 - q) V, resampling whole months and a seed.
+    """Bound the net effect q C + (1 - q) V, resampling whole months and keeping every seed.
 
-    The stream and the draw order are those of `studies.bootstrap.bootstrap_month_totals`: one seed
-    draw, then one draw of the months, per resample. C and V are the in-force and the event-free
-    difference, so their rows differ, and each is the sum over the drawn months of its month sums
-    divided by the sum of its month counts.
+    C and V are the in-force and the event-free difference. Each month's value of each is the mean
+    over the seeds of that month's sum over its row count, and each resample draws the months once
+    for both, so the pairing of C and V in a month is kept.
 
     Args:
         c_sums: Month sums of the in-force difference, (n_seeds, n_months).
@@ -254,19 +279,10 @@ def month_block_bootstrap_net(
     Returns:
         The lower and upper percentiles.
     """
-    from studies.bootstrap import BOOTSTRAP_SEED
-
-    gen = np.random.default_rng(BOOTSTRAP_SEED)
-    n_months = c_counts.shape[0]
-    out = np.empty(n_resamples)
-    for i in range(n_resamples):
-        s = gen.integers(0, c_sums.shape[0])
-        d = gen.integers(0, n_months, size=n_months)
-        out[i] = net_effect(
-            c=c_sums[s, d].sum() / c_counts[d].sum(), v=v_sums[s, d].sum() / v_counts[d].sum(), q=q
-        )
-    tail = (100.0 - level) / 2.0
-    return float(np.percentile(out, tail)), float(np.percentile(out, 100.0 - tail))
+    per_month = q * (c_sums / c_counts[None, :]).mean(axis=0) + (1.0 - q) * (
+        v_sums / v_counts[None, :]
+    ).mean(axis=0)
+    return bootstrap_month_means(per_month=per_month, level=level, n_resamples=n_resamples)
 
 
 @dataclass(frozen=True)
@@ -279,7 +295,8 @@ class Reading:
         t_upper: Upper limit of the t interval.
         boot_lower: Lower limit of the month-block bootstrap interval.
         boot_upper: Upper limit of the month-block bootstrap interval.
-        seed_points: The point estimate of each seed.
+        seed_points: The point estimate of each seed (the mean of that seed's monthly values, as
+            `point` is the mean of the seed-averaged monthly values).
     """
 
     point: float
@@ -535,19 +552,10 @@ def reading_from_month_arrays(
     Returns:
         The reading. The monthly differences of the t interval are the seed means of each month's mean.
     """
-    from studies.bootstrap import bootstrap_month_totals
-
     per_month = (sums / counts[None, :]).mean(axis=0)
     t_lo, t_hi = t_interval(monthly=per_month, level=level)
-    import studies.bootstrap as sb
-
-    previous = sb.N_BOOTSTRAP_RESAMPLES
-    sb.N_BOOTSTRAP_RESAMPLES = n_resamples
-    try:
-        b_lo, b_hi = bootstrap_month_totals(month_sums=sums, month_counts=counts, level=level)
-    finally:
-        sb.N_BOOTSTRAP_RESAMPLES = previous
-    seed_points = tuple(float(sums[i].sum() / counts.sum()) for i in range(sums.shape[0]))
+    b_lo, b_hi = bootstrap_month_means(per_month=per_month, level=level, n_resamples=n_resamples)
+    seed_points = tuple(float(v) for v in (sums / counts[None, :]).mean(axis=1))
     return Reading(
         point=float(per_month.mean()),
         t_lower=t_lo,
@@ -594,11 +602,7 @@ def net_reading(
         n_resamples=n_resamples,
     )
     seeds = tuple(
-        net_effect(
-            c=float(c_sums[i].sum() / c_counts.sum()),
-            v=float(v_sums[i].sum() / v_counts.sum()),
-            q=q,
-        )
+        float(q * (c_sums[i] / c_counts).mean() + (1.0 - q) * (v_sums[i] / v_counts).mean())
         for i in range(c_sums.shape[0])
     )
     return Reading(float(monthly.mean()), t_lo, t_hi, b_lo, b_hi, seeds)
@@ -656,6 +660,24 @@ def row_indices(*, frame: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndar
     )
 
 
+def primary_of(*, time_series_id: np.ndarray | list, ids: np.ndarray) -> np.ndarray:
+    """Return the Primary index (the site table's `primary`) of each row's `time_series_id`.
+
+    The shift lists and every per-Primary array are indexed by the site table's `primary` column,
+    which is not in the order of the `time_series_id` values, so a caller must go through this
+    mapping rather than sort the ids.
+
+    Args:
+        time_series_id: The id of each row.
+        ids: The `time_series_id` of each Primary, in `primary` order.
+
+    Returns:
+        One index per row.
+    """
+    pos = {int(t): i for i, t in enumerate(ids)}
+    return np.array([pos[int(t)] for t in time_series_id], dtype=np.int64)
+
+
 def score_fold_seed(
     *,
     month: str,
@@ -685,11 +707,10 @@ def score_fold_seed(
     import polars as pl
     from e00738_predict import panel_names, panel_path
 
-    pos = {int(t): i for i, t in enumerate(ids)}
     sums: dict = {}
     ref_median: dict[str, np.ndarray] = {}
     real_actual: np.ndarray | None = None
-    for arm in common.ALL_ARMS:
+    for arm in common.arms_of(month=month, seed=seed, out=out):
         train_y, train_q = [], []
         for name in panel_names():
             if world_of(name=name) == "train_family":
@@ -707,7 +728,7 @@ def score_fold_seed(
             y = f["actual"].to_numpy().astype(np.float64)
             q = f.select(*_QCOLS).to_numpy().astype(np.float64)
             ok = np.isfinite(y)
-            prim = np.array([pos[int(t)] for t in f["time_series_id"].to_list()])
+            prim = primary_of(time_series_id=f["time_series_id"].to_list(), ids=ids)
             origin, valid, lead = row_indices(frame=f)
             if wld == "real":
                 masks = {"all": np.ones(len(y), bool)}
@@ -735,7 +756,10 @@ def score_fold_seed(
                 delta = np.zeros(len(y))
             else:
                 base = real_actual if real_actual is not None else y
-                delta = np.where(ok, y - base, 0.0) if len(base) == len(y) else np.zeros(len(y))
+                assert len(base) == len(y), (
+                    f"the real and injected panels differ in length: {len(base)} and {len(y)}"
+                )
+                delta = np.where(ok, y - base, 0.0)
             values = {
                 "crps": 2.0 * pin.mean(axis=1),
                 "crps_scaled": crps_points(y=np.where(ok, y, 0.0), q=qs),

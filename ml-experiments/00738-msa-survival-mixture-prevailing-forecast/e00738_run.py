@@ -4,10 +4,16 @@
 Stages in run order: `phase0` (worlds, curves, the A1 table, the stratum check, the gallery),
 `review-mark`, `smoke-fit`, `smoke-predict`, `smoke-collect`, `screen-fits` (fits, then predictions
 of the 4 screen folds at seed 0), `gate`, `gate-remedy`, `screen-score`, `full-fits`, `predict`,
-`score`, `members`, `report`, and `figures`. A stage needs the marker of the stage before it, and the
-review marker must hold the hash of the current code. A failed task writes `failed/task_<name>.json`
-with the message and the traceback. A failed CPU stage exits with code 3, a failed GPU chain with code
-5, and a launcher that finds the GPU busy exits with code 75.
+`score`, `members`, `protocol`, `report`, and `figures`. A stage needs the marker of the stage before
+it, and the review marker must hold the hash of the current code. A failed task writes
+`failed/task_<name>.json` with the message and the traceback, and a later successful run of the task
+moves that record into `failed/archive/`. A failed CPU stage exits with code 3, a failed GPU chain with
+code 5 (and the gate's second failure), the gate's first failure with code 6, and a launcher that
+finds the GPU busy with code 75.
+
+Every fit and every prediction job runs in a child process of its own (`one-task`), because
+experiment 713's pipeline reads its month and phase once, when it is imported. The parent process
+keeps the ledger, the failure records, and the done markers.
 """
 
 from __future__ import annotations
@@ -18,12 +24,19 @@ import os
 import sys
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Final
 
 import e00738_common as common
 import e00738_phases as phases
 import numpy as np
 
+SMOKE_STAGES: Final[frozenset[str]] = frozenset({"smoke-fit", "smoke-predict", "smoke-collect"})
+"""The stages that read their prerequisite markers from the data folder and write the rest to a
+scratch folder."""
+GPU_STAGES: Final[frozenset[str]] = frozenset(
+    {"smoke-fit", "smoke-predict", "screen-fits", "full-fits", "predict", "gate-remedy"}
+)
 STAGES: Final[tuple[str, ...]] = (
     "phase0",
     "review-mark",
@@ -41,8 +54,9 @@ STAGES: Final[tuple[str, ...]] = (
     "protocol",
     "report",
     "figures",
+    "one-task",
 )
-PROJECTED_GPU_HOURS: Final[float] = 5.9
+PROJECTED_GPU_HOURS: Final[float] = 6.3
 
 
 # ---------------------------------------------------------------------------------------------
@@ -55,13 +69,13 @@ def fit_jobs(
 
     Args:
         screen: True for the 20 screen fits (4 folds, seed 0, 5 arms); False for the other fits.
-        drop_ld: Cut LD (the first cut of the cost plan).
+        drop_ld: Cut LD from the fits outside the screen (the first cut of the cost plan).
         seeds: The seeds of the full set (the second cut keeps seeds 0 and 1).
 
     Returns:
         The names and keyword arguments of the tasks.
     """
-    arms = tuple(a for a in common.FIT_ARMS if not (drop_ld and a == "LD"))
+    arms = tuple(a for a in common.FIT_ARMS if not (drop_ld and not screen and a == "LD"))
     jobs: list[tuple[str, dict[str, Any]]] = []
     if screen:
         jobs.extend(
@@ -103,7 +117,11 @@ def count_fits() -> int:
 # Tasks
 # ---------------------------------------------------------------------------------------------
 def task_fit(*, arm: str, month: str, seed: int, device: str) -> None:
-    """Fit one arm; the gate's remedy flag, once set, applies to every head fit."""
+    """Fit one arm in this process; the gate's remedy flag, once set, applies to every head fit.
+
+    Run only in a child process (`one-task`), because the pipeline of experiment 713 is imported for
+    one month and one phase per process.
+    """
     import e00738_fit as fit
     import e00738_gate as gate
 
@@ -116,11 +134,93 @@ def task_fit(*, arm: str, month: str, seed: int, device: str) -> None:
     )
 
 
-def task_predict(*, month: str, seed: int, device: str) -> None:
-    """Predict every arm and panel of one fold and seed."""
+def task_predict(
+    *,
+    month: str,
+    seed: int,
+    device: str,
+    arms: tuple[str, ...] | None = None,
+    only: tuple[str, ...] | None = None,
+) -> None:
+    """Predict the arms and panels of one fold and seed in this process (a child process only)."""
     import e00738_predict as pred
 
-    pred.run_job(month=month, seed=seed, device=device)
+    pred.run_job(month=month, seed=seed, device=device, arms=arms, only=only)
+
+
+def child_argv(
+    *,
+    kind: str,
+    month: str,
+    seed: int,
+    device: str,
+    arm: str | None = None,
+    arms: tuple[str, ...] | None = None,
+    only: tuple[str, ...] | None = None,
+) -> list[str]:
+    """Return the command line of the child process that runs one fit or prediction job."""
+    argv = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "one-task",
+        "--kind",
+        kind,
+        "--month",
+        month,
+        "--seed",
+        str(seed),
+        "--device",
+        device,
+    ]
+    if arm is not None:
+        argv += ["--arm", arm]
+    if arms is not None:
+        argv += ["--arms", ",".join(arms)]
+    if only is not None:
+        argv += ["--only", ",".join(only)]
+    return argv
+
+
+def sub_fit(
+    *, arm: str, month: str, seed: int, device: str, extra_env: dict[str, str] | None = None
+) -> None:
+    """Fit one arm in a child process of its own, in the training phase of its month."""
+    phases.run_child(
+        argv=child_argv(kind="fit", arm=arm, month=month, seed=seed, device=device),
+        env=phases.child_env(month=month, phase="train", extra=extra_env),
+    )
+
+
+def sub_predict(
+    *,
+    month: str,
+    seed: int,
+    device: str,
+    arms: tuple[str, ...] | None = None,
+    only: tuple[str, ...] | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> None:
+    """Predict the arms and panels of one fold and seed in a child process of its own, in the prediction phase."""
+    phases.run_child(
+        argv=child_argv(
+            kind="predict", arms=arms, only=only, month=month, seed=seed, device=device
+        ),
+        env=phases.child_env(month=month, phase="predict", extra=extra_env),
+    )
+
+
+def stage_one_task(*, args: argparse.Namespace) -> None:
+    """Run one fit or prediction job in this process; the parent process started it for this job alone."""
+    if args.kind == "fit":
+        task_fit(arm=args.arm, month=args.month, seed=args.seed, device=args.device)
+    else:
+        task_predict(
+            month=args.month,
+            seed=args.seed,
+            device=args.device,
+            arms=tuple(args.arms.split(",")) if args.arms else None,
+            only=tuple(args.only.split(",")) if args.only else None,
+        )
 
 
 def load_fold(*, month: str, phase: str, device: str) -> tuple[Any, Any, np.ndarray]:
@@ -282,11 +382,19 @@ def task_a1_table(*, month: str) -> None:
             "mean_abs_age_error": float(np.abs(found[found > 0] - true_age[sel][found > 0]).mean())
             if (found > 0).any()
             else None,
+            "mean_signed_age_error": float((found[found > 0] - true_age[sel][found > 0]).mean())
+            if (found > 0).any()
+            else None,
         }
     free = (true_age < 0) & (since_end > 15.0)
     rows["false_alarm_injected_event_free"] = float((ages["injected"][free] > 0).mean())
     rows["false_alarm_real_all_rows"] = float((ages["real"] > 0).mean())
     rows["bar_ok"] = rows["false_alarm_real_all_rows"] <= common.A1_FALSE_ALARM_MAX
+    seen = (true_age >= 0) & (ages["injected"] > 0)
+    bias = float((ages["injected"][seen] - true_age[seen]).mean()) if seen.any() else None
+    rows["age_bias_days"] = bias
+    rows["age_bias_bar_days"] = common.A1_BIAS_MAX_DAYS
+    rows["age_bias_exceeds_bar"] = bias is not None and abs(bias) > common.A1_BIAS_MAX_DAYS
     rows["noise_unit"] = noise
     del torch
     common.atomic_json(obj=rows, path=common.OUT / "a1" / f"{month}.json")
@@ -338,11 +446,29 @@ def run_gpu_tasks(
     )
 
 
-def mark(*, name: str) -> None:
-    """Write a stage marker holding the code hash."""
-    path = common.OUT / phases.STAGE_MARKERS.get(name, f"{name}.done")
+def mark(*, name: str, out: Path | None = None) -> None:
+    """Write a stage marker holding the code hash (under `OUT` unless `out` is given)."""
+    path = (out if out is not None else common.OUT) / phases.STAGE_MARKERS.get(name, f"{name}.done")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"code_hash={phases.code_hash()} {time.strftime('%FT%TZ', time.gmtime())}\n")
+
+
+def finish_stage(*, name: str, tasks: list[str]) -> None:
+    """Write the stage marker when every task of the stage has finished, whichever worker finishes last.
+
+    Each worker calls this after its own share. The marker is written by the first call that finds
+    every task done and no failure record left, so a run with several workers writes it too.
+
+    Args:
+        name: The stage's key in `phases.STAGE_MARKERS`.
+        tasks: The names of every task of the stage, not only this worker's.
+    """
+    try:
+        phases.require_finished(names=tasks)
+    except RuntimeError as exc:
+        print(f"stage marker {name} not written yet: {exc}", flush=True)
+        return
+    mark(name=name)
 
 
 def stage_phase0(*, args: argparse.Namespace) -> None:
@@ -367,8 +493,7 @@ def stage_phase0(*, args: argparse.Namespace) -> None:
         failed += not phases.run_task(name=name, fn=fn, kwargs=kw, device="cpu", stage="phase0")
     if failed:
         sys.exit(common.EXIT_FAILED)
-    if args.of == 1:
-        mark(name="phase0")
+    finish_stage(name="phase0", tasks=[n for n, _ in jobs])
     print(
         f"projection: {count_fits()} fits, {PROJECTED_GPU_HOURS} GPU-process-hours, stop at {common.STOP_GPU_HOURS}",
         flush=True,
@@ -381,29 +506,54 @@ def stage_review_mark() -> None:
     print("review marker written for", phases.write_review_marker(), flush=True)
 
 
-def stage_smoke_fit(*, args: argparse.Namespace) -> None:
-    """One pass of every arm on the real device and the real files; scratch output only."""
-    require_scratch()
-    phases.require_stage(stage="smoke")
-    os.environ[common.PASS_CAP_ENV] = "1"  # one pass of every arm
-    import e00738_fit as fit
+def smoke_marker_root() -> Path:
+    """Return the folder whose markers the smoke stages read: the data folder, read-only."""
+    return common.REAL_OUT
 
-    for arm in common.FIT_ARMS:
-        fit.fit_job(arm=arm, month=common.SCREEN_FOLDS[0], seed=0, device=args.device)
+
+def stage_smoke_fit(*, args: argparse.Namespace) -> None:
+    """One pass of every arm on the real device and the real files; scratch output only.
+
+    The prerequisite markers (`phase0.done` and the review marker) are read from the data folder.
+    Every fit runs in a child process whose environment alone holds the one-pass cap.
+    """
+    require_scratch()
+    phases.require_stage(stage="smoke", out=smoke_marker_root())
+    jobs = [
+        (
+            f"smoke_fit_{arm}",
+            {
+                "arm": arm,
+                "month": common.SCREEN_FOLDS[0],
+                "seed": 0,
+                "extra_env": {common.PASS_CAP_ENV: "1"},
+            },
+        )
+        for arm in common.FIT_ARMS
+    ]
+    run_gpu_tasks(jobs=jobs, fn=sub_fit, stage="smoke", args=args)
 
 
 def stage_smoke_predict(*, args: argparse.Namespace) -> None:
     """Predict the real record and one world pass of the first screen fold, reproduce stored `M1`, and read the files with the scoring code."""
     require_scratch()
-    phases.require_stage(stage="smoke")
-    import e00738_predict as pred
-
-    pred.run_job(month=common.SCREEN_FOLDS[0], seed=0, device=args.device, only=("real", "pass00"))
+    phases.require_stage(stage="smoke", out=smoke_marker_root())
+    jobs = [
+        (
+            "smoke_predict",
+            {"month": common.SCREEN_FOLDS[0], "seed": 0, "only": ("real", "pass00")},
+        )
+    ]
+    run_gpu_tasks(jobs=jobs, fn=sub_predict, stage="smoke", args=args)
 
 
 def stage_smoke_collect() -> None:
-    """Read the smoke predictions with the scoring code and write `smoke.ok`."""
+    """Read the smoke predictions with the scoring code, write `smoke.ok` to the scratch folder, and write it to the data folder.
+
+    The marker in the data folder is the one file the smoke test writes there. `screen-fits` needs it.
+    """
     require_scratch()
+    phases.require_stage(stage="smoke", out=smoke_marker_root())
     import e00738_predict as pred
     import e00738_score as score
     import numpy as np
@@ -424,12 +574,13 @@ def stage_smoke_collect() -> None:
         "stored M1 was not reproduced"
     )
     mark(name="smoke")
+    mark(name="smoke", out=smoke_marker_root())
     print("smoke ok", flush=True)
 
 
 def require_scratch() -> None:
-    """Stop unless `E00738_OUT` names a scratch folder (the smoke test never writes to the data folder)."""
-    if "E00738_OUT" not in os.environ:
+    """Stop unless `E00738_OUT` names a scratch folder (the smoke test never writes its output to the data folder)."""
+    if "E00738_OUT" not in os.environ or not common.is_scratch():
         sys.exit("refusing to run the smoke test outside a scratch folder: set E00738_OUT")
 
 
@@ -440,14 +591,12 @@ def stage_screen_fits(*, args: argparse.Namespace) -> None:
         f"fits starting: {len(fit_jobs(screen=True))} screen fits, {count_fits()} in all, projected {PROJECTED_GPU_HOURS} GPU-process-hours, memory cap {common.MEMORY_MAX_GB} GB, cores from SLOT_CPUS",
         flush=True,
     )
-    run_gpu_tasks(jobs=fit_jobs(screen=True), fn=task_fit, stage="screen_fit", args=args)
-    run_gpu_tasks(
-        jobs=predict_jobs(screen=True), fn=task_predict, stage="screen_predict", args=args
-    )
-    if args.of == 1:
-        projection = recompute_projection()
-        common.atomic_json(obj=projection, path=common.OUT / "projection.json")
-        mark(name="screen_fits")
+    run_gpu_tasks(jobs=fit_jobs(screen=True), fn=sub_fit, stage="screen_fit", args=args)
+    run_gpu_tasks(jobs=predict_jobs(screen=True), fn=sub_predict, stage="screen_predict", args=args)
+    names = [n for n, _ in (*fit_jobs(screen=True), *predict_jobs(screen=True))]
+    if all(phases.is_done(name=n) for n in names):
+        common.atomic_json(obj=recompute_projection(), path=common.OUT / "projection.json")
+    finish_stage(name="screen_fits", tasks=names)
 
 
 def recompute_projection() -> dict[str, float]:
@@ -493,6 +642,22 @@ def screen_shifts(*, month: str):  # noqa: ANN201
     )
 
 
+def a1_age_bias() -> dict[str, object]:
+    """Return A1's mean signed age error that Phase 0 recorded, and whether it is over the 1-day bar.
+
+    A1's age is not changed. A bias over the bar is stated here so that a reader of the gate and of
+    every reading that rests on the survival ratio sees it.
+
+    Returns:
+        The bias in days by fold (None when Phase 0 wrote no table), and `exceeds_bar`.
+    """
+    found: dict[str, float | None] = {}
+    for path in sorted((common.OUT / "a1").glob("*.json")):
+        found[path.stem] = json.loads(path.read_text()).get("age_bias_days")
+    exceeds = any(v is not None and abs(v) > common.A1_BIAS_MAX_DAYS for v in found.values())
+    return {"by_fold": found, "bar_days": common.A1_BIAS_MAX_DAYS, "exceeds_bar": exceeds}
+
+
 def stage_gate() -> None:
     """The known-answer gate on the screen fits and predictions; sets the remedy flag on a first failure, exits with code 5 on a second."""
     phases.require_stage(stage="gate")
@@ -502,60 +667,40 @@ def stage_gate() -> None:
     import numpy as np
     import polars as pl
 
-    num = den = 0.0
+    total = {"num": 0.0, "den": 0.0, "num_seen": 0.0, "den_seen": 0.0, "rows": 0, "rows_seen": 0}
     ratios: list[float] = []
+    ids = site_labels()[1]
     for m in common.SCREEN_FOLDS:
         shifts = screen_shifts(month=m)
+        real = pl.read_parquet(pred.panel_path(arm="M1", month=m, seed=0, name="real"))
         for name in (n for n in pred.panel_names() if score.world_of(name=n) == "train_family"):
-            m1 = pl.read_parquet(pred.panel_path(arm="M1", month=m, seed=0, name=name))
-            lp = pl.read_parquet(pred.panel_path(arm="LP", month=m, seed=0, name=name))
-            real = pl.read_parquet(pred.panel_path(arm="M1", month=m, seed=0, name="real"))
-            ids = sorted(m1["time_series_id"].unique().to_list())
-            prim = np.array([ids.index(t) for t in m1["time_series_id"].to_list()])
-            origin, valid, lead = score.row_indices(frame=m1)
-            sh = shifts[name]
-            masks = score.row_masks(
-                prim=prim,
-                origin_idx=origin,
-                valid_idx=valid,
-                lead_day=lead,
-                onset=np.array([s.onset_idx for s in sh]),
-                end=np.array([s.end_idx for s in sh]),
-                clipped=np.array([s.clipped for s in sh]),
+            lp_path = pred.panel_path(arm="LP", month=m, seed=0, name=name)
+            diag_path = lp_path.with_name(f"{name}_diag.parquet")
+            got = gate.panel_readings(
+                m1=pl.read_parquet(pred.panel_path(arm="M1", month=m, seed=0, name=name)),
+                lp=pl.read_parquet(lp_path),
+                real=real,
+                diag=pl.read_parquet(diag_path) if diag_path.exists() else None,
+                shifts=shifts[name],
+                ids=ids,
             )
-            sel = masks["far"] & np.isin(lead, (1, 2))
-            delta = np.nan_to_num(m1["actual"].to_numpy() - real["actual"].to_numpy())
-            num += float(((lp["q50"].to_numpy() - m1["q50"].to_numpy())[sel] * delta[sel]).sum())
-            den += float((delta[sel] ** 2).sum())
-            diag_path = pred.panel_path(arm="LP", month=m, seed=0, name=name).with_name(
-                f"{name}_diag.parquet"
-            )
-            if diag_path.exists():
-                d = pl.read_parquet(diag_path).filter(pl.col("lead_day") == 1)
-                dprim = np.array([ids.index(t) for t in d["time_series_id"].to_list()])
-                c = d["origin_us"].to_numpy()
-                c_idx = (c - common.GRID_START_US) // common.STEP_US + common.NATIVE_OFFSET_STEPS
-                onset = np.array([s.onset_idx for s in sh])[dprim]
-                end = np.array([s.end_idx for s in sh])[dprim]
-                age = (c_idx - onset) / 48.0
-                true = np.array([s.sign * s.depth for s in sh])[dprim]
-                seen = d["age"].to_numpy() > 0
-                sel2 = (c_idx >= onset) & (c_idx < end)
-                tab = gate.depth_ratio_table(
-                    depth_share=d["depth_share"].to_numpy()[sel2],
-                    true_depth=true[sel2],
-                    age=age[sel2],
-                    seen=seen[sel2],
-                )
-                if not np.isnan(tab["3-10"]):
-                    ratios.append(tab["3-10"])
+            for k in total:
+                total[k] += got[k]
+            ratios.extend(got["depth_ratio"])
     record = gate.evaluate(
         oracle={
             "midday": gate.oracle_follow_synthetic(onset_half_hour_of_day=24),
             "midnight": gate.oracle_follow_synthetic(onset_half_hour_of_day=0),
         },
-        lp_follow=num / den if den > 0 else float("nan"),
+        lp_follow=total["num_seen"] / total["den_seen"] if total["den_seen"] > 0 else float("nan"),
+        lp_follow_all_far=total["num"] / total["den"] if total["den"] > 0 else float("nan"),
         depth_ratio=float(np.median(ratios)) if ratios else float("nan"),
+        diagnostics={
+            "a1_age_bias_days": a1_age_bias(),
+            "far_rows_lead_1_2": total["rows"],
+            "far_rows_a1_sees": total["rows_seen"],
+            "share_of_far_rows_a1_sees": total["rows_seen"] / max(total["rows"], 1),
+        },
     )
     decision = gate.write_gate(
         record=record, remedy_done=gate.remedy_active(), code_hash=phases.code_hash()
@@ -568,24 +713,42 @@ def stage_gate() -> None:
 
 
 def stage_gate_remedy(*, args: argparse.Namespace) -> None:
-    """Refit the 4 screen LP fits with the pre-registered remedy (cap 120, patience 15), predict them, and run the gate again."""
+    """Refit the 16 screen head fits (LP, LD, LM, LR on 4 folds) with the remedy, predict them, and run the gate again.
+
+    The remedy (cap 120, patience 15) applies to every head arm alike, so every screen head fit is
+    refitted under it. Then S* is chosen, and C2 is compared, between fits made with one recipe. The
+    screen fits of W0 are not refitted, because the remedy does not apply to W0.
+    """
+    import shutil
+
     import e00738_gate as gate
-    import e00738_predict as pred
 
     assert gate.remedy_active(), "the gate has not set the remedy flag"
+    arms = common.HEAD_ARMS
     for m in common.SCREEN_FOLDS:
-        for p in (common.fit_paths(arm="LP", month=m, seed=0),):
-            for path in p.values():
+        for arm in arms:
+            for path in common.fit_paths(arm=arm, month=m, seed=0).values():
                 path.unlink(missing_ok=True)
-        import shutil
-
-        shutil.rmtree(common.OUT / "predictions" / "LP" / f"{m}_s0", ignore_errors=True)
-    jobs = [
-        (f"fit_LP_{m}_s0_remedy", {"arm": "LP", "month": m, "seed": 0}) for m in common.SCREEN_FOLDS
-    ]
-    run_gpu_tasks(jobs=jobs, fn=task_fit, stage="gate_remedy", args=args)
-    for m in common.SCREEN_FOLDS:
-        pred.run_job(month=m, seed=0, device=args.device, arms=("LP",))
+            shutil.rmtree(common.OUT / "predictions" / arm / f"{m}_s0", ignore_errors=True)
+    run_gpu_tasks(
+        jobs=[
+            (f"fit_{arm}_{m}_s0_remedy", {"arm": arm, "month": m, "seed": 0})
+            for m in common.SCREEN_FOLDS
+            for arm in arms
+        ],
+        fn=sub_fit,
+        stage="gate_remedy",
+        args=args,
+    )
+    run_gpu_tasks(
+        jobs=[
+            (f"predict_{m}_s0_remedy", {"month": m, "seed": 0, "arms": arms})
+            for m in common.SCREEN_FOLDS
+        ],
+        fn=sub_predict,
+        stage="gate_remedy",
+        args=args,
+    )
     stage_gate()
 
 
@@ -650,25 +813,21 @@ def site_labels():  # noqa: ANN201
 def stage_full_fits(*, args: argparse.Namespace) -> None:
     """The other 100 fits, with the manager's cuts applied if the screen projection fired them."""
     phases.require_stage(stage="full_fits")
-    cuts = common.OUT / "cuts.json"
-    spec = json.loads(cuts.read_text()) if cuts.exists() else {}
-    seeds = (0, 1) if spec.get("seeds01") else common.SEEDS
-    run_gpu_tasks(
-        jobs=fit_jobs(screen=False, drop_ld=bool(spec.get("drop_ld")), seeds=seeds),
-        fn=task_fit,
-        stage="full_fit",
-        args=args,
-    )
-    if args.of == 1:
-        mark(name="full_fits")
+    cuts = common.read_cuts()
+    if cuts["drop_ld"]:
+        star = json.loads((common.OUT / "sstar.json").read_text())["s_star"]
+        assert star != "LD", "the cut list drops LD, but the screen chose LD as S*"
+    jobs = fit_jobs(screen=False, drop_ld=cuts["drop_ld"], seeds=common.active_seeds())
+    run_gpu_tasks(jobs=jobs, fn=sub_fit, stage="full_fit", args=args)
+    finish_stage(name="full_fits", tasks=[n for n, _ in jobs])
 
 
 def stage_predict(*, args: argparse.Namespace) -> None:
-    """The other 20 prediction jobs."""
+    """The other prediction jobs (20, fewer after the seed cut)."""
     phases.require_stage(stage="predict")
-    run_gpu_tasks(jobs=predict_jobs(screen=False), fn=task_predict, stage="predict", args=args)
-    if args.of == 1:
-        mark(name="predict")
+    jobs = predict_jobs(screen=False, seeds=common.active_seeds())
+    run_gpu_tasks(jobs=jobs, fn=sub_predict, stage="predict", args=args)
+    finish_stage(name="predict", tasks=[n for n, _ in jobs])
 
 
 def stage_score(*, args: argparse.Namespace) -> None:
@@ -679,7 +838,7 @@ def stage_score(*, args: argparse.Namespace) -> None:
     labels, ids = site_labels()
     jobs = [
         (f"score_{m}_s{s}", {"month": m, "seed": s, "labels": labels, "ids": ids})
-        for s in common.SEEDS
+        for s in common.active_seeds()
         for m in common.FOLDS
     ]
 
@@ -689,9 +848,7 @@ def stage_score(*, args: argparse.Namespace) -> None:
         )
 
     run_cpu_tasks(jobs=jobs, fn=one, stage="score", args=args)
-    if args.of == 1:
-        phases.require_finished(names=[n for n, _ in jobs])
-        mark(name="score")
+    finish_stage(name="score", tasks=[n for n, _ in jobs])
 
 
 MEMBER_PANELS: Final[tuple[str, ...]] = ("pass00", "pass01", "pass02", "pass03")
@@ -788,8 +945,16 @@ def stage_report() -> None:
     labels, _ = site_labels()
     star = json.loads((common.OUT / "sstar.json").read_text())["s_star"]
     invalid = not (common.OUT / "gate_passed.json").exists()
-    tables = report.load_tables(months=common.FOLDS, seeds=common.SEEDS)
-    rep = report.compute_report(tables=tables, labels=labels, s_star=star, invalid=invalid)
+    seeds = common.active_seeds()
+    tables = report.load_tables(months=common.FOLDS, seeds=seeds)
+    rep = report.compute_report(
+        tables=tables,
+        labels=labels,
+        s_star=star,
+        seeds=seeds,
+        invalid=invalid,
+        drop_ld=common.read_cuts()["drop_ld"],
+    )
     rep["audit_triggers"] = report.audit_triggers(report=rep)
     report.write_report(report=rep)
     print(report.render(report=rep), flush=True)
@@ -820,15 +985,23 @@ def parse_args(*, argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--worker", type=int, default=0)
     p.add_argument("--of", type=int, default=1)
     p.add_argument("--device", default="cuda")
+    p.add_argument("--kind", choices=("fit", "predict"), help="one-task only")
+    p.add_argument("--arm", help="one-task fit only")
+    p.add_argument("--month", help="one-task only")
+    p.add_argument("--seed", type=int, default=0, help="one-task only")
+    p.add_argument("--arms", help="one-task predict only: comma-separated arms")
+    p.add_argument("--only", help="one-task predict only: comma-separated panel names")
     return p.parse_args(argv)
 
 
 def dispatch(*, args: argparse.Namespace) -> None:
     """Run the stage named in `args`, after the guards that need no review marker."""
     s = args.stage
-    if s not in {"phase0", "review-mark"}:
-        phases.require_review()
+    if s not in {"phase0", "review-mark", "one-task"}:
+        # the parent process of a `one-task` child has already checked the marker
+        phases.require_review(out=smoke_marker_root() if s in SMOKE_STAGES else None)
     table: dict[str, Callable[[], None]] = {
+        "one-task": lambda: stage_one_task(args=args),
         "phase0": lambda: stage_phase0(args=args),
         "review-mark": stage_review_mark,
         "smoke-fit": lambda: stage_smoke_fit(args=args),
@@ -853,14 +1026,17 @@ def main(*, argv: list[str] | None = None) -> None:
     """Run a stage; a failure writes `failed/stage_<stage>.json` with the message and the traceback, and exits with code 3 (CPU) or 5 (GPU)."""
     args = parse_args(argv=argv)
     phases.assert_blas_pinned()
-    gpu = args.stage in {
-        "smoke-fit",
-        "smoke-predict",
-        "screen-fits",
-        "full-fits",
-        "predict",
-        "gate-remedy",
-    }
+    gpu = args.stage in GPU_STAGES
+    if args.stage != "one-task" and common.PASS_CAP_ENV in os.environ:
+        sys.exit(
+            f"refusing to run: {common.PASS_CAP_ENV} is set in the environment (only the smoke "
+            "stages set it, and only for their child processes)"
+        )
+    if gpu and args.device.startswith("cuda"):
+        phases.require_gpu_free()
+    if args.stage == "one-task":
+        dispatch(args=args)  # the parent process records a failure
+        return
     try:
         dispatch(args=args)
     except SystemExit:
@@ -869,6 +1045,7 @@ def main(*, argv: list[str] | None = None) -> None:
         phases.write_failure(name=f"{args.stage}_worker_{args.worker}", exc=exc, kind="stage")
         print(f"FAILED stage {args.stage}: {exc}", file=sys.stderr, flush=True)
         sys.exit(common.EXIT_CHAIN_FAILED if gpu else common.EXIT_FAILED)
+    phases.archive_stage_failures(stage=args.stage)
 
 
 if __name__ == "__main__":

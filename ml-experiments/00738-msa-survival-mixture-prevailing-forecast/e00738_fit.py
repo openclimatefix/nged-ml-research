@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """One fit job per (arm, fold, seed): W0, or a head arm on the frozen stored stage 3 state of `M1`.
 
-Run through `e00738_run.py` in a process of its own. It sets `E00667_PHASE=train`, under which
+Run through `e00738_run.py one-task` in a child process of its own, one process per job. It sets `E00667_PHASE=train`, under which
 experiment 713's pipeline sets the cleaned power to NaN from the fold month's start, so no code
 path can read a held-out reading. It writes the state to `networks/<arm>/<month>_s<seed>.pt` and the
 log to `fits/<arm>/<month>_s<seed>.json`, each to a temporary name and then renamed. The stored
@@ -25,6 +25,13 @@ import e00738_survival as surv
 import e00738_world as world
 import numpy as np
 
+REQUIRED_CACHE_FILES: Final[tuple[str, ...]] = (
+    "dense_b1_cams.npy",
+    "dense_b1_grid.npy",
+    "dense_raw.npy",
+)
+"""The dense arrays in experiment 713's cache folder. Experiment 713's pipeline builds a missing
+one there, so a missing file stops the job before it can write into that folder."""
 N_DURATION_PASSES: Final[int] = 100
 """Training-world passes whose drawn durations the survival curve is fitted to."""
 
@@ -90,6 +97,8 @@ def load_fold_data(*, month: str, phase: str, seed: int, device: str) -> Any:
     import e00713_inputs as inp  # ty: ignore[unresolved-import]
     from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
+    missing = [f for f in REQUIRED_CACHE_FILES if not (inp.CACHE / f).exists()]
+    assert not missing, f"experiment 713's cache lacks {missing}; a build there would write to it"
     pipe = inp.load_pipeline(month=month, phase=phase, chain_root=inp.chain_root_of_seed(seed=seed))
     data = inp.build_fold_data(pipe=pipe, device=device)
     saved = (
@@ -128,6 +137,11 @@ def m1_state(*, month: str, seed: int, stage: int, device: str) -> dict:
     return torch.load(path, map_location=device)
 
 
+def head_init_seed(*, seed: int) -> int:
+    """Return the seed of the level head's initial weights, which differs between run seeds."""
+    return seed * 7 + 3
+
+
 def head_model(  # noqa: ANN201 - `LevelNet` needs torch, imported lazily
     *,
     arm: str,
@@ -153,7 +167,9 @@ def head_model(  # noqa: ANN201 - `LevelNet` needs torch, imported lazily
         The network.
     """
     import e00738_model as lmdl
+    import torch  # ty: ignore[unresolved-import]
 
+    torch.manual_seed(head_init_seed(seed=seed))
     net = lmdl.LevelNet(mode=arm, target_std=target_std, noise=noise, curve=curve).to(device)
     net.load_base(state=m1_state(month=month, seed=seed, stage=3, device=device))
     net.freeze_base()
@@ -181,6 +197,7 @@ def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = Fals
         remedy: Use the gate's remedy (cap 120, patience 15) for a head arm.
     """
     os.environ["E00667_PHASE"] = "train"
+    os.environ["E00667_MONTH"] = month
     code713 = panel.assert_713_code()
     import e00713_train as tr  # ty: ignore[unresolved-import]
     import e00738_train as train738
@@ -202,11 +219,6 @@ def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = Fals
         placebo_pool=tr.block_pool(clean=data.clean),
     )
     _, _, is_mw = fold_world()
-    attempt = 1 + (
-        len(list(paths["log"].parent.glob(f"{month}_s{seed}.attempt*")))
-        if paths["log"].parent.exists()
-        else 0
-    )
     log: dict = {
         "arm": arm,
         "month": month,
@@ -214,7 +226,6 @@ def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = Fals
         "device": device,
         "code_hash_713": code713,
         "code_hash": phases.code_hash(),
-        "attempt": attempt,
         "remedy": remedy,
         "start": time.strftime("%FT%TZ", time.gmtime(started)),
     }

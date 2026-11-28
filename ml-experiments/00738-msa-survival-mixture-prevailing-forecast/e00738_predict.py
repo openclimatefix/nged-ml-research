@@ -113,7 +113,7 @@ def run_job(
     month: str,
     seed: int,
     device: str,
-    arms: tuple[str, ...] = common.ALL_ARMS,
+    arms: tuple[str, ...] | None = None,
     only: tuple[str, ...] | None = None,
 ) -> None:
     """Predict every arm and panel of one fold and seed, and write the files.
@@ -122,11 +122,15 @@ def run_job(
         month: The fold month.
         seed: The seed.
         device: `cuda` or `cpu`.
-        arms: The arms to predict.
+        arms: The arms to predict (the arms that exist for the fold and seed after the cut list
+            when `None`).
         only: The panel names to predict; `None` predicts every panel.
     """
     os.environ["E00667_PHASE"] = "predict"
+    os.environ["E00667_MONTH"] = month
     panel.assert_713_code()
+    if arms is None:
+        arms = common.arms_of(month=month, seed=seed)
     import e00738_fit as fit
     import torch  # ty: ignore[unresolved-import]
 

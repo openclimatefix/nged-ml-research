@@ -43,6 +43,23 @@ def _output_folder() -> Path:
 
 OUT: Final[Path] = _output_folder()
 """The only folder this experiment writes to."""
+REAL_OUT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / FOLDER
+"""The experiment's folder under the shared data folder. The smoke stages read the review marker
+from here and write `smoke.ok` here; they write nothing else here."""
+
+
+def is_scratch(*, out: Path | None = None) -> bool:
+    """Return whether the output folder is a scratch folder.
+
+    Args:
+        out: The folder to test (`OUT` by default).
+
+    Returns:
+        True when `E00738_SCRATCH=1` or the path has a `scratch` component.
+    """
+    path = out if out is not None else OUT
+    return os.environ.get("E00738_SCRATCH") == "1" or "scratch" in path.parts
+
 
 # --- Read-only inputs: experiment 713 ----------------------------------------------------------
 NAME_713: Final[str] = "00713-msa-axial-attention-demand-network-part-1"
@@ -116,6 +133,9 @@ A1_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("over 15", 16.0, 1e9),
 )
 A1_FALSE_ALARM_MAX: Final[float] = 0.05
+A1_BIAS_MAX_DAYS: Final[float] = 1.0
+"""The largest mean signed error of A1's age against the true age (days) that needs no remark. A
+larger bias is recorded in the gate file and stated beside every reading that rests on the age."""
 CURVE_ERROR_MAX: Final[float] = 0.05
 CURVE_ERROR_DAYS: Final[tuple[float, ...]] = (1.0, 3.0, 7.0, 14.0, 28.0, 56.0)
 STRATUM_TOLERANCE: Final[float] = 0.03
@@ -278,16 +298,66 @@ PASS_CAP_ENV: Final[str] = "E00738_PASS_CAP"
 """An environment variable that replaces the pass cap of every fit (the smoke test sets it to 1)."""
 
 
-def pass_cap(*, remedy: bool) -> int:
+def pass_cap(*, remedy: bool, out: Path | None = None) -> int:
     """Return the cap on training passes of a fit.
 
     Args:
         remedy: Whether the gate's remedy applies (cap 120 instead of 60).
+        out: The output folder whose scratch status decides whether the override is allowed
+            (`OUT` by default).
 
     Returns:
         The value of `E00738_PASS_CAP` when set, else `REMEDY_PASS_CAP` or `PASS_CAP`.
+
+    Raises:
+        RuntimeError: When the variable is set and the output folder is not a scratch folder, so a
+            stray exported variable cannot cut the passes of a real fit.
     """
     override = os.environ.get(PASS_CAP_ENV)
     if override is not None:
+        if not is_scratch(out=out):
+            msg = f"{PASS_CAP_ENV} is set, but the output folder is not a scratch folder"
+            raise RuntimeError(msg)
         return int(override)
     return REMEDY_PASS_CAP if remedy else PASS_CAP
+
+
+CUTS_FILE: Final[str] = "cuts.json"
+"""The manager's cut list: `drop_ld` (no `LD` fits outside the 4 screen cells) and `seeds01` (no
+seed 2)."""
+
+
+def read_cuts(*, out: Path | None = None) -> dict[str, bool]:
+    """Return the cut list the manager wrote, with both cuts false when there is none.
+
+    Args:
+        out: The output folder (`OUT` by default).
+
+    Returns:
+        A dict with the keys `drop_ld` and `seeds01`.
+    """
+    path = (out if out is not None else OUT) / CUTS_FILE
+    spec = json.loads(path.read_text()) if path.exists() else {}
+    return {"drop_ld": bool(spec.get("drop_ld")), "seeds01": bool(spec.get("seeds01"))}
+
+
+def active_seeds(*, out: Path | None = None) -> tuple[int, ...]:
+    """Return the seeds that are fitted, predicted, and scored after the cut list."""
+    return (0, 1) if read_cuts(out=out)["seeds01"] else SEEDS
+
+
+def arms_of(*, month: str, seed: int, out: Path | None = None) -> tuple[str, ...]:
+    """Return the arms that exist for one fold and seed after the cut list.
+
+    Args:
+        month: The fold month.
+        seed: The seed.
+        out: The output folder (`OUT` by default).
+
+    Returns:
+        Every arm, except that `LD` exists only in the 4 screen cells when `drop_ld` is set.
+    """
+    in_screen = seed == SCREEN_SEED and month in SCREEN_FOLDS
+    if read_cuts(out=out)["drop_ld"] and not in_screen:
+        return tuple(a for a in ALL_ARMS if a != "LD")
+    return ALL_ARMS
