@@ -557,16 +557,16 @@ seen. The sections above already describe the new design, and this section gives
 change and records each finding that was not taken.
 
 **A1 has a tuned threshold, and Phase 0 stops if the tuning fails.** The code review measured that,
-on real rows of the fold 2025-11's training window, the 2-noise-unit threshold flags a shift on 0.198
-of the rows, four times the bar of 0.05. Phase 0 now tunes the threshold, over the grid 2.0 to 12.0
-in steps of 0.25 noise units, to the smallest value whose share of flagged real rows is at most
-0.05. The rows come from the earliest fold's training window, which lies inside the training
-window of every fold, and never from a scored month. The rows include the 2.5% that sit in logged events, which overstates
-the false alarms slightly, so the tuned threshold errs high. The table prints the miss rate by true
-age band, and Phase 0 stops with a message to the coordinator if no threshold meets the bar, or if
-A1 at the tuned threshold misses more than 0.6 of the shifts with a true age of 3 to 10 days. The
-tuned threshold is written to `a1/threshold.json`, every head fit reads it, and a real stage that
-finds no file refuses to run.
+on real rows of the fold 2025-11's training window, the 2-noise-unit threshold flags a shift on
+0.198 of the rows, four times the bar of 0.05. Phase 0 now tunes the threshold, over the grid 2.0 to
+12.0 in steps of 0.25 noise units, to the smallest value whose share of flagged real rows is at most
+0.05. The rows come from the earliest fold's training window, which lies inside the training window
+of every fold, and never from a scored month. The rows include the 2.5% that sit in logged events,
+which overstates the false alarms slightly, so the tuned threshold errs high. The table prints the
+miss rate by true age band, and Phase 0 stops with a message to the coordinator if no threshold
+meets the bar, or if A1 at the tuned threshold misses more than 0.6 of the shifts with a true age of
+3 to 10 days. The tuned threshold is written to `a1/threshold.json`, every head fit reads it, and a
+real stage that finds no file refuses to run.
 
 **LD and LM use the empirical survival function, and the Weibull is report-only.** The best of the
 four families was a Weibull with shape 1.03 and scale 40.6 days. Its error against the generator's
@@ -601,9 +601,9 @@ larger f is real.
 
 **S* is chosen by unscaled CRPS, and N3 needs an in-force C3 below zero.** The scale factor is
 fitted on the rows it scores and can hide a loss in the unscaled score, so the scaled figure is
-report-only. N3 passes only if its net effect is at most -0.03, both intervals are below zero, and the
-98.33% t interval of the in-force unscaled C3 lies below zero. This adds one boolean to the verdict
-table, which now has 16,384 states.
+report-only. N3 passes only if its net effect is at most -0.03, both intervals are below zero, and
+the 98.33% t interval of the in-force unscaled C3 lies below zero. This adds one boolean to the
+verdict table, which now has 16,384 states.
 
 **The artefacts carry the code that wrote them.** Every state file and forecast file has a recipe
 file that holds the hash of the fitting modules (the state) or the fitting and prediction modules
@@ -612,21 +612,21 @@ prediction job refuses to reuse or overwrite it. The diagnostics file is written
 file, so a forecast file implies its diagnostics.
 
 **Smaller guards.** The remedy resumes after a crash: the first attempt moves aside once into
-`gate_first_attempt/`, each finished remedy task is skipped, and only a complete remedy makes a second
-failure final. GPU waits are printed and are not counted by the stop line. A GPU stage refuses more
-than one worker. The smoke hours are copied into the real ledger. The prediction asserts that the
-fold's cutoff is the first day of the month.
+`gate_first_attempt/`, each finished remedy task is skipped, and only a complete remedy makes a
+second failure final. GPU waits are printed and are not counted by the stop line. A GPU stage
+refuses more than one worker. The smoke hours are copied into the real ledger. The prediction
+asserts that the fold's cutoff is the first day of the month.
 
 **New report-only readings.** The report prints the survival curve's error and the fitted family
 beside the empirical curve, A1's table and tuned threshold, the gate's depth ratios by age band, the
-mean CRPS of every arm in the four scenarios of the injected worlds (all rows, outside events and the
-7 days after, inside events, and the 7 days after an end), and C2 for LD, LM, and LR split into the
-median's error and the 90% interval's coverage, which shows whether a mixture gains by spread.
+mean CRPS of every arm in the four scenarios of the injected worlds (all rows, outside events and
+the 7 days after, inside events, and the 7 days after an end), and C2 for LD, LM, and LR split into
+the median's error and the 90% interval's coverage, which shows whether a mixture gains by spread.
 
 **Not taken.** The scenario table has no climatology row, because no climatology forecast exists for
-an injected world. The LM control with a constant survival ratio is not built, because the cost table
-has no room for another arm, and the split of C2 into the median's error and the coverage tests the
-same question.
+an injected world. The LM control with a constant survival ratio is not built, because the cost
+table has no room for another arm, and the split of C2 into the median's error and the coverage
+tests the same question.
 
 ## The gallery
 
