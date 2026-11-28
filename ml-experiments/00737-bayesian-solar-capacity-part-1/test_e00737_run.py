@@ -548,3 +548,23 @@ def test_g1_records_must_hold_the_current_tuned_values_and_code() -> None:
     for bad in ({"growth_sd": 0.6}, {"ridge_scale": 0.01}, {"code_hash": "stale"}):
         with pytest.raises(RuntimeError, match="other tuned values or other code"):
             gates.check_tuned_record(record={**good, **bad}, tuned=tuned, what="a draw")
+
+
+def test_task_keyword_arguments_do_not_collide_with_run_task(tmp_path: Path) -> None:
+    import inspect
+
+    import e00737_run as run
+
+    reserved = set(inspect.signature(phases.run_task).parameters) - {"kwargs"}
+    tasks = [
+        *run.tune_tasks(
+            primaries=["D5"], store=tmp_path, part="growth", ridge_scale=0.1, worker=0, of=1
+        ),
+        *run.tune_tasks(
+            primaries=["D5"], store=tmp_path, part="ridge", ridge_scale=None, worker=0, of=1
+        ),
+        *run.fit_tasks(primaries=["D5"], store=tmp_path, tuned=common.Tuned(0.3, 0.1)),
+    ]
+    assert tasks
+    for task_name, kwargs in tasks:
+        assert not set(kwargs) & reserved, task_name

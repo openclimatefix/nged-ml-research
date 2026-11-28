@@ -284,12 +284,14 @@ def task_placebo(*, site: str, store: Path, growth_sd: float, ridge_scale: float
     time_log(stage="fit", task=f"placebo_{site}", start=start, out=store)
 
 
-def task_world(*, site: str, name: str, store: Path, growth_sd: float, ridge_scale: float) -> None:
+def task_world(
+    *, site: str, world_name: str, store: Path, growth_sd: float, ridge_scale: float
+) -> None:
     """Build one injected world, check G2 on it, write it, and fit every arm.
 
     Args:
         site: The Primary's label.
-        name: The world's name.
+        world_name: The world's name.
         store: The output folder.
         growth_sd: The tuned growth standard deviation.
         ridge_scale: The tuned multiplier of the baseline's ridge precision.
@@ -299,13 +301,13 @@ def task_world(*, site: str, name: str, store: Path, growth_sd: float, ridge_sca
     """
     start = time.time()
     model = get_model(site=site)
-    spec = next(s for s in world_specs(primary=site) if s.name == name)
+    spec = next(s for s in world_specs(primary=site) if s.name == world_name)
     world = build_world(inputs=model.inputs, spec=spec)
     check = check_injection(inputs=model.inputs, world=world)
     if not check["passed"]:
-        msg = f"G2 failed for world {site}/{name}: {check}"
+        msg = f"G2 failed for world {site}/{world_name}: {check}"
         raise RuntimeError(msg)
-    atomic_npz(arrays=world_arrays(world=world), path=store / "worlds" / site / f"{name}.npz")
+    atomic_npz(arrays=world_arrays(world=world), path=store / "worlds" / site / f"{world_name}.npz")
     fits = fit_all_arms(
         model=model,
         power=world.power,
@@ -313,8 +315,8 @@ def task_world(*, site: str, name: str, store: Path, growth_sd: float, ridge_sca
         ridge_scale=ridge_scale,
         oracle_term=oracle_term(model=model, fleet=world.fleet),
     )
-    atomic_npz(arrays=fits_to_arrays(fits=fits), path=store / "fits" / site / f"{name}.npz")
-    time_log(stage="fit", task=f"world_{site}_{name}", start=start, out=store)
+    atomic_npz(arrays=fits_to_arrays(fits=fits), path=store / "fits" / site / f"{world_name}.npz")
+    time_log(stage="fit", task=f"world_{site}_{world_name}", start=start, out=store)
 
 
 def task_past(
@@ -400,25 +402,25 @@ def task_tune_control(*, site: str, store: Path, ridge_scale: float) -> None:
     time_log(stage="tune", task=f"tune_growth_control_{site}", start=start, out=store)
 
 
-def task_tune_world(*, site: str, name: str, store: Path, ridge_scale: float) -> None:
+def task_tune_world(*, site: str, world_name: str, store: Path, ridge_scale: float) -> None:
     """Fit arm A to one tuning world at each growth standard deviation of the grid.
 
     Args:
         site: The Primary's label.
-        name: The tuning world's name.
+        world_name: The tuning world's name.
         store: The output folder.
         ridge_scale: The chosen ridge scale.
     """
     start = time.time()
     model = get_model(site=site)
-    spec = next(s for s in tuning_specs(primary=site) if s.name == name)
+    spec = next(s for s in tuning_specs(primary=site) if s.name == world_name)
     world = build_world(inputs=model.inputs, spec=spec)
     caps = growth_fits(model=model, power=world.power, ridge_scale=ridge_scale)
     atomic_npz(
         arrays={"cap": np.array(caps), "truth": world.truth},
-        path=store / "tuning" / site / f"growth_{name}.npz",
+        path=store / "tuning" / site / f"growth_{world_name}.npz",
     )
-    time_log(stage="tune", task=f"tune_growth_{site}_{name}", start=start, out=store)
+    time_log(stage="tune", task=f"tune_growth_{site}_{world_name}", start=start, out=store)
 
 
 def growth_fits(*, model: PrimaryModel, power: np.ndarray, ridge_scale: float) -> list[np.ndarray]:
@@ -477,7 +479,10 @@ def fit_tasks(*, primaries: list[str], store: Path, tuned: Tuned) -> list[tuple[
         ]
         tasks.append((f"placebo_{site}", {"kind": "placebo", "site": site, **common}))
         tasks += [
-            (f"world_{site}_{s.name}", {"kind": "world", "site": site, "name": s.name, **common})
+            (
+                f"world_{site}_{s.name}",
+                {"kind": "world", "site": site, "world_name": s.name, **common},
+            )
             for s in world_specs(primary=site)
             if s.kind not in ("placebo", "control")
         ]
@@ -532,7 +537,7 @@ def tune_tasks(
         tasks += [
             (
                 f"tune_growth_{site}_{s.name}",
-                {"kind": "world", "site": site, "name": s.name, **common},
+                {"kind": "world", "site": site, "world_name": s.name, **common},
             )
             for s in tuning_specs(primary=site)
         ]
@@ -742,7 +747,7 @@ def stage_unit() -> None:
     t0 = time.perf_counter()
     task_world(
         site=UNIT_PRIMARY,
-        name=UNIT_WORLD,
+        world_name=UNIT_WORLD,
         store=store,
         growth_sd=tuned.growth_sd,
         ridge_scale=tuned.ridge_scale,
