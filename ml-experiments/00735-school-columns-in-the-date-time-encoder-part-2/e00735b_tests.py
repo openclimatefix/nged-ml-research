@@ -30,6 +30,7 @@ from typing import Any
 import e00735_columns as p1  # ty: ignore[unresolved-import]
 import e00735b_columns as cols  # ty: ignore[unresolved-import]
 import numpy as np
+import polars as pl
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -165,14 +166,20 @@ def test_every_attribute_exists() -> None:
 
 
 def test_calendar_covers_stage_one() -> None:
-    """The calendar covers every valid time from 2019-12-01, also read 21 days earlier, and has sane term gaps."""
+    """The calendar covers every real row (valid time from 2019-09-17), also read 28 days earlier, and has sane term gaps."""
     cal = cols.calendar()
-    first = p1.code_of(day=cols.FIRST_PRETRAIN_DATE)
-    assert cal.first_code <= first - cols.PLACEBO_SHIFT_DAYS, (cal.first_code, first)
+    first = p1.code_of(day=date(2019, 9, 17))
+    assert cal.first_code <= first - cols.PLACEBO_SHIFT_DAYS - cols.LAG_READ_DAYS, (
+        cal.first_code,
+        first,
+    )
     assert cal.last_code >= p1.code_of(day=date(2026, 7, 31)), cal.last_code
     table = cols.terms()
     p1.validate_terms(table=table)  # ordered, no overlap, weekdays, 4 to 8 weeks, gaps
-    assert table["first_day"].min() == date(2019, 9, 3)
+    assert table["first_day"].min() == date(2019, 6, 3)  # the assumed 2018-19 summer-term row
+    assert table.filter(pl.col("first_day") >= date(2019, 9, 3))["first_day"].min() == date(
+        2019, 9, 3
+    )
     blocks = cols.blocks()
     in_2019_21 = [b for b in blocks if date(2019, 10, 1) <= b.first <= date(2021, 8, 1)]
     assert len(in_2019_21) == 12, len(in_2019_21)
@@ -192,14 +199,96 @@ def test_calendar_covers_stage_one() -> None:
         "a term day has no school column"
     )  # 2020-01-14 is a Tuesday in term 3
     passed(
-        "the calendar covers 2019-12-01 minus 21 days, its terms validate, and its blocks have plausible lengths"
+        "the calendar covers 2019-09-17 minus 28 days, its terms validate, and its blocks have plausible lengths"
+    )
+
+
+def test_assumed_row_and_shifted_arm_at_the_first_real_row() -> None:
+    """The assumed summer-term row makes 2019-07-20 to 2019-09-02 a holiday block, changes no column from 2019-09-03, and the shifted arm resolves at 2019-09-17."""
+    cal = cols.calendar()
+    summer = cols.blocks()[0]
+    assert (summer.first, summer.last) == (date(2019, 7, 20), date(2019, 9, 2)), summer
+    for day, off in (
+        (date(2019, 7, 19), 0.0),
+        (date(2019, 7, 20), 1.0),
+        (date(2019, 8, 31), 1.0),
+        (date(2019, 9, 2), 1.0),
+        (date(2019, 9, 3), 0.0),
+    ):
+        i = int(cal.index(codes=np.asarray([p1.code_of(day=day)]))[0])
+        assert cal.school_off[i] == off and cal.half_term[i] == 0.0, (
+            day,
+            cal.school_off[i],
+            cal.half_term[i],
+        )  # the 45-day block is not half-term
+    # the shifted arm at valid time 2019-09-17 and at its week lag (2019-09-10) reads 2019-08-27 and 2019-08-20: a holiday
+    c, cp = cols.coast_arrays()
+    for stamp in (
+        stamp_us(year=2019, month=9, day=17, hour=11),
+        stamp_us(year=2019, month=9, day=10, hour=11),
+    ):
+        row = cols.extra_columns(
+            valid_us=np.asarray([stamp]),
+            primary=np.asarray([0]),
+            arm=cols.ARMS["SKE-S21"],
+            c_true=c,
+            c_permuted=cp,
+        )
+        assert row[0, 0] == 1.0 and row[0, 2] == 0.0 and row[0, 3] > 0, (
+            row
+        )  # S1 = 1 (an assumed holiday), S3 = 0 (not half-term)
+        real = cols.extra_columns(
+            valid_us=np.asarray([stamp]),
+            primary=np.asarray([0]),
+            arm=cols.ARMS["SKE"],
+            c_true=c,
+            c_permuted=cp,
+        )
+        assert real[0, 0] == 0.0, real  # the real calendar says: term
+    # no real-arm row (valid time from 2019-09-17, lags back to 2019-09-10) reads a date before 2019-09-03
+    first_valid = stamp_us(year=2019, month=9, day=17, hour=11)
+    assert (
+        cols.earliest_read_date(first_valid_us=first_valid, arm=cols.ARMS["SKE"])
+        >= cols.FIRST_REAL_DATE
+    )
+    assert cols.earliest_read_date(
+        first_valid_us=first_valid, arm=cols.ARMS["SKE-S21"]
+    ) >= p1.date_of(code=cal.first_code)
+    # the whole lag grid (from 2019-09-01) is covered for every arm: no NaN
+    for name in ("SKE", "SKE-S21", "SKE-CP"):
+        table = cols.grid_table(
+            arm=cols.ARMS[name],
+            first_us=stamp_us(year=2019, month=9, day=1),
+            step_us=1_800_000_000,
+            n_grid=2000,
+            c_true=c,
+            c_permuted=cp,
+        )
+        assert np.isfinite(table).all(), name
+    # the assumed row changes no column value from 2019-09-03 on, for any arm without a shift
+    stamps = stamp_us(year=2019, month=9, day=3, hour=12) + np.arange(0, 2300, 3) * 86_400_000_000
+    primary = np.arange(len(stamps)) % 16
+    with_row = {n: block_of(arm=n, stamps=stamps, primary=primary) for n in ("SKE", "SKE-CP")}
+    saved_terms, saved_cache = cols.terms, list(cols._CALENDAR)
+    try:
+        cols._CALENDAR.clear()
+        cols.terms = lambda: saved_terms().filter(pl.col("academic_year") != "2018-19")  # ty: ignore[invalid-assignment]
+        assert cols.calendar().first_code == p1.code_of(day=date(2019, 9, 3))
+        for name, want in with_row.items():
+            assert np.array_equal(block_of(arm=name, stamps=stamps, primary=primary), want), name
+    finally:
+        cols.terms = saved_terms
+        cols._CALENDAR.clear()
+        cols._CALENDAR.extend(saved_cache)
+    passed(
+        "the assumed row gives a 45-day holiday block (not half-term), changes no column from 2019-09-03, and the shifted arm resolves at 2019-09-17 and its week lag"
     )
 
 
 def test_raises_outside_calendar() -> None:
     """A valid time outside the calendar raises `ValueError`, and `grid_table` marks it NaN."""
     c, cp = cols.coast_arrays()
-    before = np.asarray([stamp_us(year=2019, month=8, day=1)])
+    before = np.asarray([stamp_us(year=2019, month=5, day=1)])
     after = np.asarray([stamp_us(year=2026, month=12, day=15)])
     for stamps in (before, after):
         try:
@@ -215,7 +304,7 @@ def test_raises_outside_calendar() -> None:
         else:
             raise AssertionError("a time outside the calendar did not raise")
     early = np.asarray(
-        [stamp_us(year=2019, month=9, day=20, hour=12)]
+        [stamp_us(year=2019, month=6, day=20, hour=12)]
     )  # inside, but 21 days earlier is not
     cols.extra_columns(
         valid_us=early, primary=np.asarray([0]), arm=cols.ARMS["SKE"], c_true=c, c_permuted=cp
@@ -233,7 +322,7 @@ def test_raises_outside_calendar() -> None:
     else:
         raise AssertionError("a shifted read before the calendar did not raise")
     table = cols.grid_table(
-        arm=cols.ARMS["SKE"], first_us=stamp_us(year=2019, month=8, day=30), step_us=1_800_000_000 * 48,
+        arm=cols.ARMS["SKE"], first_us=stamp_us(year=2019, month=5, day=30), step_us=1_800_000_000 * 48,
         n_grid=6, c_true=c, c_permuted=cp,
     )  # fmt: skip
     assert np.isnan(table[0, 0]).all() and np.isfinite(table[0, 5]).all(), table[0, :, 0]

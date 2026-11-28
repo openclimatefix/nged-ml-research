@@ -28,8 +28,12 @@ import e00735b_columns as cols  # ty: ignore[unresolved-import]
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
 
-STAGE_1_FIRST_VALID: Final = datetime(2019, 12, 1, tzinfo=UTC)
-"""The first valid time that a stage-1 row may have (the start of the ERA5 pre-training record)."""
+STAGE_1_FIRST_VALID: Final = datetime(2019, 9, 3, tzinfo=UTC)
+"""The first valid time that a stage-1 row of a real arm may have: the first date with real term dates.
+
+The real pre-training rows start on 2019-09-17. The calendar reaches back to 2019-06-03 for the
+shifted arm and the lag path (`e00735b_columns.calendar`).
+"""
 
 
 class History:
@@ -457,8 +461,13 @@ def pretrain_arm(  # noqa: PLR0915
         valid_us = first_us + pre.target_idx.astype(np.int64) * step_us
         if arm.columns:
             assert valid_us.min() >= STAGE_1_FIRST_VALID.timestamp() * 1e6, (
-                "a stage-1 row is earlier than 2019-12-01",
+                "a stage-1 row is earlier than the first date with real term dates",
                 datetime.fromtimestamp(valid_us.min() / 1e6, UTC),
+            )
+            earliest = cols.earliest_read_date(first_valid_us=int(valid_us.min()), arm=arm)
+            assert cols.p1.code_of(day=earliest) >= cols.calendar().first_code, (
+                "the arm reads a date before the calendar starts",
+                earliest,
             )
             block = cols.extra_columns(
                 valid_us=valid_us,

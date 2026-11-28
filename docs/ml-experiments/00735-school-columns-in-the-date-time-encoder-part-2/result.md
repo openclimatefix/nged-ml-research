@@ -21,7 +21,7 @@ size: >-
 hypothesis: >-
   Part 1 gave the step-5 neural network the school-holiday columns at the mixer only, so the
   network could learn them only from the ENS rows after 2024-04-01, about 5 independent school
-  holidays in the held-in months. The encoder pre-training reaches back to 2019-12-01 (6 to 7
+  holidays in the held-in months. The encoder pre-training rows start on 2019-09-17 (6 to 7
   years of school holidays, depending on the refit month). Giving the date-time encoder the
   school-holiday and coast-closeness columns in stage 1 (ERA5 and CAMS pre-training), and keeping
   them as encoder inputs in stages 2 and 3, lowers the neural network's CRPS in the weeks around
@@ -86,7 +86,7 @@ production_status: not-for-production
 that school-holiday columns at the step-5 neural network's mixer did not lower its error, and
 listed "school columns in the date-time encoder" under "Not done". Part 2 asks the same question
 with the columns placed where the neural network has years of data to learn them: the date-time
-encoder, which is pre-trained on ERA5 and CAMS rows from 2019-12-01 and then frozen.
+encoder, which is pre-trained on ERA5 and CAMS rows from 2019-09-17 and then frozen.
 
 ## What the maintainer required
 
@@ -135,13 +135,15 @@ to the encoder's input, which widens its first layer from 29 to 37 inputs:
   in the ERA5 and CAMS rows of stage 1. This is a departure from part 1's SKW arm.
 
 **The school calendar covers the whole stage 1 record.** Stage 1 rows have valid times from
-2019-12-01. The calendar has three parts:
+2019-09-17. The calendar has four parts:
 
 - Term dates for 2019-20 and 2020-21, parsed from Branston Community Academy's published term-date
   PDFs (a Lincolnshire academy, so a proxy for the county calendar), in
   `lincolnshire_term_dates_2019_21.csv`. The academy's summer term ends 16 July in both years,
   while the county's 2021-22 term ends 22 July, so the July holiday block may start a few days
   early. The fetch lineage is in the experiment's data folder.
+- One assumed row, the 2018-19 summer term ending 2019-07-19, so that 2019-07-20 to 2019-09-02 is a
+  holiday block. Only the 21-day shifted placebo and the lag path read dates before 2019-09-03.
 - Term dates for 2021-22 to 2025-26, from experiment 11's `lincolnshire_term_dates.csv`,
   unchanged.
 - Terms 1 and 2 of 2026-27, from part 1's file, unchanged.

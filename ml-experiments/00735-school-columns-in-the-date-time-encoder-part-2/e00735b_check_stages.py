@@ -20,7 +20,7 @@ class that experiment 677's step-5 network is.
 **What a batch is.** The batch of a stage is `ROWS` rows with valid times drawn uniformly over the
 stage's valid-time range, random Primaries, and day and week lags 1 to 3 days and 1 to 2 weeks before
 the row (5% missing). The ranges are those of the refit month 2026-03: stage 1 trains on ERA5 and CAMS
-rows from 2019-12-01, and stages 2 and 3 on ensemble rows from 2024-04-01, both to 3.5 hours before
+rows from 2019-09-17, and stages 2 and 3 on ensemble rows from 2024-04-01, both to 3.5 hours before
 the refit. Stage 3 runs in training mode with the two label columns attached; stages 1 and 2 run without
 labels. The other columns of a row are random numbers, because the gate checks the new columns' path.
 This synthetic mode does not read the real rows of a month.
@@ -61,7 +61,7 @@ STEP_US: Final = 1_800_000_000
 FIRST_US: Final = int(common.GRID_START.timestamp() * 1e6)
 N_GRID: Final = int((common.GRID_END - common.GRID_START).total_seconds() // 1800) + 1
 STAGE_RANGES: Final = {
-    1: (datetime(2019, 12, 1, tzinfo=UTC), datetime(2026, 3, 1, tzinfo=UTC)),
+    1: (datetime(2019, 9, 17, tzinfo=UTC), datetime(2026, 3, 1, tzinfo=UTC)),
     2: (datetime(2024, 4, 1, tzinfo=UTC), datetime(2026, 3, 1, tzinfo=UTC)),
     3: (datetime(2024, 4, 1, tzinfo=UTC), datetime(2026, 3, 1, tzinfo=UTC)),
 }

@@ -20,10 +20,13 @@ K5 real. `permuted` replaces `c` by the closeness of another Primary in K1 to K5
 permutation, seed 735). The columns are not standardised.
 
 The school calendar is part 1's calendar extended backwards with
-`lincolnshire_term_dates_2019_21.csv`, so that it starts on 2019-09-03 and every valid time from
-2019-12-01 (the first ERA5 pre-training row) is covered, also when it is read 21 days earlier. A time
-outside the calendar raises `ValueError`, except in `grid_table`, which fills such times with NaN so
-that a lookup at an uncovered time cannot go unnoticed.
+`lincolnshire_term_dates_2019_21.csv`. The file starts with one assumed row (the end of the 2018-19
+summer term, 2019-07-19), so that 2019-07-20 to 2019-09-02 is a holiday block and the calendar starts
+on 2019-06-03. The real arms read no date before 2019-09-03 (the real pre-training rows start on
+2019-09-17, and their lags read at most 7 days earlier); only the 21-day shifted placebo and the
+lag path at the start of the grid (2019-09-01) read earlier dates. A time outside the calendar raises
+`ValueError`, except in `grid_table`, which fills such times with NaN so that a lookup at an
+uncovered time cannot go unnoticed.
 """
 
 from dataclasses import dataclass
@@ -56,8 +59,22 @@ COLUMN_NAMES: Final[tuple[str, ...]] = (
 )
 SCHOOL_SLICE: Final = slice(0, 3)
 COAST_SLICE: Final = slice(3, 8)
-FIRST_PRETRAIN_DATE: Final = date(2019, 12, 1)
-"""The first valid date of a stage-1 row; the calendar must cover it, also 21 days earlier."""
+FIRST_REAL_DATE: Final = date(2019, 9, 3)
+"""The first date with real term dates; every real arm reads only dates from here on."""
+LAG_READ_DAYS: Final = 7
+"""How many days earlier than a row's valid time the lag path reads (the week lag)."""
+
+
+def earliest_read_date(*, first_valid_us: int, arm: ArmB) -> date:
+    """Return the earliest date that the arm reads for rows whose first valid time is `first_valid_us`.
+
+    A row reads its own date, the date `school_shift_days` earlier, and (on the lag path) another
+    `LAG_READ_DAYS` earlier still.
+    """
+    first = p1.date_of(code=int(first_valid_us // 86_400_000_000))
+    return first - timedelta(days=arm.school_shift_days + LAG_READ_DAYS)
+
+
 BANK_HOLIDAY_YEARS: Final = range(2019, 2028)
 N_PRIMARIES: Final = p1.N_PRIMARIES
 

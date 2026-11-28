@@ -1,4 +1,5 @@
 academic_year,term,first_day,last_day,source
+2018-19,6,2019-06-03,2019-07-19,"ASSUMED: end of the 2018-19 summer term, so that 2019-07-20 to 2019-09-02 is a holiday block; only the 21-day shifted placebo and the lag path read dates before 2019-09-03"
 2019-20,1,2019-09-03,2019-10-18,"Branston Community Academy PDF (Lincolnshire academy; not LCC)"
 2019-20,2,2019-10-28,2019-12-20,"Branston Community Academy PDF (Lincolnshire academy; not LCC)"
 2019-20,3,2020-01-07,2020-02-14,"Branston Community Academy PDF (Lincolnshire academy; not LCC)"
