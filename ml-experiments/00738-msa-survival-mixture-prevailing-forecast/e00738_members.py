@@ -3,24 +3,34 @@
 
 CRPS at one valid time depends only on the marginal distribution at that valid time, so a mixture
 whose shifted branch has probability p at a lead scores the same as 51 paths whose end times are
-drawn from the same survival curve. The check draws 51 end times at the conditional inverse of the
-survival curve, and a shared quantile level for the base forecast, so that a path keeps the shift
-until its end time and returns to the base forecast after it.
+drawn from the same survival curve. A path is one draw of the base level (a quantile of `M1`'s forecast) plus the
+shift times the survival indicator (1 until the path's end time, 0 after it). The base level and the
+end time are drawn independently: the 51 end times are the conditional inverse of the survival
+curve at evenly spaced levels, and the 51 base levels are the same evenly spaced levels in a fixed
+order (a stride permutation) that is uncorrelated with the end-time order. The tolerances come
+from `known_answer_gaps`, which scores the construction against a Gaussian mixture whose quantiles
+are known exactly.
 """
 
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
 from typing import Final
 
 import e00738_score as score_mod
 import e00738_survival as surv
 import numpy as np
 import polars as pl
+from scipy import stats
 
 N_PATHS: Final[int] = 51
+BASE_STRIDE: Final[int] = 19
+"""The stride of the permutation of the base levels. It is coprime with 51 (3 times 17)."""
+LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
 SHARE_TOLERANCE: Final[float] = 0.02
 QUANTILE_TOLERANCE_POINTS: Final[float] = 0.5
-CRPS_TOLERANCE_POINTS: Final[float] = 0.05
+CRPS_TOLERANCE_POINTS: Final[float] = 0.10
 HORIZON_DAYS: Final[float] = 10.0
 T_MAX_DAYS: Final[float] = 1.0e4
 MAX_CHECK_ROWS: Final[int] = 2000
@@ -59,6 +69,23 @@ def end_times(*, curve: surv.SurvivalFunction, age_days: float, n: int = N_PATHS
     return np.maximum(isf(curve=curve, s=s_a * levels), age_days)
 
 
+def base_levels(*, n: int = N_PATHS) -> np.ndarray:
+    """Return the `n` base quantile levels in the order of the paths.
+
+    The levels are the evenly spaced `(j + 0.5) / n`, in the order `(BASE_STRIDE * k) mod n`, so the
+    level of path `k` is not tied to the path's end time (the end times run from the longest to the
+    shortest with `k`).
+
+    Args:
+        n: The number of paths (coprime with `BASE_STRIDE`).
+
+    Returns:
+        An array (n,) of levels in 0 to 1.
+    """
+    assert math.gcd(BASE_STRIDE, n) == 1, "the stride must be coprime with the number of paths"
+    return ((BASE_STRIDE * np.arange(n)) % n + 0.5) / n
+
+
 def interp_quantile(*, q: np.ndarray, tau: np.ndarray) -> np.ndarray:
     """Return the base forecast's value at levels `tau`, by linear interpolation of its 11 quantiles.
 
@@ -69,9 +96,8 @@ def interp_quantile(*, q: np.ndarray, tau: np.ndarray) -> np.ndarray:
     Returns:
         An array (..., n); levels outside 0.01 to 0.99 take the end values.
     """
-    levels = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
     flat = q.reshape(-1, 11)
-    out = np.stack([np.interp(tau, levels, row) for row in flat])
+    out = np.stack([np.interp(tau, LEVELS, row) for row in flat])
     return out.reshape(*q.shape[:-1], len(tau))
 
 
@@ -98,8 +124,7 @@ def paths_at_leads(
         The paths (n_lead, n) and the ended share (n_lead,).
     """
     t_end = end_times(curve=curve, age_days=age_days, n=n)
-    tau = (np.arange(1, n + 1) - 0.5) / n
-    base = interp_quantile(q=base_q, tau=tau)
+    base = interp_quantile(q=base_q, tau=base_levels(n=n))
     on = (age_days + np.asarray(lead_days))[:, None] < t_end[None, :]
     return base + depth * on, 1.0 - on.mean(axis=1)
 
@@ -163,8 +188,7 @@ def check_origin(
     paths, ended = paths_at_leads(
         base_q=base_q, depth=depth, age_days=age_days, lead_days=lead_days, curve=curve
     )
-    levels = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
-    emp = np.quantile(paths, levels, axis=1).T
+    emp = np.quantile(paths, LEVELS, axis=1).T
     inside = np.nonzero(lead_days <= HORIZON_DAYS)[0]
     last = inside[-1]
     return {
@@ -180,6 +204,136 @@ def passes(*, ended_gap: float, quantile_gap: float, crps_gap: float) -> bool:
         and quantile_gap <= QUANTILE_TOLERANCE_POINTS
         and crps_gap <= CRPS_TOLERANCE_POINTS
     )
+
+
+def gaussian_mixture_quantiles(*, p: np.ndarray, depth: float, sd: float) -> np.ndarray:
+    """Return the 11 quantiles of `p N(depth, sd) + (1 - p) N(0, sd)` for each `p`, by bisection.
+
+    Args:
+        p: The weight of the shifted branch, (n,).
+        depth: The shift (the mean of the shifted branch).
+        sd: The standard deviation of both branches.
+
+    Returns:
+        An array (n, 11).
+    """
+    p = np.asarray(p, dtype=float)[:, None]
+    lo = np.full((p.shape[0], 11), min(0.0, depth) - 10.0 * sd)
+    hi = np.full((p.shape[0], 11), max(0.0, depth) + 10.0 * sd)
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        cdf = p * stats.norm.cdf(mid, loc=depth, scale=sd) + (1.0 - p) * stats.norm.cdf(
+            mid, scale=sd
+        )
+        below = cdf < LEVELS[None, :]
+        lo = np.where(below, mid, lo)
+        hi = np.where(below, hi, mid)
+    return 0.5 * (lo + hi)
+
+
+def known_answer_gaps(
+    *,
+    sd: float,
+    depth: float,
+    age_days: float,
+    curve: surv.SurvivalFunction,
+    lead_day: int,
+    seed: int = 0,
+) -> dict[str, float]:
+    """Return the three gaps of the check on a case whose answer is known exactly.
+
+    The base forecast is `N(0, sd)`, the shifted branch is `N(depth, sd)`, and the stored forecast
+    is the exact mixture quantiles at the survival ratio of `curve`. A construction that is right
+    returns gaps that come only from drawing 51 paths and from interpolating 11 quantiles, so these
+    gaps set the tolerances. Values are shares of capacity (multiply by 100 for points).
+
+    Args:
+        sd: The standard deviation of the base forecast.
+        depth: The signed depth.
+        age_days: A1's age.
+        curve: The survival curve that both the paths and the stored forecast follow.
+        lead_day: The zero-based lead day (the 48 half-hours of that day are checked).
+        seed: The seed of the outcomes drawn from the mixture.
+
+    Returns:
+        `ended_gap`, `quantile_gap` and `crps_gap` as `check_origin` and `check_frames` define them.
+    """
+    rng = np.random.default_rng(seed)
+    leads = lead_day + np.arange(STEPS_PER_ROW) / STEPS_PER_ROW
+    p = surv.ratio(curve=curve, age_days=np.full(STEPS_PER_ROW, age_days), lead_days=leads)
+    base_q = np.tile(stats.norm.ppf(LEVELS, scale=sd), (STEPS_PER_ROW, 1))
+    arm_q = gaussian_mixture_quantiles(p=p, depth=depth, sd=sd)
+    got = check_origin(
+        base_q=base_q,
+        arm_q=arm_q,
+        depth=depth,
+        age_days=age_days,
+        lead_days=leads,
+        curve=curve,
+        p_arm=p,
+    )
+    paths, _ = paths_at_leads(
+        base_q=base_q, depth=depth, age_days=age_days, lead_days=leads, curve=curve
+    )
+    shifted = rng.random(STEPS_PER_ROW) < p
+    y = rng.normal(0.0, sd, STEPS_PER_ROW) + depth * shifted
+    emp = np.quantile(paths, LEVELS, axis=1).T
+    crps_gap = float(
+        np.abs(score_mod.crps_points(y=y, q=emp) - score_mod.crps_points(y=y, q=arm_q)).mean()
+    )
+    return {**got, "crps_gap": crps_gap}
+
+
+@dataclass(frozen=True)
+class WeibullSurvival:
+    """A Weibull survival function of the duration in days (the known-answer cases use it)."""
+
+    shape: float
+    scale_days: float
+
+    def sf(self, t: np.ndarray) -> np.ndarray:
+        """Return P(duration > t) for `t` in days."""
+        return np.exp(-((np.asarray(t, dtype=float) / self.scale_days) ** self.shape))
+
+
+def tolerance_study(*, n_cases: int = 400, seed: int = 1) -> dict[str, dict[str, float]]:
+    """Return the distribution of the three gaps over random known-answer cases.
+
+    The cases draw the base standard deviation (1 to 5 points of capacity), the depth (3 to 20
+    points, either sign), A1's age (2 to 14 days), the Weibull shape (0.7 to 1.5) and scale (5 to 40
+    days), and the lead day (1 to 9). The tolerances sit above the mean of each gap over the cases,
+    because the check reports a mean over thousands of rows, and below the gap of a wrong
+    construction.
+
+    Args:
+        n_cases: The number of cases.
+        seed: The seed of the draw.
+
+    Returns:
+        For each gap, the `mean`, `p95`, and `max` over the cases (points of capacity for the
+        quantile and CRPS gaps, a share for the ended gap).
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    for i in range(n_cases):
+        got = known_answer_gaps(
+            sd=rng.uniform(0.01, 0.05),
+            depth=rng.choice([-1.0, 1.0]) * rng.uniform(0.03, 0.20),
+            age_days=rng.uniform(2.0, 14.0),
+            curve=WeibullSurvival(shape=rng.uniform(0.7, 1.5), scale_days=rng.uniform(5.0, 40.0)),
+            lead_day=int(rng.integers(1, 10)),
+            seed=i,
+        )
+        rows.append([got["ended_gap"], got["quantile_gap"], got["crps_gap"]])
+    arr = np.array(rows)
+    return {
+        name: {
+            "mean": float(arr[:, j].mean()),
+            "p95": float(np.percentile(arr[:, j], 95)),
+            "max": float(arr[:, j].max()),
+        }
+        for j, name in enumerate(("ended_gap", "quantile_gap", "crps_gap"))
+    }
 
 
 def check_frames(
@@ -207,7 +361,11 @@ def check_frames(
     Returns:
         The means over the checked rows: `ended_gap`, `quantile_gap`, `crps_gap` (points of
         capacity), the report-only `energy_score` and `variogram_score` of the 51 paths against the
-        actual half-hours of the day, the largest `ended_gap`, and the number of rows checked.
+        actual half-hours of the day, the report-only `ensemble_crps` (the fair CRPS of the 51
+        paths) and `tail_weighted_crps` (the 11-level formula of the scorer on the paths' own 11
+        quantiles), the largest `ended_gap`, and the number of rows checked. The `crps_gap` compares
+        the 11-level formula on the paths' quantiles with the same formula on the stored quantiles,
+        so it measures the paths and not the difference between two formulas.
     """
     qcols = [f"q{n}" for n in ("01", "05", "10", "25", "40", "50", "60", "75", "90", "95", "99")]
     assert arm.height == base.height
@@ -246,7 +404,16 @@ def check_frames(
         rows = [rows[j] for j in np.linspace(0, len(rows) - 1, max_rows).astype(int)]
     assert rows, "no row has a shift that A1 sees: nothing to check"
     acc: dict[str, list[float]] = {
-        k: [] for k in ("ended_gap", "quantile_gap", "crps_gap", "energy_score", "variogram_score")
+        k: []
+        for k in (
+            "ended_gap",
+            "quantile_gap",
+            "crps_gap",
+            "ensemble_crps",
+            "tail_weighted_crps",
+            "energy_score",
+            "variogram_score",
+        )
     }
     for i in rows:
         age, depth = found[(int(tsid[i]), int(origin_us[i]), int(lead[i]))]
@@ -266,9 +433,12 @@ def check_frames(
         )
         acc["ended_gap"].append(got["ended_gap"])
         acc["quantile_gap"].append(got["quantile_gap"])
-        ensemble_crps = float(fair_crps(paths=paths, y=y[i]).mean()) * 100.0
-        quantile_crps = float(score_mod.crps_points(y=y[i], q=q_arm[i]).mean())
-        acc["crps_gap"].append(abs(ensemble_crps - quantile_crps))
+        emp = np.quantile(paths, LEVELS, axis=1).T
+        tail_weighted = score_mod.crps_points(y=y[i], q=emp)
+        stored = score_mod.crps_points(y=y[i], q=q_arm[i])
+        acc["crps_gap"].append(float(np.abs(tail_weighted - stored).mean()))
+        acc["ensemble_crps"].append(float(fair_crps(paths=paths, y=y[i]).mean()) * 100.0)
+        acc["tail_weighted_crps"].append(float(tail_weighted.mean()))
         acc["energy_score"].append(energy_score(paths=paths.T, y=y[i]))
         acc["variogram_score"].append(variogram_score(paths=paths.T, y=y[i]))
     out = {k: float(np.mean(v)) for k, v in acc.items()}
