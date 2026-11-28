@@ -52,7 +52,7 @@ prediction: >-
   `refuted` 3%. The prediction fails if any of C1, C2, C3, or V1 falls outside its range, or if
   S* is LR.
 decision_rule: >-
-  Fixed before any fit. S* is the arm of LD, LM, and LR with the lowest in-force scaled CRPS on the
+  Fixed before any fit. S* is the arm of LD, LM, and LR with the lowest in-force unscaled CRPS on the
   4 screen folds at seed 0 (an arm within 0.10 loses to the simpler arm, in the order LD, LM, LR).
   The unscaled CRPS governs every reading, and the scaled figure is report-only. N1 = q C1 + (1 - q)
   V1 is the net all-rows effect of the bundle, with q = 0.05 the assumed share of real rows in a
@@ -264,15 +264,16 @@ with 652. Two robustness worlds are report-only: experiment 650's held-out famil
 10, 21, and 45 days, depths up to 0.65, ramps of 72 to 120 hours), and a world whose durations are
 resampled from the 66 real transfers, sub-day durations included.
 
-**The fitted survival curve uses the training worlds' drawn durations and nothing else.** The best
-of an exponential, Weibull, log-normal, and log-logistic distribution, chosen by likelihood, is
-fitted to the drawn durations of every shift, clipped or not, because the generator knows each
-drawn duration and excluding clipped shifts would bias the fit towards short shifts. The curve is
-refitted at each monthly refit from that fold's training worlds. The true survival function is flat
-between 14 and 28 days, which none of the four families can reproduce, so LD and LM carry a known
-misspecification that LR can learn. A pre-fit criterion bounds it: the largest absolute error of the
-fitted S against the generator's true S at 1, 3, 7, 14, 28, and 56 days must be under 0.05, or the
-page reports the error beside every LD and LM reading. The 66 real transfers do not enter the
+**The survival curve of LD and LM is the empirical survival function of the training worlds' drawn
+durations, and nothing else.** The curve takes every shift's drawn duration, clipped or not, because
+the generator knows each drawn duration and excluding clipped shifts would bias the curve towards
+short shifts. The curve is rebuilt at each monthly refit from that fold's training worlds, which lie
+in the training window only. The true survival function is flat between 14 and 28 days, which an
+exponential, Weibull, log-normal, or log-logistic distribution cannot reproduce (Amendment 2 gives
+the error). The best of those four families, chosen by likelihood, is still fitted and recorded
+beside the empirical curve, for the report only, and no arm reads it. A pre-fit criterion bounds
+the empirical curve: the largest absolute error against the generator's true S at 1, 3, 7, 14, 28,
+and 56 days must be under 0.05, or Phase 0 stops. The 66 real transfers do not enter the
 counted curve. Their dates fall inside the scored months, and fewer than 66 would remain before
 each fold's cutoff. Half of them last under a day, a range the generator never draws. The counted
 worlds' own durations come from the generator.
@@ -308,11 +309,12 @@ because the valid time moves with it. Over origins on days 0 to 29 of a month, p
 hours 0.015, ended 1 to 7 days before 0.09, event-free 0.29, and onset ahead 0.10. With every row
 at a lead of 10 days, event-free is 0.225 and onset ahead 0.17. In both cases 0.50 of origins are in
 force and 0.33 of the in-force origins are older than 15 days. The clipping of shifts at the window
-edge moves the shares by under 1 point. "In force" pools far, middle, and near, and a shift clipped
-at the window edge is left out of the strata that use the end, and its in-force rows form a separate
-stratum that the counted contrasts leave out. A long shift that starts late in the 2026-05 or 2026-06
-fold can reach the end of the window, so those folds hold fewer in-force rows than the other folds.
-All arms drop the same rows. An origin at the half-hour of the shift's end counts as ended in the
+edge moves the shares by under 1 point. "In force" pools far, middle, and near, and the strata
+are built from the shift as the generator drew it (its drawn end and drawn depth). No in-force row is
+dropped because the window would have cut the shift short, because that would drop rows on
+information that lies after the forecast. Every scored valid time lies before 2026-07-01, so the
+drawn end is exact for every scored row. An origin at the half-hour of the shift's end counts as
+ended in the
 last 24 hours. The scaling factor pools all strata of a month, so
 the factor cannot absorb a stratum. The event-free stratum can hold a history with a shift that
 ended 8 to 15 days before the origin, and the page reports that share.
@@ -367,7 +369,8 @@ row.** "Gain" for a net effect or for C2 means that the upper limits of the 98.3
 the 98.33% month-block bootstrap interval are both below zero. "Seeds agree" means that each of the 3
 seeds has the sign of the point estimate. "Held-out agrees" means that the point estimates of C2 and
 C3 on the held-out-duration world have the sign of the training-family point estimates. A test
-enumerates every combination of the states and checks that each maps to one verdict.
+enumerates every combination of the 14 boolean states (16,384) and checks that each maps to one
+verdict.
 
 | Order | Verdict | Condition |
 |---|---|---|
@@ -375,8 +378,8 @@ enumerates every combination of the states and checks that each maps to one verd
 | 2 | `refuted` | The lower limit of the 98.33% t interval of N1 is above 0 (S* is worse than `M1` on the net effect) |
 | 3 | `not supported` | V1 fails; or the 98.33% t interval of N1 lies inside -0.05 to +0.05 |
 | 4 | `inconclusive` | A gain in N1, N3, or C2 has an interval below zero but the seeds do not agree |
-| 5 | `supported` | N1 gain at or below -0.05, N3 gain at or below -0.03, C2 gain, V1 passes, seeds agree, and held-out agrees |
-| 6 | `partly supported` | N1 gain at or below -0.05, V1 passes, seeds agree, and N3 is not a gain at -0.03, or C2 is not a gain, or held-out disagrees (the reading is then labelled "duration-dependent") |
+| 5 | `supported` | N1 gain at or below -0.05, N3 gain at or below -0.03 with the 98.33% t interval of in-force C3 (unscaled CRPS, S* minus W0) below zero, C2 gain, V1 passes, seeds agree, and held-out agrees |
+| 6 | `partly supported` | N1 gain at or below -0.05, V1 passes, seeds agree, and N3 does not pass (a gain at -0.03 with C3 below zero), or C2 is not a gain, or held-out disagrees (the reading is then labelled "duration-dependent") |
 | 7 | `small gain` | N1 gain with a point estimate above -0.05, V1 passes, and seeds agree |
 | 8 | `inconclusive` | Anything else |
 
@@ -471,11 +474,13 @@ rises is read as a harm of the training worlds on rows with no shift.
 trained LP and W0 fits of the 4 screen folds at seed 0, so the order is smoke test, screen fits, gate,
 screen scoring, full fits. Three checks must pass. An oracle that adds the true shift times the true
 survival to `M1`'s median forecast must return a follow share of at least 0.95 through the scorer, at
-a mid-day onset as well as at midnight. LP must add at least 0.75 of the depth of a shift that is in
-force and far from its end, to the median at lead days 1 to 2, beyond the median of `M1`, on the rows
-where A1 sees the shift (A1's age is above zero). The record also holds the same share over all far
+a mid-day onset as well as at midnight. LP must add at least 0.75 of the depth that `M1` leaves
+unfollowed (Amendment 2 gives the derivation) of a shift that is in force and far from its end, to
+the median at lead days 1 to 2, beyond the median of `M1`, on the rows where A1 sees the shift (A1's
+age is above zero). The record also holds the same share over all far
 rows, and the share of far rows that A1 sees, as diagnostics. The depth head's median depth divided
-by the true depth must be at least 0.7 on shifts of 3 to 10 days. Checks 2 and 3 read only the rows
+by the true depth must be at least 0.7 of the same remaining depth on shifts of 3 to 10 days.
+Checks 2 and 3 read only the rows
 where A1 sees the shift, so a head can pass while A1 misses many shifts. The Phase 0 table of A1
 reports the share of shifts that A1 misses by age band, and the gate record holds the share of far
 rows that A1 sees.
@@ -542,6 +547,86 @@ ended-share tolerance in 99% or 91% of the cases. `members.tolerance_study` repe
 bootstrap interval held seed noise that the t interval does not. The seed points of a reading were
 also ratios of pooled sums, which differ from the mean of monthly means that the point estimate
 uses when the months hold unequal row counts. Both now use the mean of the monthly means.
+
+## Amendment 2 before any fit
+
+**Amendment 2 (2026-11-28) changes A1, the survival curve, the level head of LP, the holdout, the
+strata, the gate bars, the choice of S*, the verdict, and the run guards, after a second code review
+and before any fit.** No fit, prediction, or score had run, and no real forecast number had been
+seen. The sections above already describe the new design, and this section gives the reason for each
+change and records each finding that was not taken.
+
+**A1 has a tuned threshold, and Phase 0 stops if the tuning fails.** The code review measured that,
+on real rows of the fold 2025-11's training window, the 2-noise-unit threshold flags a shift on 0.198
+of the rows, four times the bar of 0.05. Phase 0 now tunes the threshold, over the grid 2.0 to 12.0
+in steps of 0.25 noise units, to the smallest value whose share of flagged real rows is at most
+0.05. The rows come from the earliest fold's training window, which lies inside the training window of every fold, and
+never from a scored month. The rows include the 2.5% that sit in logged events, which overstates
+the false alarms slightly, so the tuned threshold errs high. The table prints the miss rate by true
+age band, and Phase 0 stops with a message to the coordinator if no threshold meets the bar, or if
+A1 at the tuned threshold misses more than 0.6 of the shifts with a true age of 3 to 10 days. The
+tuned threshold is written to `a1/threshold.json`, every head fit reads it, and a real stage that
+finds no file refuses to run.
+
+**LD and LM use the empirical survival function, and the Weibull is report-only.** The best of the
+four families was a Weibull with shape 1.03 and scale 40.6 days. Its error against the generator's
+survival function is 0.216 at 14 days and 0.081 at 56 days, against the bar of 0.05, because the
+generator's function is flat between 14 and 28 days. The fitted survival ratio was then nearly
+constant across ages, so LD and LM would not have timed the end of a shift. The empirical function
+of about 16,000 drawn durations per fold is within sampling error of the generator's.
+
+**LP is full persistence.** The depth of LP read the lead-day one-hot, the base forecast's mean and
+spread, and the pooled target summary, so its level term could change with the lead. LP now reads
+only the 14 row means, the 14 presence flags, and the Primary, and a unit test asserts that its
+level term is identical at every lead and for different target weather.
+
+**No forecast, score, or injected world uses a valid time on or after 2026-07-01.** Experiment 713's
+own pass filters those rows, and the forecast pass here did not, so the 2026-06 fold would have read
+July actuals. The forecast pass now drops them, the scorer asserts that none is left, and the member
+check leaves out the blocks that the cut shortens. Phase 0 writes every fold's scoring shifts to
+disk, reads the files back, and checks that no shift ends after the holdout and that the filter
+drops rows of the 2026-06 fold and of no other fold, which needs no fit.
+
+**The strata use the drawn end.** Dropping in-force rows because the window clips the shift removed
+0, 0, 0, 0, 0.01, 0.17, 0.52, and 0.70 of the in-force rows of the folds 2025-11 to 2026-06 in a
+simulation, and the rows kept in 2026-06 were 0.81 short shifts. The strata now use the drawn end
+and the drawn shift, and the stratum-share check reads the injected worlds that were written to
+disk, not a simulation.
+
+**The bars of gate checks 2 and 3 follow `M1`'s own follow share.** The gate record holds `M1`'s own
+share f of the injected depth on the same rows. A perfect head adds the remaining depth 1 - f
+(floored at 0.2), and the bars are 0.75 and 0.7 of that remaining depth. The gate prints the
+derivation. With f = 0, the bars are the plan's 0.75 and 0.7, and the first run shows whether a
+larger f is real.
+
+**S* is chosen by unscaled CRPS, and N3 needs an in-force C3 below zero.** The scale factor is
+fitted on the rows it scores and can hide a loss in the unscaled score, so the scaled figure is
+report-only. N3 passes only if its net effect is at most -0.03, both intervals are below zero, and the
+98.33% t interval of the in-force unscaled C3 lies below zero. This adds one boolean to the verdict
+table, which now has 16,384 states.
+
+**The artefacts carry the code that wrote them.** Every state file and forecast file has a recipe
+file that holds the hash of the fitting modules (the state) or the fitting and prediction modules
+(the forecast). A stage that scores or reuses a file refuses one with another hash, and the
+prediction job refuses to reuse or overwrite it. The diagnostics file is written before the forecast
+file, so a forecast file implies its diagnostics.
+
+**Smaller guards.** The remedy resumes after a crash: the first attempt moves aside once into
+`gate_first_attempt/`, each finished remedy task is skipped, and only a complete remedy makes a second
+failure final. GPU waits are printed and are not counted by the stop line. A GPU stage refuses more
+than one worker. The smoke hours are copied into the real ledger. The prediction asserts that the
+fold's cutoff is the first day of the month.
+
+**New report-only readings.** The report prints the survival curve's error and the fitted family
+beside the empirical curve, A1's table and tuned threshold, the gate's depth ratios by age band, the
+mean CRPS of every arm in the four scenarios of the injected worlds (all rows, outside events and the
+7 days after, inside events, and the 7 days after an end), and C2 for LD, LM, and LR split into the
+median's error and the 90% interval's coverage, which shows whether a mixture gains by spread.
+
+**Not taken.** The scenario table has no climatology row, because no climatology forecast exists for
+an injected world. The LM control with a constant survival ratio is not built, because the cost table
+has no room for another arm, and the split of C2 into the median's error and the coverage tests the
+same question.
 
 ## The gallery
 
@@ -618,8 +703,9 @@ fit times, not from one fit, and the cut list fires on that figure.** The cuts, 
 (its contrast with LM is report-only), then fit seeds 0 and 1 only. No fold is cut from a counted
 reading, because the 8 months are the resampled unit. The manager approves any cut before phase 4.
 The launcher stops between jobs at the stop line and never inside a fit. A fit writes its state to a
-temporary name and renames the file when complete. The ledger counts a crashed attempt and the
-waiting time under contention. A job treats the GPU as busy when `nvidia-smi` lists a compute
+temporary name and renames the file when complete. The ledger counts a crashed attempt. The waits under
+contention are printed and booked as waits, and the stop line does not count them. A job treats the
+GPU as busy when `nvidia-smi` lists a compute
 process of another session, and backs off for 5 minutes. The run uses one GPU process at a time under
 `systemd-run --user --scope -p MemoryMax=16G -p MemorySwapMax=0 -p OOMPolicy=continue`, one thread
 for each numerical library, and cores 8 to 15 for the CPU phases.
@@ -738,11 +824,14 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
   the known-answer gate's second failure. The gate's first failure exits with 6, and means that the
   remedy flag is set and `gate-remedy` runs next. A launcher that finds the GPU busy exits with 75
   and starts nothing. The plan states only the code 5 and "a different code" for the busy GPU.
-- `e00738_gate.py` runs the known-answer gate. `e00738_figures.py` and `e00738_gallery.py` draw the
+- `e00738_worldcheck.py` writes every fold's scoring shifts to disk and checks the strata and the
+  holdout from the files. `e00738_gate.py` runs the known-answer gate. `e00738_figures.py` and
+  `e00738_gallery.py` draw the
   figures and the gallery.
 - The tests are `test_e00738_world.py`, `test_e00738_survival.py`, `test_e00738_score.py`,
   `test_e00738_panel.py`, `test_e00738_run.py`, `test_e00738_review_fixes.py`,
-  `test_e00738_model.py`, `test_e00738_attributes.py`, and `test_e00738_dryrun.py`. The last three
+  `test_e00738_opus_fixes.py`, `test_e00738_model.py`, `test_e00738_attributes.py`, and
+  `test_e00738_dryrun.py`. The last three
   need `torch` and skip without it. The tests cover every pure function, the visibility limit of the
   level features, the keyword names of `run_task`, every state of the verdict table, the guards, and
   the existence of every attribute that the scripts take from an imported module, including lazy
