@@ -1156,13 +1156,13 @@ def dispatch(*, args: argparse.Namespace) -> None:
 def main(*, argv: list[str] | None = None) -> None:
     """Run a stage; a failure writes `failed/stage_<stage>.json` with the message and the traceback, and exits with code 3 (CPU) or 5 (GPU)."""
     args = parse_args(argv=argv)
-    phases.assert_blas_pinned()
     gpu = args.stage in GPU_STAGES
     if gpu and args.of != 1:
         sys.exit(
             f"refusing to run: {args.stage} is a GPU stage, which runs as one worker "
             f"(got --of {args.of}); two workers would both train on the one GPU"
         )
+    phases.assert_blas_pinned()
     if args.stage != "one-task" and common.PASS_CAP_ENV in os.environ:
         sys.exit(
             f"refusing to run: {common.PASS_CAP_ENV} is set in the environment (only the smoke "

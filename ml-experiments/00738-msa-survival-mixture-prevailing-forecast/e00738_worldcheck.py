@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import calendar
 from pathlib import Path
+from typing import Any
 
 import e00738_common as common
 import e00738_panel as panel
@@ -141,7 +142,7 @@ def check_worlds(*, months: tuple[str, ...], out: Path | None = None) -> dict:
     }
 
 
-def verdict(*, found: dict) -> dict[str, object]:
+def verdict(*, found: dict) -> dict[str, Any]:
     """Return the shares that are off the plan and the holdout faults of a `check_worlds` result."""
     bad = {}
     for k, want in common.EXPECTED_SHARES.items():

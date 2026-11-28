@@ -15,7 +15,7 @@ after 2026-07-01 (`common.HOLDOUT_START_US`) is dropped, as in experiment 713's 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Final
+from typing import Any, Final
 
 import e00738_common as common
 import numpy as np
@@ -78,7 +78,7 @@ def assert_713_code() -> str:
     return actual
 
 
-def before_holdout(*, valid_us: np.ndarray | pl.Expr) -> np.ndarray | pl.Expr:
+def before_holdout(*, valid_us: Any) -> Any:
     """Return the mask of valid times that lie before 2026-07-01 (the rows a forecast may keep)."""
     return valid_us < common.HOLDOUT_START_US
 

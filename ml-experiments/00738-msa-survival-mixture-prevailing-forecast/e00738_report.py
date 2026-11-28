@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Final, TypedDict
+from typing import Any, Final, TypedDict
 
 import e00738_common as common
 import e00738_score as score
@@ -255,7 +255,7 @@ def scenario_tables(
     return out
 
 
-def phase0_readings(*, out: Path | None = None) -> dict[str, object]:
+def phase0_readings(*, out: Path | None = None) -> dict[str, Any]:
     """Return what Phase 0 and the gate wrote that the page reports beside the readings.
 
     These are the survival curve's error against the generator's at each checkpoint, A1's table
@@ -263,7 +263,7 @@ def phase0_readings(*, out: Path | None = None) -> dict[str, object]:
     age band. A missing file reads as None.
     """
     root = out if out is not None else common.OUT
-    found: dict[str, object] = {"curves": {}, "a1": {}, "gate_depth_ratio_by_band": None}
+    found: dict[str, Any] = {"curves": {}, "a1": {}, "gate_depth_ratio_by_band": None}
     for path in sorted((root / "curves").glob("*.json")):
         found["curves"][path.stem] = json.loads(path.read_text())  # ty: ignore[invalid-assignment]
     for path in sorted((root / "a1").glob("20*.json")):
