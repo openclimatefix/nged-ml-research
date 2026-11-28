@@ -243,7 +243,7 @@ groups.
 
 **The power loader reads grid index `i` from store index `i + 1`.** The power store's index `i` is
 the half-hour that ends at the origin (the start of the grid, 2022-01-01) plus 30 minutes times `i`.
-[Amendment 1](#amendment-1-to-the-plan-of-experiment-737) gives the history of the correction, and
+[Amendment 1](#amendment-1-to-the-plan-of-experiment-737-2026-11-28) gives the history of the correction, and
 the audit in it found that no earlier published result depends on the same off-by-one.
 
 **The timing gate G4 passes only in a relaxed form.** Gate G4 compares each Primary's timing with
@@ -704,8 +704,8 @@ can check each one.
   `temperature_2m`, because the mean gap is 0.9 K, so `e00737_forward.py` builds the means from
   `temperature_2m`); any switching label from NGED's logs (the logs score nothing here); and any
   row from 2026-07-01 on. The weather files run past that date (ERA5 to 2026-07-31, CAMS to
-  2026-09-10, and the farm file to 2026-10), so every loader cuts at 2026-07-01 and a test asserts
-  the cut.
+  2026-09-10, and the farm file runs past the cut date), so every loader cuts at 2026-07-01 and a
+  test asserts the cut.
 - **Look-ahead.** The fit is a whole-record smoother, so the capacity of quarter q uses power and
   weather from later quarters. ERA5 and CAMS are published about 5 days late, so the result bears
   on labelling a historical record and not on a live estimate. A past-only sample (6 Primaries, the
@@ -765,7 +765,7 @@ day 365 days later, and the last four quarters use 365 days earlier, because the
   output is half the capacity from the farm's per-unit output and half from the physics mixture. A
   farm half-hour with no finite reading takes the physics mixture instead, and a quarter in which
   the farm has finite readings in under 60% of its daylight half-hours (for example before a
-  late-starting farm's first reading) takes the physics mixture alone.
+  farm with a late first reading) takes the physics mixture alone.
 - **Cloud-following load.** Experiment 40's `e00040_arms.confound_shapes(window=...)` returns eight
   shapes, and the world uses the one named `flat`, the day's cloud fraction scaled to a mean of 1,
   at 25% of the fleet's capacity, added as demand (a positive load that rises with cloud). The
@@ -960,16 +960,17 @@ gives estimates of unmetered solar anonymised. The private tables hold every num
   of experiment 6's `features.parquet`, whose `valid_time` is a half-hour end stamp, matches the
   store at that index in every row), whereas the grid's index `i` ends 30 minutes times `i + 1`
   after the origin and `baseline_design` takes end times. The loader therefore reads grid index `i`
-  from store index `i + 1` ([Amendment 1](#amendment-1-to-the-plan-of-experiment-737) records the
-  correction). The gate runs on the real half-hourly series: for each Primary, it compares the mean
+  from store index `i + 1`
+  ([Amendment 1](#amendment-1-to-the-plan-of-experiment-737-2026-11-28) records the correction).
+  The gate runs on the real half-hourly series: for each Primary, it compares the mean
   daytime dip of real summer power minus real winter power (April to September against October to
   March, by half-hour of the day) with the model's unit solar curve for the same two seasons,
   shifted by -1, 0, and +1 half-hour, and requires the best shift (the one with the highest
   correlation over the 48 half-hours) to be 0 at each Primary and in the pooled mean. The gate also
   requires that the real nights carry no CAMS irradiance, and the test calls the real loader on a
-  small fixture shaped like the real file (the second lesson of experiment 729). [Amendment
-  1](#amendment-1-to-the-plan-of-experiment-737) replaces the summer-minus-winter comparison with a
-  same-month comparison of sunny and dull days, scans the shift in steps of 0.25 half-hour, and
+  small fixture shaped like the real file (the second lesson of experiment 729).
+  [Amendment 1](#amendment-1-to-the-plan-of-experiment-737-2026-11-28) replaces the
+  summer-minus-winter comparison with a same-month comparison of sunny and dull days, scans the shift in steps of 0.25 half-hour, and
   requires the Primaries to match the metered farms' best shift within stated bounds.
 - **G5, convergence.** The expectation-maximisation fit converges in 30 iterations or fewer in 99%
   of the fits, and no fit ends with every quarter's capacity at its bound.
