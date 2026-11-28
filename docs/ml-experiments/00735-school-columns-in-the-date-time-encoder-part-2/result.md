@@ -117,7 +117,8 @@ to the encoder's input, which widens its first layer from 29 to 37 inputs:
   initialisation: R1 draws the 29 original first-layer input columns from the seed, the new arms
   copy those weights, and draw the 8 new columns' weights from a generator seeded 735 (uniform
   within plus or minus 1 over the square root of 37), so the arms of one seed differ only in the
-  new columns.
+  new columns. The 8 new columns' initial weights are the same for all 3 seeds, so the seed spread
+  does not sample the variation from initialising those columns.
 - **The 8 columns enter at every place the encoder is called.** The step-5 neural network passes
   two inputs through the date-time encoder: the row itself, and the day lag and week lag, whose
   weather and date-time columns are read at each lag's own valid time (`e00574_model._expected`,

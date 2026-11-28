@@ -15,8 +15,10 @@ records it) and `NewColumnTables` (the arm's `table_new` on a device, cached by 
 PYTHONPATH: source `ml-experiments/00524*/env.sh` from the worktree root.
 """
 
+import hashlib
 import json
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -135,6 +137,181 @@ def check_table_matches_rows(
     )
 
 
+TABLE_TAG_STEPS: Final = 20_000
+"""Grid steps of `table_new` that the stage tag hashes (every stage's table is at least this long)."""
+GATE_ROWS: Final = 2048
+"""Rows in the gate's training batch and validation batch."""
+GATE_SEED: Final = 735
+"""Seed of the random choice of the gate's rows."""
+
+
+def _sha(*, array: np.ndarray) -> str:
+    """Return the hex sha256 of an array's bytes."""
+    return hashlib.sha256(np.ascontiguousarray(array).tobytes()).hexdigest()
+
+
+def table_sha(*, model: Any) -> str:
+    """Return the sha256 of the first `TABLE_TAG_STEPS` grid steps of the model's `table_new`, or `none`."""
+    table = getattr(model, "table_new", None)
+    if table is None:
+        return "none"
+    assert table.shape[1] >= TABLE_TAG_STEPS, table.shape
+    return _sha(array=table[:, :TABLE_TAG_STEPS].detach().cpu().numpy())
+
+
+def weight_sha(*, model: Any) -> str:
+    """Return the sha256 of the date-time encoder's first-layer weight (`datetime.0.weight`)."""
+    return _sha(array=model.datetime[0].weight.detach().cpu().numpy())
+
+
+def write_stage_tag(*, path: Path, arm: cols.ArmB, model: Any) -> None:
+    """Write the arm, the `table_new` hash, and the `datetime.0.weight` hash beside a stage-1 checkpoint."""
+    write_json(
+        path=path,
+        payload={"arm": arm.name, "table_new_sha256": table_sha(model=model), "datetime_0_weight_sha256": weight_sha(model=model)},
+    )  # fmt: skip
+
+
+def check_stage_tag(*, path: Path, arm: cols.ArmB, model: Any) -> None:
+    """Raise `AssertionError` unless the model's `table_new` and `datetime.0.weight` match the stage-1 tag."""
+    assert path.exists(), ("the stage-1 tag is missing", str(path))
+    tag = json.loads(path.read_text())
+    assert tag["arm"] == arm.name, (tag["arm"], arm.name)
+    assert tag["table_new_sha256"] == table_sha(model=model), "table_new differs from stage 1's"
+    assert tag["datetime_0_weight_sha256"] == weight_sha(model=model), (
+        "datetime.0.weight differs from stage 1's"
+    )
+
+
+def _recorder(*, seen: list[np.ndarray]) -> Any:
+    """Return a forward pre-hook that appends the tensor reaching the module."""
+
+    def hook(_module: Any, args: tuple) -> None:
+        seen.append(args[0].detach().cpu().numpy().copy())
+
+    return hook
+
+
+def gate_stage(  # noqa: PLR0915
+    *, model: Any, x: torch.Tensor, primary: torch.Tensor, is_val: torch.Tensor,
+    valid_us: np.ndarray, arm: cols.ArmB, stage: int, month: str, seed: int, out_dir: Path,
+    first_us: int, step_us: int, c_true: np.ndarray, c_permuted: np.ndarray, n_rows: int = GATE_ROWS,
+) -> dict[str, Any]:  # fmt: skip
+    """Check, on real rows, the tensors that reach the date-time encoder, and write them to a JSON file.
+
+    For one training batch and one validation batch of `n_rows` random rows, a forward pre-hook on
+    `model.datetime` reads the encoder's input on the three paths (the row, the day lag, the week
+    lag). An arm with the columns must show the arm's 8 columns (`extra_columns` at the row's valid
+    time, and at the grid times in `x[:, 43]` and `x[:, 44]`, zeros where the index is below 0) in
+    input columns 21 to 28. An arm without them must show an encoder input of 21 columns plus the
+    embedding. The file `checks_stage_<stage>_<month>_s<seed>.json` holds, for each batch, path, and
+    column, the number of distinct values and the shares of ones and of non-zero values.
+
+    Args:
+        model: The network, with its tables attached.
+        x: The rows' input matrix (all rows of the stage).
+        primary: The rows' Primary indices.
+        is_val: True for validation rows.
+        valid_us: The rows' valid times in microseconds since the epoch.
+        arm: The arm.
+        stage: 1, 2, or 3.
+        month: The refit month.
+        seed: The seed.
+        out_dir: The folder of the JSON file.
+        first_us: The first grid time in microseconds since the epoch.
+        step_us: The grid step in microseconds.
+        c_true: Closeness per Primary index.
+        c_permuted: The placebo closeness per Primary index.
+        n_rows: Rows per batch.
+
+    Returns:
+        The payload that was written.
+    """
+    assert len(valid_us) == len(x) == len(primary) == len(is_val), (
+        len(valid_us),
+        len(x),
+        len(primary),
+        len(is_val),
+    )
+    width, emb_dim = model.datetime[0].in_features, model.embedding.embedding_dim
+    assert width == 21 + arm.width + emb_dim, ("encoder input width", width, arm.width, emb_dim)
+    rng = np.random.default_rng(GATE_SEED)
+    was_training = model.training
+    model.eval()
+    batches: dict[str, Any] = {}
+    try:
+        for batch, mask in (("train", ~is_val), ("val", is_val)):
+            pool = torch.nonzero(mask).squeeze(1).cpu().numpy()
+            if not len(pool):
+                batches[batch] = {"n_rows": 0}
+                continue
+            rows = np.sort(rng.choice(pool, size=min(n_rows, len(pool)), replace=False))
+            idx_t = torch.from_numpy(rows).to(x.device)
+            seen: list[np.ndarray] = []
+            hook = model.datetime.register_forward_pre_hook(_recorder(seen=seen))
+            try:
+                with torch.no_grad():
+                    model(x[idx_t], primary[idx_t])
+            finally:
+                hook.remove()
+            assert len(seen) == 3, len(seen)  # the row, the day lag, the week lag
+            xb = x[idx_t].cpu().numpy()
+            pb = primary[idx_t].cpu().numpy()
+            vb = np.asarray(valid_us)[rows]
+            paths: dict[str, Any] = {}
+            for k, name in enumerate(("row", "day lag", "week lag")):
+                inp = seen[k]
+                assert inp.shape == (len(rows), width), (name, inp.shape)
+                entry: dict[str, Any] = {"input_width": int(inp.shape[1]), "columns": []}
+                if arm.columns:
+                    new = inp[:, 21 : 21 + arm.width]
+                    if k == 0:
+                        when = vb
+                        present = np.ones(len(rows), dtype=bool)
+                    else:
+                        lag = xb[:, 43 + k - 1].astype(np.int64)
+                        present = lag >= 0
+                        when = np.where(present, first_us + lag * step_us, vb)
+                    want = cols.extra_columns(
+                        valid_us=when, primary=pb, arm=arm, c_true=c_true, c_permuted=c_permuted
+                    )
+                    want[~present] = 0.0
+                    entry["equals_expected"] = bool(np.array_equal(new, want))
+                    assert entry["equals_expected"], (
+                        arm.name,
+                        stage,
+                        name,
+                        "the encoder's new columns differ from the arm's columns",
+                    )
+                    for j, col in enumerate(arm.names):
+                        v = new[:, j]
+                        entry["columns"].append(
+                            {
+                                "column": col, "distinct": len(np.unique(v)),
+                                "share_one": float((v == 1.0).mean()), "share_nonzero": float((v != 0.0).mean()),
+                            }
+                        )  # fmt: skip
+                    if batch == "train" and name == "row":
+                        assert all(c["distinct"] > 1 for c in entry["columns"]), (
+                            arm.name,
+                            stage,
+                            "a column is constant",
+                            entry["columns"],
+                        )
+                else:
+                    entry["equals_expected"] = None
+                paths[name] = entry
+            batches[batch] = {"n_rows": len(rows), "paths": paths}
+    finally:
+        model.train(was_training)
+    payload = {
+        "arm": arm.name, "stage": stage, "month": month, "seed": seed, "n_new": arm.width,
+        "encoder_input_width": width, "embedding_dim": emb_dim, "batches": batches,
+    }  # fmt: skip
+    write_json(path=out_dir / f"checks_stage_{stage}_{month}_s{seed}.json", payload=payload)
+    return payload
+
+
 class NewColumnTables:
     """The arm's `table_new` (Primaries, grid, 8) on a device, built once per grid length."""
 
@@ -161,6 +338,7 @@ class NewColumnTables:
 def pretrain_arm(  # noqa: PLR0915
     *, e: Any, months: list[str], seeds: list[int], device: str, arm: cols.ArmB,
     c_true: np.ndarray, c_permuted: np.ndarray, history_dir: Path, smoke: bool, code_hash: str,
+    checks_dir: Path, check_b1_stats: Callable[[str], None],
 ) -> None:  # fmt: skip
     """Pre-train the arm's network on each fold's ERA5 and CAMS rows, with the arm's 8 columns.
 
@@ -176,6 +354,8 @@ def pretrain_arm(  # noqa: PLR0915
         history_dir: Where the per-epoch loss history of each seed is written.
         smoke: Cap every pre-training at one epoch.
         code_hash: The code hash that is recorded beside each history file.
+        checks_dir: Where the stage-1 gate writes its JSON file of each seed.
+        check_b1_stats: Called with the month right after the B1 statistics are written; raises if they differ from experiment 677's.
     """
     assert e.SPEC.pretrain_from != "V3D5", "this arm uses the stored pre-training of experiment 572"
     c, k, r448, d560, lg = e.c, e.k, e.r448, e.d560, e.lg
@@ -227,11 +407,12 @@ def pretrain_arm(  # noqa: PLR0915
         if e.SPEC.b1:
             extra_b1 = e.pretrain_b1_columns(month=month, pre=pre)
             assert extra_b1.shape == (len(pre.x), e.N_B1) and np.isfinite(extra_b1).all()
+            check_b1_stats(month)  # the statistics are written by `pretrain_b1_columns`
             x_gpu[:, mod.b1_cols(n_b1=e.N_B1)] = torch.from_numpy(extra_b1).to(device)
             del extra_b1
         # >>> PART 2 BEGIN (the arm's 8 columns from each row's valid time and Primary)
+        valid_us = first_us + pre.target_idx.astype(np.int64) * step_us
         if arm.columns:
-            valid_us = first_us + pre.target_idx.astype(np.int64) * step_us
             assert valid_us.min() >= STAGE_1_FIRST_VALID.timestamp() * 1e6, (
                 "a stage-1 row is earlier than 2019-12-01",
                 datetime.fromtimestamp(valid_us.min() / 1e6, UTC),
@@ -256,7 +437,7 @@ def pretrain_arm(  # noqa: PLR0915
                 zip(arm.names, (block != 0).mean(axis=0).round(4).tolist(), strict=True)
             )
             print(month, "stage-1 new columns, non-zero shares", e.CHECK["months"][month]["new_columns_pretrain"], flush=True)  # fmt: skip
-            del block, valid_us
+            del block
         # <<< PART 2 END
         stub = np.zeros((min(2_000_000, len(blk)), e.N_LAG_INPUTS), np.float32)
         stub[:, 37:] = blk[: len(stub)]
@@ -275,6 +456,7 @@ def pretrain_arm(  # noqa: PLR0915
         n_primaries = len(mr.base.target_mean)
         origin_idx = pre.origin_idx
         del pre, mr
+        prim_t = t["p"]
         for seed in todo:
             started = time.monotonic()
             for a in range(0, len(blk), 1_000_000):
@@ -284,6 +466,11 @@ def pretrain_arm(  # noqa: PLR0915
             share = e.apply_dropout(x=x_gpu, origin_idx=origin_idx, seed=seed)
             torch.manual_seed(seed)
             model = e.new_model(n_primaries=n_primaries, stage="pre").to(device)
+            gate_stage(
+                model=model, x=x_gpu, primary=prim_t, is_val=t["v"], valid_us=valid_us, arm=arm, stage=1,
+                month=month, seed=seed, out_dir=checks_dir, first_us=first_us, step_us=step_us,
+                c_true=c_true, c_permuted=c_permuted,
+            )  # fmt: skip
             hist.reset()
             e.row_nll = row_nll_recorded
             try:
@@ -309,6 +496,7 @@ def pretrain_arm(  # noqa: PLR0915
             )  # fmt: skip
             target = e.pretrained_dir() / f"{month}_s{seed}.pt"
             target.parent.mkdir(parents=True, exist_ok=True)
+            write_stage_tag(path=target.with_suffix(".tag.json"), arm=arm, model=model)
             tmp = target.with_suffix(".tmp")
             torch.save(model.state_dict(), tmp)
             tmp.rename(target)
@@ -316,6 +504,6 @@ def pretrain_arm(  # noqa: PLR0915
                 f"  pretrain {arm.name} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, dropout {share}",
                 flush=True,
             )
-        del t, x_gpu, blk
+        del t, x_gpu, blk, valid_us
         e.CTX.pop("table_pre", None)
         torch.cuda.empty_cache()

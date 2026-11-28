@@ -23,14 +23,23 @@ the row (5% missing). The ranges are those of the refit month 2026-03: stage 1 t
 rows from 2019-12-01, and stages 2 and 3 on ensemble rows from 2024-04-01, both to 3.5 hours before
 the refit. Stage 3 runs in training mode with the two label columns attached; stages 1 and 2 run without
 labels. The other columns of a row are random numbers, because the gate checks the new columns' path.
-It does not read the real rows of a month; the runner records the real rows' non-zero shares in its
-checks files (`new_columns_pretrain`, `new_columns_train`, `new_columns_test`).
+This synthetic mode does not read the real rows of a month.
 
-Usage: `python e00735b_check_stages.py [--out PATH]`. PYTHONPATH: source `ml-experiments/00524*/env.sh`.
-Exit code 0 when every assertion holds, and the table is printed (and written to PATH as csv).
+**The real-run mode** (`--from-json FOLDER`) reads the files `checks_stage_<stage>_<month>_s<seed>.json`
+that the runner writes in stages 1, 2, and 3 (`e00735b_stage1.gate_stage`, run on 2,048 random
+training rows and 2,048 random validation rows of the real matrix, through a forward pre-hook on
+`network.datetime`). It prints, for each arm, stage, batch, path, and column, the number of distinct
+values and the share of ones, and asserts that an arm with the columns shows them equal to the
+expected columns on every path, that each column of the training batch is non-constant, and that R1
+shows none of the columns. R0 is experiment 677's stored control and writes no file.
+
+Usage: `python e00735b_check_stages.py [--out PATH] [--from-json FOLDER]`. PYTHONPATH: source
+`ml-experiments/00524*/env.sh`. Exit code 0 when every assertion holds, and the table is printed (and
+written to PATH as csv).
 """
 
 import argparse
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -160,11 +169,62 @@ def expected_columns(
     return np.where(present[:, None], block, 0.0).astype(np.float32), present
 
 
+def read_json_checks(*, folder: Path) -> pl.DataFrame:
+    """Read the runner's stage-gate files in a folder, assert their contents, and return the table."""
+    files = sorted(folder.glob("checks_stage_*_s*.json"))
+    assert files, ("no checks_stage_*.json file in", str(folder))
+    rows: list[dict[str, object]] = []
+    for file in files:
+        record = json.loads(file.read_text())
+        arm, stage = record["arm"], record["stage"]
+        assert arm in cols.ARMS and arm != "R0", (file.name, arm)
+        assert record["n_new"] == cols.ARMS[arm].width, (file.name, record["n_new"])
+        for batch, body in record["batches"].items():
+            for path, entry in body.get("paths", {}).items():
+                if not cols.ARMS[arm].columns:
+                    assert (
+                        entry["columns"] == []
+                        and entry["input_width"] == 21 + record["embedding_dim"]
+                    ), (file.name, batch, path)
+                    rows.append(
+                        {
+                            "arm": arm, "stage": stage, "month": record["month"], "seed": record["seed"], "batch": batch,
+                            "path": path, "column": "none", "distinct": 0, "share_of_ones": 0.0,
+                        }
+                    )  # fmt: skip
+                    continue
+                assert entry["equals_expected"] is True, (file.name, batch, path)
+                assert len(entry["columns"]) == cols.N_COLUMNS, (file.name, batch, path)
+                for column in entry["columns"]:
+                    if batch == "train" and path == "row":
+                        assert column["distinct"] > 1, (file.name, column)
+                    rows.append(
+                        {
+                            "arm": arm, "stage": stage, "month": record["month"], "seed": record["seed"], "batch": batch,
+                            "path": path, "column": column["column"], "distinct": column["distinct"],
+                            "share_of_ones": round(column["share_one"], 4),
+                        }
+                    )  # fmt: skip
+    return pl.DataFrame(rows)
+
+
 def main() -> int:
     """Run the gate, print the table, and return 0 (an assertion raises otherwise)."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=None)
+    parser.add_argument(
+        "--from-json", default=None, help="a folder of the runner's checks_stage_*.json files"
+    )
     args = parser.parse_args()
+    if args.from_json:
+        frame = read_json_checks(folder=Path(args.from_json))
+        with pl.Config(tbl_rows=2000, tbl_cols=10, tbl_width_chars=180):
+            print(frame)
+        if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            frame.write_csv(args.out)
+        print("REAL-RUN STAGE GATE PASSED")
+        return 0
     c_true, c_permuted = cols.coast_arrays()
     table_rows: list[dict[str, object]] = []
     captured: dict[tuple[str, int, str], np.ndarray] = {}

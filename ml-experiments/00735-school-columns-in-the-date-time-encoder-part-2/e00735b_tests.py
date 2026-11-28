@@ -996,6 +996,276 @@ def test_lag_table_check_catches_an_offset() -> None:
     )
 
 
+FAKE_677_LOG = """2025-11: pretraining rows 7,144,058
+  pretrain P5 2025-11 s0: 45 epochs, val NLL 0.3144, 54 s, dropout {'share_all_lags_masked': 0.23141833394969638, 'share_day_lag_missing': 0.30076518654823303}
+  pretrain P5 2025-11 s1: 60 epochs, val NLL 0.3072, 70 s, dropout {'share_all_lags_masked': 0.242239774649086, 'share_day_lag_missing': 0.2957655191421509}
+  pretrain P5 2025-11 s2: 60 epochs, val NLL 0.3186, 70 s, dropout {'share_all_lags_masked': 0.2548102213055941, 'share_day_lag_missing': 0.31151390}
+"""
+
+
+def _fake_mine(
+    *, epochs: tuple[int, int, int], nll: tuple[str, str, str], change_dropout: bool = False
+) -> str:
+    """Return a fake R1 stage-1 log built from the fake 677 log with new epochs and NLLs."""
+    lines = []
+    for seed, (line, ep, v) in enumerate(
+        zip(FAKE_677_LOG.splitlines()[1:], epochs, nll, strict=True)
+    ):
+        head, tail = line.split(": ", 1)
+        tail = tail.split(", dropout ", 1)[1]
+        if change_dropout and seed == 1:
+            tail = tail.replace("0.2422", "0.2423")
+        lines.append(f"{head.replace('P5', 'R1')}: {ep} epochs, val NLL {v}, 50 s, dropout {tail}")
+    return "\n".join(lines)
+
+
+def test_r1_reproduction_check() -> None:
+    """The R1 check parses both logs, accepts equality, flags one epoch within 2e-3, and stops on anything else."""
+    import e00735b_phases as phases  # ty: ignore[unresolved-import]
+
+    ref = phases.parse_pretrain_log(text=FAKE_677_LOG)
+    assert set(ref) == {0, 1, 2} and ref[0]["epochs"] == 45 and ref[1]["nll"] == 0.3072
+    assert ref[0]["dropout"]["share_all_lags_masked"] == 0.23141833394969638
+    seeds = [0, 1, 2]
+    same = phases.parse_pretrain_log(
+        text=_fake_mine(epochs=(45, 60, 60), nll=("0.3144", "0.3072", "0.3186"))
+    )
+    assert phases.compare_pretrain(mine=same, reference=ref, seeds=seeds)[0] == "ok"
+    close = phases.parse_pretrain_log(
+        text=_fake_mine(epochs=(45, 60, 60), nll=("0.3150", "0.3079", "0.3190"))
+    )
+    assert phases.compare_pretrain(mine=close, reference=ref, seeds=seeds)[0] == "ok"  # within 1e-3
+    flag = phases.parse_pretrain_log(
+        text=_fake_mine(epochs=(46, 60, 60), nll=("0.3154", "0.3072", "0.3186"))
+    )
+    assert phases.compare_pretrain(mine=flag, reference=ref, seeds=seeds)[0] == "flag"
+    for name, text in (
+        (
+            "NLL off by 2e-3 at equal epochs",
+            _fake_mine(epochs=(45, 60, 60), nll=("0.3164", "0.3072", "0.3186")),
+        ),
+        (
+            "one epoch and NLL off by 3e-3",
+            _fake_mine(epochs=(46, 60, 60), nll=("0.3174", "0.3072", "0.3186")),
+        ),
+        ("two epochs", _fake_mine(epochs=(47, 60, 60), nll=("0.3144", "0.3072", "0.3186"))),
+        (
+            "dropout shares",
+            _fake_mine(
+                epochs=(45, 60, 60), nll=("0.3144", "0.3072", "0.3186"), change_dropout=True
+            ),
+        ),
+    ):
+        status, _ = phases.compare_pretrain(
+            mine=phases.parse_pretrain_log(text=text), reference=ref, seeds=seeds
+        )
+        assert status == "mismatch", name
+    assert phases.compare_pretrain(mine={0: same[0]}, reference=ref, seeds=seeds)[0] == "mismatch"
+    with tempfile.TemporaryDirectory(prefix="e735b_") as tmp:
+        data = Path(tmp) / "data"
+        (data / "ml-experiments" / "00677-fake" / "logs").mkdir(parents=True)
+        (data / "ml-experiments" / "00677-fake" / "logs" / "2025-11_5w_pretrain.log").write_text(
+            FAKE_677_LOG
+        )
+        root = Path(tmp) / "00735-smoke"
+        (root / "logs").mkdir(parents=True)
+        saved = os.environ["DATA_PATH_INTERNAL"]
+        os.environ["DATA_PATH_INTERNAL"] = str(data)
+        try:
+            assert (
+                phases.r1_reproduction_check(root=root, month="2026-03") == 0
+            )  # no 677 log: skipped
+            assert (
+                phases.r1_reproduction_check(root=root, month="2025-11") == phases.EXIT_FAILED
+            )  # R1's log is missing
+            (root / "logs" / "2025-11_R1_pretrain.log").write_text(
+                _fake_mine(epochs=(45, 60, 60), nll=("0.3144", "0.3072", "0.3186"))
+            )
+            assert phases.r1_reproduction_check(root=root, month="2025-11") == 0
+            (root / "logs" / "2025-11_R1_pretrain.log").write_text(
+                _fake_mine(
+                    epochs=(45, 60, 60), nll=("0.3144", "0.3072", "0.3186"), change_dropout=True
+                )
+            )
+            assert phases.r1_reproduction_check(root=root, month="2025-11") == phases.EXIT_FAILED
+        finally:
+            os.environ["DATA_PATH_INTERNAL"] = saved
+        record = json.loads((root / "failures" / "2025-11_R1_reproduction.json").read_text())
+        assert (
+            "Traceback (most recent call last)" in record["traceback"]
+            and "dropout shares differ" in record["exception_message"]
+        ), record
+        out = subprocess.run(
+            [sys.executable, str(HERE / "e00735b_phases.py"), "fit", "--dry-run"],
+            env={**os.environ, "R735": str(root)}, capture_output=True, text=True, check=False,
+        )  # fmt: skip
+        order = [line for line in out.stdout.splitlines() if line.startswith("dry run:")]
+        assert order[0].startswith("dry run: R1 2025-11") and order[1].startswith(
+            "dry run: SKE 2025-11"
+        ), (out.returncode, order[:3], out.stdout[-300:])
+    passed(
+        "the R1 reproduction check parses the logs, accepts, flags, and stops as specified, writes the traceback record, and R1 runs first in each month"
+    )
+
+
+def _gate_fixture(*, torch, arm_name: str, rows: int = 900):  # noqa: ANN001, ANN202
+    """Return a network, an input matrix, Primaries, a validation mask, and valid times for the gate."""
+    import e00735b_model as model_module  # ty: ignore[unresolved-import]
+
+    c, cp = cols.coast_arrays()
+    arm = cols.ARMS[arm_name]
+    first_us, step_us, n_grid = stamp_us(year=2019, month=9, day=1), 1_800_000_000, 62_000
+    rng = np.random.default_rng(9)
+    target = rng.integers(20_000, n_grid, size=rows)
+    primary = rng.integers(0, 16, size=rows)
+    valid = first_us + target.astype(np.int64) * step_us
+    x = rng.normal(size=(rows, 60)).astype(np.float32)
+    day, week = target - 48, target - 336
+    day[:50] = -1
+    x[:, 43], x[:, 44] = day, week
+    block = cols.extra_columns(valid_us=valid, primary=primary, arm=arm, c_true=c, c_permuted=cp)
+    torch.manual_seed(0)
+    net = model_module.make_network(n_primaries=16, stage="ft", n_knots=6, n_b1=14, n_new=arm.width)
+    with torch.no_grad():
+        gen = torch.Generator().manual_seed(6)
+        for p in net.parameters():
+            p.copy_(torch.randn(p.shape, generator=gen) * 0.3)
+    net.table = torch.zeros(16, n_grid, 28)
+    if arm.columns:
+        net.table_new = torch.from_numpy(
+            cols.grid_table(
+                arm=arm, first_us=first_us, step_us=step_us, n_grid=n_grid, c_true=c, c_permuted=cp
+            )
+        )
+    xin = torch.from_numpy(np.concatenate([x, block], axis=1))
+    is_val = torch.from_numpy(rng.random(rows) < 0.3)
+    return net, xin, torch.from_numpy(primary), is_val, valid, arm, (first_us, step_us, c, cp)
+
+
+def test_real_run_stage_gate_and_tags() -> None:
+    """`gate_stage` writes its JSON for an arm with the columns, shows none for R1, raises on a wrong table, and the stage tag catches changes."""
+    torch = _torch_or_skip()
+    if torch is None:
+        return
+    import e00735b_check_stages as check_stages  # ty: ignore[unresolved-import]
+    import e00735b_stage1 as stage1  # ty: ignore[unresolved-import]
+
+    with tempfile.TemporaryDirectory(prefix="e735b_") as tmp:
+        out = Path(tmp)
+        for name in ("SKE", "SKE-S21", "SKE-CP", "R1"):
+            net, x, primary, is_val, valid, arm, (first_us, step_us, c, cp) = _gate_fixture(
+                torch=torch, arm_name=name
+            )
+            if not arm.columns:
+                x = x[:, :60]
+            for stage in (1, 2, 3):
+                payload = stage1.gate_stage(
+                    model=net, x=x, primary=primary, is_val=is_val, valid_us=valid, arm=arm, stage=stage,
+                    month="2026-03", seed=0, out_dir=out, first_us=first_us, step_us=step_us, c_true=c, c_permuted=cp, n_rows=300,
+                )  # fmt: skip
+                assert (out / f"checks_stage_{stage}_2026-03_s0.json").exists() or stage != 3
+                paths = payload["batches"]["train"]["paths"]
+                if arm.columns:
+                    assert set(paths) == {"row", "day lag", "week lag"} and all(
+                        p["equals_expected"] for p in paths.values()
+                    )
+                    assert (
+                        all(col["distinct"] > 1 for col in paths["row"]["columns"])
+                        and len(paths["row"]["columns"]) == 8
+                    )
+                else:
+                    assert all(
+                        p["columns"] == [] and p["input_width"] == 21 + net.embedding.embedding_dim
+                        for p in paths.values()
+                    )
+            (out / "checks_stage_3_2026-03_s0.json").rename(out / f"{name}_stage3.json.bak")
+            (out / "checks_stage_2_2026-03_s0.json").rename(out / f"{name}_stage2.json.bak")
+            (out / "checks_stage_1_2026-03_s0.json").rename(out / f"{name}_stage1.json.bak")
+        # the table the lag path reads is wrong by one step: the gate raises
+        net, x, primary, is_val, valid, arm, (first_us, step_us, c, cp) = _gate_fixture(
+            torch=torch, arm_name="SKE"
+        )
+        net.table_new = torch.roll(net.table_new, shifts=1, dims=1)
+        try:
+            stage1.gate_stage(
+                model=net, x=x, primary=primary, is_val=is_val, valid_us=valid, arm=arm, stage=2, month="2026-03", seed=0,
+                out_dir=out, first_us=first_us, step_us=step_us, c_true=c, c_permuted=cp, n_rows=300,
+            )  # fmt: skip
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("the gate accepted a lag table that is one step late")
+        # the stage tag
+        net, *_ = _gate_fixture(torch=torch, arm_name="SKE")
+        tag = out / "m_s0.tag.json"
+        arm = cols.ARMS["SKE"]
+        stage1.write_stage_tag(path=tag, arm=arm, model=net)
+        stage1.check_stage_tag(path=tag, arm=arm, model=net)
+        with torch.no_grad():
+            net.datetime[0].weight[0, 0] += 1e-3
+        for what in ("weight", "table", "arm", "missing"):
+            bad, *_ = _gate_fixture(torch=torch, arm_name="SKE")
+            check_arm = arm
+            if what == "weight":
+                bad.load_state_dict(net.state_dict())
+            elif what == "table":
+                bad.table_new = bad.table_new + 1.0
+                stage1.write_stage_tag(path=tag, arm=arm, model=bad)
+                bad.table_new = bad.table_new + 1.0
+            elif what == "arm":
+                stage1.write_stage_tag(path=tag, arm=arm, model=bad)
+                check_arm = cols.ARMS["SKE-CP"]
+            else:
+                tag.unlink()
+            try:
+                stage1.check_stage_tag(path=tag, arm=check_arm, model=bad)
+            except AssertionError:
+                continue
+            raise AssertionError(f"the tag check accepted a changed {what}")
+        # the real-run mode of the every-stage gate reads the files
+        for name in ("SKE", "R1"):
+            net, x, primary, is_val, valid, arm, (first_us, step_us, c, cp) = _gate_fixture(
+                torch=torch, arm_name=name
+            )
+            stage1.gate_stage(
+                model=net, x=x if arm.columns else x[:, :60], primary=primary, is_val=is_val, valid_us=valid, arm=arm, stage=1,
+                month="2026-03", seed=1 if arm.columns else 2, out_dir=out, first_us=first_us, step_us=step_us, c_true=c, c_permuted=cp, n_rows=300,
+            )  # fmt: skip
+        frame = check_stages.read_json_checks(folder=out)
+        assert set(frame["arm"]) == {"SKE", "R1"} and set(frame.filter(arm="R1")["column"]) == {
+            "none"
+        }
+        assert (
+            frame.filter(arm="SKE")["distinct"].to_numpy().min() >= 1
+            and len(frame.filter(arm="SKE", batch="train", path="row")) == 8
+        )
+    passed(
+        "the real-run gate writes the JSON, shows no columns for R1, raises on a late lag table, the stage tag catches a changed weight, table, arm, or missing file, and the table mode reads the files"
+    )
+
+
+def test_b1_stats_check_comes_first_and_gate_is_wired() -> None:
+    """Stage 1 compares the B1 statistics right after they are written, and the runner wires the gate into stages 1, 2, and 3."""
+    stage1_text = (HERE / "e00735b_stage1.py").read_text()
+    assert (
+        stage1_text.index("check_b1_stats(month)")
+        < stage1_text.index("x_gpu[:, mod.b1_cols")
+        < stage1_text.index("for seed in todo")
+    )
+    assert stage1_text.index("e.pretrain_b1_columns(") < stage1_text.index("check_b1_stats(month)")
+    assert "gate_stage(" in stage1_text and "write_stage_tag(" in stage1_text
+    runner = (HERE / "e00735b_k1.py").read_text()
+    assert runner.count("np.load(_OWN_STATS") == 1, "the statistics are compared in one place only"
+    assert (
+        "e.train = _gated(inner=train_recorded, stage=2)" in runner
+        and "e.train = _gated(inner=e.train, stage=3)" in runner
+    )
+    assert "check_b1_stats=_check_b1_stats" in runner
+    passed(
+        "stage 1 compares the B1 statistics before any seed trains, and the gate and the tag check are wired into the three stages"
+    )
+
+
 def test_failed_basenames_do_not_clash() -> None:
     """No basename of this folder's scripts is the basename of another script under `ml-experiments/` or `studies/`."""
     mine = {p.name for p in HERE.glob("e00735b_*")}

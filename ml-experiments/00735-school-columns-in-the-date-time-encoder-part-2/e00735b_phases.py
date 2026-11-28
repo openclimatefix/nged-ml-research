@@ -40,9 +40,11 @@ Usage: python e00735b_phases.py PHASE [--arms R1 SKE ...] [--months 2025-11 ...]
 """
 
 import argparse
+import ast
 import csv
 import json
 import os
+import re
 import subprocess
 import sys
 import traceback
@@ -160,6 +162,105 @@ def failure_record(*, root: Path, arm: str, month: str, stage: str, code: int) -
     return path
 
 
+PRETRAIN_LINE: Final = re.compile(
+    r"pretrain (?P<arm>\S+) (?P<month>\d{4}-\d{2}) s(?P<seed>\d+): (?P<epochs>\d+) epochs, "
+    r"val NLL (?P<nll>[0-9.]+), \d+ s, dropout (?P<dropout>\{.*\})"
+)
+"""A line of a stage-1 log, from experiment 677's `e00677_k1.py pretrain` or this experiment's runner."""
+NLL_TOLERANCE: Final = 1e-3
+NLL_TOLERANCE_ONE_EPOCH: Final = 2e-3
+
+
+def parse_pretrain_log(*, text: str) -> dict[int, dict]:
+    """Return, by seed, the epochs, validation NLL, and dropout-share dictionary of each stage-1 line in a log."""
+    out: dict[int, dict] = {}
+    for line in text.splitlines():
+        found = PRETRAIN_LINE.search(line)
+        if found:
+            out[int(found["seed"])] = {
+                "epochs": int(found["epochs"]),
+                "nll": float(found["nll"]),
+                "dropout": ast.literal_eval(found["dropout"]),
+            }
+    return out
+
+
+def compare_pretrain(
+    *, mine: dict[int, dict], reference: dict[int, dict], seeds: list[int]
+) -> tuple[str, list[str]]:
+    """Compare R1's stage 1 with experiment 677's, seed by seed.
+
+    Returns `ok`, `flag`, or `mismatch`, and the messages. The dropout shares must be equal; the
+    epochs and the validation NLL must agree to 1e-3. A difference of one epoch with NLL within 2e-3
+    is flagged and does not stop the phase.
+    """
+    status, messages = "ok", []
+    for seed in seeds:
+        if seed not in mine or seed not in reference:
+            return "mismatch", [
+                f"seed {seed}: missing from {'R1' if seed not in mine else 'experiment 677'}'s log"
+            ]
+        a, b = mine[seed], reference[seed]
+        gap = abs(a["nll"] - b["nll"])
+        if a["dropout"] != b["dropout"]:
+            return "mismatch", [
+                f"seed {seed}: dropout shares differ: {a['dropout']} against {b['dropout']}"
+            ]
+        if a["epochs"] == b["epochs"] and gap <= NLL_TOLERANCE:
+            continue
+        if abs(a["epochs"] - b["epochs"]) == 1 and gap <= NLL_TOLERANCE_ONE_EPOCH:
+            status = "flag"
+            messages.append(
+                f"seed {seed}: epochs {a['epochs']} against {b['epochs']}, val NLL {a['nll']} against {b['nll']}"
+            )
+            continue
+        return "mismatch", [
+            f"seed {seed}: epochs {a['epochs']} against {b['epochs']}, val NLL {a['nll']} against {b['nll']}"
+        ]
+    return status, messages
+
+
+def r1_reproduction_check(*, root: Path, month: str) -> int:
+    """Compare R1's stage 1 of a month with experiment 677's log; return 0, or `EXIT_FAILED` after writing the failure record."""
+    reference_logs = sorted(
+        (Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments").glob(
+            f"00677-*/logs/{month}_5w_pretrain.log"
+        )
+    )
+    if not reference_logs:
+        print(
+            f"R1 reproduction check skipped: experiment 677 has no stage-1 log for {month}",
+            flush=True,
+        )
+        return 0
+    path = root / "logs" / f"{month}_R1_pretrain.log"
+    try:
+        assert path.exists(), f"R1's stage-1 log is missing: {path}"
+        status, messages = compare_pretrain(
+            mine=parse_pretrain_log(text=path.read_text(errors="replace")),
+            reference=parse_pretrain_log(text=reference_logs[0].read_text(errors="replace")),
+            seeds=[int(s) for s in SEEDS],
+        )
+        assert status != "mismatch", (
+            f"R1's stage 1 does not reproduce experiment 677's for {month}: {messages}"
+        )
+    except AssertionError as error:
+        record = root / "failures" / f"{month}_R1_reproduction.json"
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(
+            json.dumps(
+                {"arm": "R1", "month": month, "stage": "reproduction", "exit_code": EXIT_FAILED,
+                 "when_utc": datetime.now(UTC).isoformat(), "exception_message": f"AssertionError: {error}",
+                 "traceback": traceback.format_exc(), "log": str(path)},
+                indent=1,
+            )
+        )  # fmt: skip
+        print("R1 REPRODUCTION FAILED:", error, "record", record, flush=True)
+        return EXIT_FAILED
+    print(f"R1 reproduction check {status} for {month}", *messages, flush=True)
+    return 0
+
+
 def run_job(*, arm: str, month: str, stage: str, root: Path, smoke: bool, cores: str) -> int:
     """Run one arm-month stage through the shell driver and return its exit code.
 
@@ -257,6 +358,9 @@ def main() -> int:  # noqa: PLR0911
             return EXIT_USAGE
         arms = args.arms or list(NEW_ARMS)
         months = args.months or list(MONTHS)
+        arms = sorted(
+            arms, key=lambda a: a != "R1"
+        )  # R1 first in every month: its stage 1 is the reproduction check
         jobs = [(a, m) for m in months for a in arms]  # month-major, so a stop leaves whole months
         stages = JOB_STAGES
         smoke, work_root = False, root
@@ -279,6 +383,7 @@ def main() -> int:  # noqa: PLR0911
         f" spent {gpu_hours(csv_paths=csvs):.2f} GPU-process-hours",
         flush=True,
     )  # fmt: skip
+    checked_months: set[str] = set()
     for arm, month in jobs:
         spent = gpu_hours(csv_paths=csvs)
         done_minutes = [job_minutes(path=csvs[0], arm=a, month=m) for a, m in jobs]
@@ -304,6 +409,15 @@ def main() -> int:  # noqa: PLR0911
                 )
                 print("FAILED", arm, month, stage, code, "record", record, flush=True)
                 return EXIT_FAILED
+            if (
+                args.phase == "fit"
+                and arm == "R1"
+                and stage == "pretrain"
+                and month not in checked_months
+            ):
+                checked_months.add(month)
+                if r1_reproduction_check(root=work_root, month=month) != 0:
+                    return EXIT_FAILED  # before step 2 of R1 and before any SKE job
     if args.dry_run:
         return 0
     spent = gpu_hours(csv_paths=csvs)

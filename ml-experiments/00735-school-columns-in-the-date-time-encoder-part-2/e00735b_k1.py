@@ -291,21 +291,65 @@ HIST = _stage1.History()
 _write_history = _stage1.write_json
 # <<< E00735B PATCH END (E: code-hash marker and per-epoch loss history)
 
+
+def _check_b1_stats(month: str) -> None:
+    """Raise unless the B1 statistics that stage 1 wrote for the month equal experiment 677's stored statistics."""
+    mine, stored = np.load(_OWN_STATS / f"{month}.npz"), np.load(STATS_READ / f"{month}.npz")
+    assert np.array_equal(mine["mean"], stored["mean"]) and np.array_equal(mine["std"], stored["std"]), (
+        "stage 1's B1 statistics differ from experiment 677's stored statistics",
+        month,
+    )  # fmt: skip
+
+
+# >>> E00735B PATCH BEGIN (H: the real-run stage gate of stages 2 and 3)
+_orig_refit_tensors = e.LagGpuMonth.refit_tensors
+
+
+def _refit_tensors_stash(self, *, refit, shift_z=None):
+    """Return the tensors of the wrapped method, and keep the selected rows' valid times for the stage gate."""
+    t = _orig_refit_tensors(self, refit=refit, shift_z=shift_z)
+    e.CTX["gate_valid_us"] = self.mr.valid_us[refit.index]
+    return t
+
+
+e.LagGpuMonth.refit_tensors = _refit_tensors_stash
+
+
+def _gated(*, inner, stage: int):
+    """Wrap `e.train` of stage 2 or 3 with the stage gate, the stage-1 tag check, and the frozen-encoder check."""
+
+    def train_gated(**kwargs):
+        model, x = kwargs["model"], kwargs["x"]
+        month, seed = f"{e.CTX['cut']:%Y-%m}", e.CTX["seed"]
+        valid_us = e.CTX["gate_valid_us"]
+        tag = e.pretrained_dir() / f"{month}_s{seed}.tag.json"
+        _stage1.check_stage_tag(
+            path=tag, arm=SPEC735, model=model
+        )  # after the load, before any training
+        _stage1.gate_stage(
+            model=model, x=x, primary=kwargs["p"], is_val=kwargs["is_val"], valid_us=valid_us, arm=SPEC735,
+            stage=stage, month=month, seed=seed, out_dir=OUT / "work" / "checks",
+            first_us=_GRID_FIRST_US, step_us=_GRID_STEP_US, c_true=_C_TRUE, c_permuted=_C_PERMUTED,
+        )  # fmt: skip
+        result = inner(**kwargs)
+        _stage1.check_stage_tag(
+            path=tag, arm=SPEC735, model=model
+        )  # the frozen encoder did not move
+        return result
+
+    return train_gated
+
+
+# <<< E00735B PATCH END (H: the real-run stage gate of stages 2 and 3)
+
 if MINE.command == "pretrain":
     # >>> E00735B PATCH BEGIN (F1: stage 1 trains the arm's own network on ERA5 and CAMS rows)
     _stage1.pretrain_arm(
         e=e, months=e.ARGS.months, seeds=e.ARGS.seeds, device="cuda", arm=SPEC735,
         c_true=_C_TRUE, c_permuted=_C_PERMUTED, history_dir=OUT / "work" / "history_pre",
         smoke=E00735B_SMOKE, code_hash=E00735B_CODE_HASH,
+        checks_dir=OUT / "work" / "checks", check_b1_stats=_check_b1_stats,
     )  # fmt: skip
-    for _month in e.ARGS.months:  # the B1 statistics are a function of the pre-training rows of the month: they must equal experiment 677's
-        _mine, _stored = (
-            np.load(_OWN_STATS / f"{_month}.npz"),
-            np.load(STATS_READ / f"{_month}.npz"),
-        )
-        assert np.array_equal(_mine["mean"], _stored["mean"]) and np.array_equal(_mine["std"], _stored["std"]), (
-            "stage 1's B1 statistics differ from experiment 677's stored statistics", _month,
-        )  # fmt: skip
     print("PRETRAIN DONE", {a: v for a, v in e.CHECK.items() if a != "months"}, flush=True)
     # <<< E00735B PATCH END (F1: stage 1 trains the arm's own network on ERA5 and CAMS rows)
 elif MINE.command == "step2":
@@ -339,7 +383,7 @@ elif MINE.command == "step2":
         )  # fmt: skip
         return epochs, best
 
-    e.train = train_recorded
+    e.train = _gated(inner=train_recorded, stage=2)
     # <<< E00735B PATCH END (F: stage 2 records its per-epoch loss history)
     e.step2(months=e.ARGS.months, seeds=e.ARGS.seeds, device="cuda")
     print("STEP2 DONE", {a: v for a, v in e.CHECK.items() if a != "months"}, flush=True)
@@ -398,6 +442,7 @@ elif MINE.command == "fit":
         return model, log
 
     e.fine_tune = fine_tune_recorded
+    e.train = _gated(inner=e.train, stage=3)
     # <<< E00735B PATCH END (G: diagnostics and per-epoch loss history of stage 3; no change to the fit)
     e.k.build_month = arm.build_month_syn
     e.k.GpuMonth = arm.AuxGpuMonth
