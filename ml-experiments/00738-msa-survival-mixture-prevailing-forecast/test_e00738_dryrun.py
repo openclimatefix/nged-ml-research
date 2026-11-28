@@ -209,3 +209,137 @@ def test_phase_zero_tasks_run_on_the_tiny_fold(dry: FakeData) -> None:
     assert "false_alarm_real_all_rows" in table
     assert table["noise_unit"] > 0
     run.task_gallery(month=MONTH)
+    assert table["age_bias_bar_days"] == common.A1_BIAS_MAX_DAYS
+    assert "age_bias_days" in table
+    assert "age_bias_exceeds_bar" in table
+    assert all("mean_signed_age_error" in v for k, v in table.items() if k in {"0-2", "3-5"})
+
+
+def test_the_level_head_starts_from_different_weights_for_different_seeds(dry: FakeData) -> None:
+    def first_layer(seed: int) -> torch.Tensor:
+        net = fit.head_model(
+            arm="LR", month=MONTH, seed=seed, target_std=dry.target_std, noise=0.05, curve=None,
+            device="cpu",
+        )  # fmt: skip
+        return net.level_head[0].weight.detach().clone()
+
+    a0, a0_again, a1 = first_layer(0), first_layer(0), first_layer(1)
+    assert torch.equal(a0, a0_again), "one seed gives one initialisation"
+    assert not torch.equal(a0, a1), "two seeds give two initialisations"
+    assert fit.head_init_seed(seed=0) != fit.head_init_seed(seed=1)
+
+
+def _level_readings(net: object, inp: object) -> dict[str, torch.Tensor]:
+    h0, base, spread, _ = net.base_forward(inp)  # ty: ignore[unresolved-attribute]
+    out = net.level_forward(inp)  # ty: ignore[unresolved-attribute]
+    return {
+        "features": net.features_of(inp=inp, h0=h0, base=base, spread=spread),  # ty: ignore[unresolved-attribute]
+        "age": out.age,
+        "depth": out.depth,
+        "p": out.p,
+        "mixture": out.out,
+    }
+
+
+def _origin_batch(source: object, data: FakeData, origin: int) -> object:
+    samples = tr.SampleSet(
+        primary=np.arange(16), c_idx=np.full(16, origin), is_val=np.zeros(16, bool)
+    )
+    return tr.batch_for(
+        source=source, samples=samples, index=np.arange(16), lead=np.zeros(16, int),
+        ensemble=False, cut=10**9, dropout=None,
+    ).inputs  # fmt: skip
+
+
+def _random_head_net(dry: FakeData, mode: str) -> object:
+    import e00738_model as lmdl
+    import e00738_survival as surv
+
+    torch.manual_seed(3)
+    curve = surv.GeneratorCurve() if mode in {"LD", "LM"} else None
+    net = lmdl.LevelNet(mode=mode, target_std=dry.target_std, noise=0.05, curve=curve)
+    torch.nn.init.normal_(net.level_head[-1].weight, std=0.5)
+    torch.nn.init.normal_(net.level_head[-1].bias, std=0.5)
+    return net.eval()
+
+
+@pytest.mark.parametrize("mode", ["LP", "LD", "LM", "LR"])
+def test_nothing_after_the_origin_reaches_the_level_head_through_the_real_source(
+    dry: FakeData, mode: str
+) -> None:
+    """Perturb the Source's power after the origin, then add a shift that starts after it."""
+    import e00738_train as train
+
+    origin = dry.cutoff_idx - 48 * 8 + 24
+    net = _random_head_net(dry, mode)
+    before = _level_readings(net, _origin_batch(dry.source, dry, origin))
+
+    # (i) every power value from the origin on is replaced by noise
+    rng = np.random.default_rng(5)
+    z = dry.source.power_z.clone()
+    z[:, origin:] = torch.from_numpy(
+        rng.normal(5.0, 3.0, size=z[:, origin:].shape).astype(np.float32)
+    )
+    noisy = type(dry.source)(
+        power_z=z, dense_weather=dry.source.dense_weather, dense_datetime=dry.source.dense_datetime,
+        day_type=dry.source.day_type, ens=dry.source.ens, power_in=z,
+    )  # fmt: skip
+    after = _level_readings(net, _origin_batch(noisy, dry, origin))
+    for k, v in before.items():
+        assert torch.equal(v, after[k]), f"{mode}: {k} changed when the future power changed"
+
+    # (ii) a shift that starts after the origin is added to the whole source
+    late = [
+        world.Shift(primary=p, kind="constant", onset_idx=origin + 48 * 2, ramp_half_hours=12,
+                    end_idx=origin + 48 * 30, drawn_days=28.0, depth=0.2, sign=1, family="train")
+        for p in range(16)
+    ]  # fmt: skip
+    own = world.build_own(clean=dry.clean, shifts=late, is_mw=np.array([True] * 8 + [False] * 8))
+    shifted = train.world_source(
+        base=dry.source, clean=dry.clean, own=own, target_mean=dry.target_mean,
+        target_std=dry.target_std, device="cpu",
+    )  # fmt: skip
+    plain = train.world_source(
+        base=dry.source, clean=dry.clean, own=np.zeros_like(own), target_mean=dry.target_mean,
+        target_std=dry.target_std, device="cpu",
+    )  # fmt: skip
+    a = _level_readings(net, _origin_batch(plain, dry, origin))
+    b = _level_readings(net, _origin_batch(shifted, dry, origin))
+    for k, v in a.items():
+        assert torch.equal(v, b[k]), f"{mode}: {k} changed when a later shift was added"
+
+    # perturbing the history before the origin does change the readings, so the test can fail
+    z2 = dry.source.power_z.clone()
+    z2[:, origin - 48 * 3 : origin - 48 * 2] += 4.0
+    seen = type(dry.source)(
+        power_z=z2, dense_weather=dry.source.dense_weather,
+        dense_datetime=dry.source.dense_datetime,
+        day_type=dry.source.day_type, ens=dry.source.ens, power_in=z2,
+    )  # fmt: skip
+    c = _level_readings(net, _origin_batch(seen, dry, origin))
+    assert not torch.equal(before["features"], c["features"])
+
+
+def test_the_noise_unit_and_the_curve_read_nothing_after_the_cutoff(
+    dry: FakeData, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import e00738_survival as surv
+
+    z = (dry.clean - dry.target_mean[:, None]) / dry.target_std[:, None]
+    z_late = z.copy()
+    z_late[:, dry.cutoff_idx :] = 99.0
+    assert surv.noise_unit_from_panel(z=z, cutoff_idx=dry.cutoff_idx) == surv.noise_unit_from_panel(
+        z=z_late, cutoff_idx=dry.cutoff_idx
+    )
+    # the curve is fitted to drawn durations only: it reads neither the power nor the real durations
+    monkeypatch.setattr(fit, "N_DURATION_PASSES", 4)
+
+    def refuse() -> None:
+        msg = "the curve must not read the real durations"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(world, "load_real_durations_days", refuse)
+    is_mw = np.array([True] * 8 + [False] * 8)
+    one = fit.fold_curve(month=MONTH, seed=0, cutoff_idx=dry.cutoff_idx, is_mw=is_mw)
+    two = fit.fold_curve(month=MONTH, seed=0, cutoff_idx=dry.cutoff_idx, is_mw=is_mw)
+    assert (one.family, one.params) == (two.family, two.params)

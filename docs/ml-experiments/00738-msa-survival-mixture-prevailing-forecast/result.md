@@ -309,8 +309,11 @@ hours 0.015, ended 1 to 7 days before 0.09, event-free 0.29, and onset ahead 0.1
 at a lead of 10 days, event-free is 0.225 and onset ahead 0.17. In both cases 0.50 of origins are in
 force and 0.33 of the in-force origins are older than 15 days. The clipping of shifts at the window
 edge moves the shares by under 1 point. "In force" pools far, middle, and near, and a shift clipped
-at the window edge is left out of the strata that use the end. An origin at the half-hour of the
-shift's end counts as ended in the last 24 hours. The scaling factor pools all strata of a month, so
+at the window edge is left out of the strata that use the end, and its in-force rows form a separate
+stratum that the counted contrasts leave out. A long shift that starts late in the 2026-05 or 2026-06
+fold can reach the end of the window, so those folds hold fewer in-force rows than the other folds.
+All arms drop the same rows. An origin at the half-hour of the shift's end counts as ended in the
+last 24 hours. The scaling factor pools all strata of a month, so
 the factor cannot absorb a stratum. The event-free stratum can hold a history with a shift that
 ended 8 to 15 days before the origin, and the page reports that share.
 
@@ -361,11 +364,10 @@ unscreened folds, which must carry the sign of the 8-fold reading.
 
 **The verdict is the first row that holds, fixed before any fit, and every outcome maps to exactly one
 row.** "Gain" for a net effect or for C2 means that the upper limits of the 98.33% t interval and of
-the 98.33% month-block bootstrap interval (`studies.bootstrap.bootstrap_difference_at_level`) are
-both below zero. "Seeds agree" means that each of the 3 seeds has the sign of the point estimate. "Held-out
-agrees" means that the point estimates of C2 and C3 on the held-out-duration world have the sign of
-the training-family point estimates. A test enumerates every combination of the states and checks
-that each maps to one verdict.
+the 98.33% month-block bootstrap interval are both below zero. "Seeds agree" means that each of the 3
+seeds has the sign of the point estimate. "Held-out agrees" means that the point estimates of C2 and
+C3 on the held-out-duration world have the sign of the training-family point estimates. A test
+enumerates every combination of the states and checks that each maps to one verdict.
 
 | Order | Verdict | Condition |
 |---|---|---|
@@ -470,14 +472,76 @@ trained LP and W0 fits of the 4 screen folds at seed 0, so the order is smoke te
 screen scoring, full fits. Three checks must pass. An oracle that adds the true shift times the true
 survival to `M1`'s median forecast must return a follow share of at least 0.95 through the scorer, at
 a mid-day onset as well as at midnight. LP must add at least 0.75 of the depth of a shift that is in
-force and far from its end, to the median at lead days 1 to 2, beyond the median of `M1`. The depth
-head's median depth divided by the true depth must be at least 0.7 on shifts of 3 to 10 days.
+force and far from its end, to the median at lead days 1 to 2, beyond the median of `M1`, on the rows
+where A1 sees the shift (A1's age is above zero). The record also holds the same share over all far
+rows, and the share of far rows that A1 sees, as diagnostics. The depth head's median depth divided
+by the true depth must be at least 0.7 on shifts of 3 to 10 days. Checks 2 and 3 read only the rows
+where A1 sees the shift, so a head can pass while A1 misses many shifts. The Phase 0 table of A1
+reports the share of shifts that A1 misses by age band, and the gate record holds the share of far
+rows that A1 sees.
 
 **One remedy is pre-registered, and it runs once before the maintainer is called.** Experiment 713's
 equivalent gate failed four times at a cap of 60 passes and a patience of 8, and passed in runs
 without early stopping. The remedy is a cap of 120 passes with a patience of 15 for the head fits,
-which applies to every head arm alike. A second failure stops the stage and goes to the maintainer.
-No worker waives the gate. The gate and the remedy fits are in the cost table.
+which applies to every head arm alike. A first failure therefore refits all 16 screen head fits (LP,
+LD, LM, and LR on 4 folds) under the remedy and predicts them again, so that S* is chosen, and C2 is
+compared, between fits that share one recipe. The 4 screen fits of W0 are not refitted, because the
+remedy does not apply to W0. A second failure stops the stage and goes to the maintainer. No worker
+waives the gate. The gate and the remedy fits are in the cost table.
+
+## Amendment 1 before any fit
+
+**Amendment 1 (2026-11-28) changes the second check of the gate, the remedy, and the member-path
+check, after a code review and before any fit.** No fit, prediction, or score had run. The changes
+below are already written into the sections above, and this section gives the reason for each.
+
+**Gate check 2 judges only the rows where A1 sees the shift.** A1 reads a history of 14 daily rows,
+so it cannot see a shift that began more than about 15 days before the origin. The head then reads
+age zero, and LP adds exactly zero. In a simulation of the scoring generator (the training family, 8
+months, 12 passes, 16 Primaries, lead days 1 and 2), 41% of the far-stratum rows lie on origins where
+the shift is older than the 15-day history. Even a perfect head with a perfect A1 then reaches a
+share of 0.59 to 0.62 over all far rows (the figure depends on the age at which A1 stops seeing),
+below the bar of 0.75, and the remedy cannot change that. The threshold stays at 0.75. The check now
+uses the far rows with A1's age above zero, and the share over all far rows is a diagnostic beside
+it.
+
+**A1's age may overstate the true age, and the report says so.** A1 returns the count n of differing
+history rows plus 2, while the onset may lie between n and n + 1 days before the origin, so A1's age
+may be 1 to 2 days too high. The age sets every survival ratio. The Phase 0 table of A1 now reports
+the mean signed error of A1's age against the true age, by band and over all seen rows. A mean error
+beyond 1 day in either direction is recorded in the gate file, beside the readings that rest on the
+survival ratio. The definition of A1 is not changed.
+
+**The remedy refits every head arm.** The screen fits of LD, LM, and LR would otherwise keep a cap of
+60 passes while the LP fits and the 80 later head fits use a cap of 120, and S* would be chosen on a
+different recipe from the one that produces most of its counted cells. The remedy now refits all 16
+screen head fits. The cost table carries the extra fits.
+
+**The member-path check gets a different construction and tolerances from simulation.** The first
+construction gave path k the k-th lowest base level and the k-th longest end time, so the shift was
+on only in the low half of the base distribution. For a Gaussian base forecast it returned a
+quantile gap of 1.7 points against a tolerance of 0.5. The scorer's CRPS also weights the tails, so
+its value sits about 22% below the fair CRPS that the check compared it with. The construction
+above removes the coupling, and the CRPS comparison now uses the scorer's formula on both sides.
+
+**The tolerances come from known-answer cases.** The base forecast is a normal distribution with a
+standard deviation of 1 to 5 points of capacity, the shifted branch is the same distribution moved by
+a depth of 3 to 20 points (either sign), and the stored forecast is the exact mixture quantiles at the
+survival ratio of a Weibull curve (shape 0.7 to 1.5, scale 5 to 40 days) at an A1 age of 2 to 14 days
+and a lead day of 1 to 9. Over 400 random cases of this kind, a right construction gives a mean gap of
+0.005 in the ended share (largest 0.010), 0.32 points in the quantiles (95th percentile 0.58, largest
+0.67), and 0.050 points in the CRPS (95th percentile 0.105, largest 0.224). The check reports a mean
+over thousands of rows, so each tolerance sits above the mean of its gap: 0.02 for the ended share,
+0.5 points for the quantiles, and 0.10 points for the CRPS. Two faults show that the tolerances
+detect an error. A base level tied to the end time (the first construction) gave a mean quantile gap
+of 1.74 points and a mean CRPS gap of 0.42 points. A stored forecast that follows a Weibull curve
+with a scale 30% too short or too long gave a mean ended-share gap of 0.094 or 0.058, and exceeded the
+ended-share tolerance in 99% or 91% of the cases. `members.tolerance_study` repeats the simulation.
+
+**The bootstrap keeps every seed.** The first plan drew one seed in each resample, so the
+bootstrap interval held seed noise that the t interval does not. The seed points of a reading were
+also ratios of pooled sums, which differ from the mean of monthly means that the point estimate
+uses when the months hold unequal row counts. Both now use the mean of the monthly means.
 
 ## The gallery
 
@@ -494,15 +558,28 @@ the stratum shares match the simulated shares above.
 **The stored and scored forecast is the mixture's 11 quantiles at each lead, and the 51 member paths
 are a check on it.** CRPS at one valid time depends only on the marginal distribution at that valid
 time, so a mixture whose shifted branch has probability p at that lead scores the same as 51 paths
-whose end times are drawn from the same survival curve. The check draws, for each origin, 51 end
-times T equal to the survival curve's inverse at (k - 0.5) / 51 for k = 1 to 51, conditioned on A1's
-age, and a shared quantile level for the base mixture, so that a path keeps the shift until T and
-returns to the base after it. The check asserts three properties on the screen folds: the share of
-paths that end inside 240 hours is within 0.02 of 1 - p at 240 hours, the 51-path empirical
-quantiles at each lead differ from the stored 11 quantiles by at most 0.5 points of capacity on
-average, and the 51-path ensemble CRPS with the finite-sample correction is within 0.05 points of
-the quantile CRPS. The energy score and the variogram score of the 51 paths against independent
-draws are report-only, because an earlier check found no measurable gain from coupling member paths.
+whose end times are drawn from the same survival curve. A path is a draw of the base level plus the
+shift times the survival indicator. For each origin, the 51 end times T are the survival curve's
+inverse at S(a) (k - 0.5) / 51 for k = 1 to 51, conditioned on A1's age a. The 51 base levels are
+the same evenly spaced levels (j + 0.5) / 51, taken in the order of the stride-19 permutation of
+j, so that the base level of a path is not tied to its end time. Path k returns the base forecast's
+quantile at its base level, plus the depth while the path's lead is below T. The base forecast's
+value at a level is a linear interpolation of its 11 stored quantiles.
+
+**The check asserts three properties on the screen folds, with tolerances from known-answer cases.**
+The share of paths that end inside 240 hours is within 0.02 of 1 - p at 240 hours. The 51-path
+empirical quantiles at the 11 levels differ from the stored quantiles by at most 0.5 points of
+capacity on average. The scorer's 11-level CRPS formula, applied to the paths' own 11 empirical
+quantiles, differs from the same formula applied to the stored quantiles by at most 0.10 points. The
+energy score and the variogram score of the 51 paths against the actual half-hours of the day, and
+the fair CRPS of the paths, are report-only. The check runs on LM only: LR learns its hazards from
+the features of each sample, which no stored file holds, and LD is not a mixture. The result says
+whether S* is LM.
+
+**The scored CRPS is a tail-weighted CRPS.** It is twice the mean pinball loss at 11 levels, and 4
+of the 11 levels lie beyond q05 or q95. For a Gaussian forecast it is about 22% below the fair CRPS
+(0.440 and 0.564 standard deviations). All arms use the same formula, so the contrasts are
+unaffected, and the check compares the formula with itself.
 
 ## Checks
 
@@ -510,12 +587,14 @@ draws are report-only, because an earlier check found no measurable gain from co
 mean forecast per Primary, the normalised error of the median beside every CRPS contrast (audit
 trigger 3), leave-one-Primary-out and leave-one-month-out versions of C1 to C3 including a line
 without D5 (which holds 0.19 of the real event rows), the eight MVA-only Primaries with and without
-D8, the reproduction of the stored `M1` on the real record, the A1 accuracy table, the depth
+D8, the reproduction of the stored `M1` on the real record (the tolerance is 1e-5 of capacity; if the
+first smoke run misses it, check the launcher for a TF32 setting or a batch size that differs from
+experiment 713's before touching the tolerance), the A1 accuracy table, the depth
 diagnostics, the fitted-curve error, and the fitted scaling factors by arm.
 
 ## Cost
 
-**The plan fits 120 heads or networks and projects about 5.9 GPU-process-hours, with a stop line of
+**The plan fits 120 heads or networks and projects about 6.3 GPU-process-hours, with a stop line of
 7.0, and about 5.5 CPU-hours.** The head arms train a head on a frozen forecaster, which needs a
 forward pass and no backward pass through the trunk, so each head fit is projected at 1 minute. W0
 repeats stages 2 and 3 at 2.2 minutes, from the stored times of experiment 713 (stage 2 60 seconds
@@ -527,12 +606,12 @@ in experiment 726. The frozen-trunk fit time is not measured, and phase 0 times 
 | 0. Generator, tests, A1 table, gallery, curve fits, pre-fit guards, timing of fits | 12 | 0.3 | 1.5 |
 | 1. Real-environment smoke test, one epoch of each arm, scratch output | 6 | 0.2 | 0.2 |
 | 2. Screen fits: 16 head fits and 4 W0 fits (4 folds, seed 0), then predict | 24 | 0.8 | 0.3 |
-| 3. Gate, and its pre-registered remedy refit of the 4 LP fits | 6 | 0.4 | 0.1 |
+| 3. Gate, and its pre-registered remedy refit of the 16 screen head fits and their prediction | 24 | 0.8 | 0.1 |
 | 4. Remaining fits: 80 head fits and 20 W0 fits | 100 | 2.1 | 0.2 |
 | 5. Prediction on the worlds and the real record, one job per fold and seed | 20 | 1.8 | 0.2 |
 | 6. Scoring, intervals, scenarios, member-path check | 8 | 0 | 2.5 |
 | 7. Figures, loss plots, time series plots | 4 | 0.3 | 0.5 |
-| **Total** | **about 180** | **about 5.9** | **about 5.5** |
+| **Total** | **about 200** | **about 6.3** | **about 5.5** |
 
 **After the 20 screen fits, the projection is recomputed from the mean and the 90th percentile of the
 fit times, not from one fit, and the cut list fires on that figure.** The cuts, in order: drop LD
@@ -578,7 +657,7 @@ for each numerical library, and cores 8 to 15 for the CPU phases.
   learning rate is fixed here and not chosen on any score.
 - The loss is the mixture negative log-likelihood on the standardised, shifted target, with the
   training worlds' shifts in the history rows and the target.
-- Seeds 0 to 2. One refit per month. The GPU hours are 5.9 projected, and the measured figure goes
+- Seeds 0 to 2. One refit per month. The GPU hours are 6.3 projected, and the measured figure goes
   into the finished page.
 
 ### Measurement
@@ -592,8 +671,10 @@ for each numerical library, and cores 8 to 15 for the CPU phases.
   pinball loss at q01, q05, q95, and q99, and the follow share, by stratum, age band, and lead day.
 - Baselines: `M1`, W0, LP, and the month-by-half-hour climatology as a context row.
 - Intervals: a t interval on the 8 monthly differences of the seed-averaged forecasts at 98.33% for
-  N1, N3, and C2 and at 95% for V1 and V2, and a month-block bootstrap of 100,000 resamples through
-  `studies.bootstrap.bootstrap_difference_at_level`. A gain needs both intervals below zero, because
+  N1, N3, and C2 and at 95% for V1 and V2, and a month-block bootstrap of 100,000 resamples, which
+  draws whole months with replacement and keeps all 3 seeds in every resample (the statistic is the
+  mean of the drawn months' seed-averaged values, the statistic of the point estimate). A gain needs
+  both intervals below zero, because
   8 monthly blocks share overlapping training windows and give fewer than 7 effective degrees of
   freedom.
 - The decision rule, the gate, and the verdict mapping are above.
@@ -607,8 +688,33 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
   `e00738_phases.py` holds the review markers, the hour ledgers, and the done markers.
   `e00738_run.py` is the one entry point. `run.sh` starts a stage inside a memory-capped
   `systemd-run` scope, and `run_workers.sh` starts the workers of a CPU stage inside that scope.
-  `run.sh` takes `E00738_713_DIR`, the frozen checkout of experiment 713 that goes first on
-  `PYTHONPATH`, because the stored fits carry the code hash of that checkout.
+  `run.sh` takes `E00738_713_DIR`, the folder of experiment 713 in the frozen checkout (commit
+  `7c29114a8`). The whole `ml-experiments` folder of that checkout goes first on `PYTHONPATH`,
+  because the stored fits carry the code hash of that checkout, and that hash covers the recipe
+  folders beside experiment 713's own. The two recipe files that changed since that commit
+  (`e00513_slices.py` and `e00709_era_table.py`, which now need a private engine file) then come from
+  the frozen commit. `run.sh` also sets `PYTHONDONTWRITEBYTECODE=1`, so the frozen checkout stays
+  clean. A job stops before it can write into experiment 713's cache folder, because a missing
+  dense array there would be built and written by experiment 713's pipeline.
+- **Child processes.** Experiment 713's pipeline reads its month and phase once, when it is
+  imported, so every fit job and every prediction job runs in a child process of its own
+  (`e00738_run.py one-task`). The parent process keeps the ledger, the failure records, and the done
+  markers. The parent also refuses to start a GPU stage when `nvidia-smi` lists a compute process of
+  another session (exit code 75), and waits between jobs.
+- **The smoke test and its markers.** The smoke stages write all their output to the scratch
+  folder `E00738_OUT`. They read `phase0.done` and the review marker from the data folder, read
+  only, and `smoke-collect` writes `smoke.ok` to both folders. That file is the one the smoke test
+  writes into the data folder, and `screen-fits` needs it there. The pass cap of one pass reaches
+  only the child processes of the smoke stages, and a real stage refuses to start when
+  `E00738_PASS_CAP` is set.
+- **The cut list.** `cuts.json` in the output folder holds `drop_ld` and `seeds01`. The fit,
+  prediction, scoring, report, protocol, and member-path code all read it, so a cut run has no
+  missing-file error. After `drop_ld`, LD exists in the 4 screen cells only, every reading that
+  involves LD uses those cells, and the full fits refuse a cut list that drops the arm that the
+  screen chose as S*.
+- **Failure records and markers.** A task that failed once and then finished has its record moved to
+  `failed/archive/`, so a rerun can finish the stage. With several workers, the stage marker is
+  written by the worker that finds every task of the stage done.
 - `e00738_world.py` draws the training worlds and the scoring worlds from experiment 650's
   generator, adds the shift to the inputs and the target, and assigns the strata.
 - `e00738_survival.py` fits the four candidate curves to the drawn durations, returns p(a, h), and
@@ -635,14 +741,18 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
 - `e00738_gate.py` runs the known-answer gate. `e00738_figures.py` and `e00738_gallery.py` draw the
   figures and the gallery.
 - The tests are `test_e00738_world.py`, `test_e00738_survival.py`, `test_e00738_score.py`,
-  `test_e00738_panel.py`, `test_e00738_run.py`, `test_e00738_model.py`,
-  `test_e00738_attributes.py`, and `test_e00738_dryrun.py`. The last three need `torch` and skip
-  without it. The tests cover every pure function, the visibility limit of the level features, the
-  keyword names of `run_task`, every state of the verdict table, the guards, and the existence of
-  every attribute that the scripts take from an imported module, including lazy imports inside
-  functions. The dry run fits every arm, predicts four panels, scores them, and runs the member-path
-  check on a tiny synthetic fold, on the CPU, in a scratch folder, with every read of the data folder
-  replaced. It runs for about 3 minutes.
+  `test_e00738_panel.py`, `test_e00738_run.py`, `test_e00738_review_fixes.py`,
+  `test_e00738_model.py`, `test_e00738_attributes.py`, and `test_e00738_dryrun.py`. The last three
+  need `torch` and skip without it. The tests cover every pure function, the visibility limit of the
+  level features, the keyword names of `run_task`, every state of the verdict table, the guards, and
+  the existence of every attribute that the scripts take from an imported module, including lazy
+  imports inside functions. The dry run fits every arm, predicts four panels, scores them, and runs
+  the member-path check on a tiny synthetic fold, on the CPU, in a scratch folder, with every read
+  of the data folder replaced. It also perturbs the power after the origin, and adds a shift that
+  starts after the origin, in the real `Source` class, and asserts that the level head's features,
+  age, depth, and hazards stay bit-identical. It runs for about 3 minutes. The known-answer tests of
+  the member-path check use a Gaussian forecast, and the gate test uses site identifiers that are
+  not in the order of the site table.
 - Read from experiment 713 (`ml-experiments/00713-msa-axial-attention-demand-network-part-1/`): the
   network, inputs, batch, train, and score modules, and the stored stage 1 and stage 3 states and
   forecasts of `M1`, under

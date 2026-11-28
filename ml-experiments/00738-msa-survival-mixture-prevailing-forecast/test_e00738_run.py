@@ -75,7 +75,9 @@ def test_cut_list_drops_ld_and_keeps_two_seeds() -> None:
     assert len(run.fit_jobs(screen=False, drop_ld=True)) == 100 - 20
     two = run.fit_jobs(screen=False, seeds=(0, 1))
     assert {kw["seed"] for _, kw in two} == {0, 1}
-    assert all(kw["arm"] != "LD" for _, kw in run.fit_jobs(screen=True, drop_ld=True))
+    assert any(kw["arm"] == "LD" for _, kw in run.fit_jobs(screen=True, drop_ld=True)), (
+        "the screen keeps LD"
+    )
 
 
 def test_screen_fits_are_four_folds_at_seed_zero() -> None:
