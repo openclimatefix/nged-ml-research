@@ -1,0 +1,7301 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Does an axial-attention neural network over a matrix of the last 14 days by 48 half-hours forecast Primary demand better than the Candidate, and does the gain come from the recent days? - NGED ML research</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#verdict" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED ML research" class="md-header__button md-logo" aria-label="NGED ML research" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED ML research
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Does an axial-attention neural network over a matrix of the last 14 days by 48 half-hours forecast Primary demand better than the Candidate, and does the gain come from the recent days?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED ML research" class="md-nav__button md-logo" aria-label="NGED ML research" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED ML research
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/embedded-pv-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How much solar sits behind each Primary substation, and how far can the number be trusted?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/solar-bmu-census/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How many Balancing Mechanism Units in Great Britain are solar?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/solar-bmu-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/battery-pv-separation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can solar be separated from a battery in an aggregate Balancing Mechanism Unit?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/unmetered-battery-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can a primary substation's half-hourly flow reveal an unmetered battery?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/embedded-battery-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How well can an embedded battery's output be forecast, and how many of NGED's batteries have a published plan?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/indgen-inddem-and-gsp-take/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do INDDEM and INDGEN line up with the GSP groups of NGED's licence areas?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/reanalysis-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CERRA and NORA3 describe past wind better than ERA5?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/cerra-wind-levels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending CERRA's wind heights beat one height?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/cerra-wind-direction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CERRA's wind direction add to its wind speed?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/era5-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which ERA5 variables help predict solar farm output?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/ukv-ceda-vs-era5/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does CEDA's UKV or ERA5 describe past wind and temperature better?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/past-weather/ukv-ceda-vs-openmeteo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do CEDA's and Open-Meteo's archives of UKV give the same power forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_11" id="__nav_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/wind-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wind component storage measurement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/wind-interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How should we interpolate wind components?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/matched-lead-extra-products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extra weather products in the day-ahead lead comparison: how they are read, and their results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ifs-solar-variables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which IFS forecast variables, or which second forecast, help a solar power forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/blends-with-ens/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which single weather forecast should be added to ECMWF's ensemble mean first?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ukv-ceda-blends/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does adding UKV from CEDA to ECMWF's ensemble mean lower the error at lead days 1 to 4?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/lag-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a same-hour power lag improve a day-ahead solar forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/effective-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Is a daily capacity estimate worth building for day-ahead solar forecasts?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/quick-wins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which cheap changes lower the production XGBoost forecast's error?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/production-feature-faults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production feature faults: diagnosis and forecast effects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../studies/forecasts/llm-capacity-labeller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Can a language model label a solar plant's capacity changes?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experiments
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experiments
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-power-telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED power telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-inputs-by-product/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather inputs by product
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/row-sets-and-scoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Row sets and scoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/what-is-on-disk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What is on disk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/substation-information-fields/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Substation information fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/reverse-flow-at-signed-mw-primaries/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reverse flow at the signed-MW Primaries
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/metered-generators-and-anonymisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metered generators and anonymisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/market-and-other-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market and other data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/problems-and-current-best-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Problems and the current best forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/adopted-and-open-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adopted and open questions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research default
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Research default
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research-default/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation-protocol-demand/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, demand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../scoreboard-demand/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoreboard, demand
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation-protocol-solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, solar
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation-protocol-wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation protocol, wind
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../research-default-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Log of versions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../final-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Final models for the production port
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../data-processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../detector-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How the history detectors fit together
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kalman-gam-explainer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kalman filter explainer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_9" id="__nav_3_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration and uncertainty
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Calibration and uncertainty
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/calibration-and-uncertainty/delivery-recommendation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery recommendation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_10" id="__nav_3_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curtailment cost
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Curtailment cost
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/curtailment-cost/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_11" id="__nav_3_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demand inputs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Demand inputs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/demand-inputs/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12" id="__nav_3_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Differentiable physics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-literature/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Literature scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-economy-7/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Economy 7
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12_4" id="__nav_3_12_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demand, calendar, and weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_12_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Demand, calendar, and weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-demand-calendar-and-weather/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12_5" id="__nav_3_12_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embedded generation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_12_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Embedded generation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-embedded-generation/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12_6" id="__nav_3_12_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Long history and drift
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_12_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Long history and drift
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-long-history-and-drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-long-history-and-drift/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-long-history-and-drift/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12_7" id="__nav_3_12_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pooling across substations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_12_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Pooling across substations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-pooling-across-substations/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12_8" id="__nav_3_12_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast engine
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_12_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecast engine
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-forecast-engine/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_12_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_12_9" id="__nav_3_12_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_12_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_12_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Network
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-network/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/differentiable-physics-network/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_13" id="__nav_3_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator forecasting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Generator forecasting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/generator-forecasting/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_14" id="__nav_3_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gross-demand simulation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Gross-demand simulation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/asset-inventory-simulator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Asset-inventory simulator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/simulator-discussion-2026-11-09/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulator discussion of 2026-11-09
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/gross-demand-simulation/proposal-to-nged-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Options for proposing the simulator to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_15" id="__nav_3_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hierarchy and pooling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Hierarchy and pooling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/hierarchy-and-pooling/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_16" id="__nav_3_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lagged power and error correction
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Lagged power and error correction
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lagged-power-and-error-correction/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_17" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_17" id="__nav_3_17_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production reference and best guess
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_17">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Production reference and best guess
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/production-reference-and-best-guess/neural-simplification-series/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neural simplification series
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_18" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_18" id="__nav_3_18_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Retraining and training history
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_18_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_18">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Retraining and training history
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/retraining-and-training-history/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_19" id="__nav_3_19_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metered solar farms
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_19">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Metered solar farms
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/metered-solar-farms/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_20" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_20" id="__nav_3_20_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Solar disaggregation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_20_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_20">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Solar disaggregation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/solar-disaggregation/unmetered-pv-capacity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unmetered PV capacity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_21" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_21" id="__nav_3_21_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LSC detectors
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_21_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_21">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    LSC detectors
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/event-table-summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event-table summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/lsc-detectors/state-at-january-pause/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State at the January pause
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_22" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_22" id="__nav_3_22_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load-shift labels in the forecast
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_22_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_22">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Load-shift labels in the forecast
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/switching-labels-in-the-forecast/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_23" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_23" id="__nav_3_23_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products and blending
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_23_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_23">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Weather products and blending
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Summary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/experiments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Research plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../themes/weather-products-and-blending/state-and-next-steps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State and next steps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#verdict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verdict
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-results-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the results mean
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations-disclosed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations disclosed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lessons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lessons
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-known-answer-gate-has-failed-four-times" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The known-answer gate has failed four times
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The known-answer gate has failed four times">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diagnostics-after-the-failed-gate-which-are-not-a-gate-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnostics after the failed gate, which are not a gate result
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-maintainer-waived-the-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The maintainer waived the gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-registered-contrasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-registered contrasts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#arms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision rule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detectable-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detectable effect
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screen-and-the-choice-of-m" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screen, and the choice of M*
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Method">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#training-regime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training regime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#measurement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measurement
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+  <h1>Does an axial-attention neural network over a matrix of the last 14 days by 48 half-hours forecast Primary demand better than the Candidate, and does the gain come from the recent days?</h1>
+
+<p><strong>Status: finished. Verdict: small gain at the six signed-MW Primaries, no detectable difference at
+the eight MVA-only Primaries. The pre-registered known-answer gate failed and the maintainer waived
+it, so every statement about following level shifts is unsupported by a passing known-answer test.</strong></p>
+<p>We asked whether a neural network that reads the last 14 days of power, weather, and calendar as a
+grid of days by half-hours, with attention across days and within a day, forecasts the demand of 16
+primary substations (Primaries) better than the Candidate, the two-output demand neural network that
+<a href="../../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result/">experiment 667</a>
+backtested over a year. We also asked whether any gain comes from those 14 recent days, by comparing
+the neural network with an identical copy whose 14 history days are random past days (the placebo).
+We scored 8 test months (2025-11 to 2026-06) at lead times of 24 to 240 hours, in continuous ranked
+probability score (CRPS, lower is better) expressed in points of capacity, where one point is 1% of
+a Primary's capacity. The counted readings keep two groups apart: the six signed-MW Primaries, whose
+telemetry records power in megawatts with its sign, and the eight MVA-only Primaries, whose
+telemetry records only apparent power in megavolt-amperes. The remaining two Primaries, D15 and D18,
+are report-only.</p>
+<p><strong>At the six signed-MW Primaries the neural network was better than the Candidate by 0.147 points,
+and at the eight MVA-only Primaries it was not detectably different.</strong> The 98.75% interval of the
+six signed-MW difference is -0.262 to -0.020. The neural network beat the placebo in both groups, so
+the recent days carry information a random past day does not. The result is a research result with
+limits that matter (see "Limitations disclosed"): the neural network is worse than the Candidate at
+D15 and D18, the interval at the six signed-MW Primaries fails the pre-registered t test on monthly
+differences, and the history rows use weather analyses that a live service could not build for the
+days 2 to 5 before the origin.</p>
+<h2 id="verdict">Verdict</h2>
+<p><strong>The verdict is "small gain", read from the scorer's pre-registered rule: a small gain at the six
+signed-MW Primaries and no detectable difference at the eight MVA-only Primaries.</strong> Every number is
+the neural network <code>M1</code> (the arm with frozen pre-trained weather and date-time encoders, selected on
+the screen folds as <code>M*</code>) minus the reference, in points of capacity, over the 24 to 240 h band,
+from 5 seeds and 8 test months, with a 98.75% interval from resampling whole months. The 98.75%
+level is the pre-registered Bonferroni correction across the four counted readings.</p>
+<table>
+<thead>
+<tr>
+<th>Reading</th>
+<th>Group</th>
+<th>Difference</th>
+<th>98.75% interval</th>
+<th>Reading of the rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H1: <code>M1</code> minus the Candidate <code>C</code></td>
+<td>the six signed-MW Primaries</td>
+<td>-0.147</td>
+<td>-0.262 to -0.020</td>
+<td>small gain</td>
+</tr>
+<tr>
+<td>H1: <code>M1</code> minus <code>C</code></td>
+<td>the eight MVA-only Primaries</td>
+<td>+0.022</td>
+<td>-0.092 to +0.112</td>
+<td>no detectable difference</td>
+</tr>
+<tr>
+<td>H2: <code>M1</code> minus the placebo <code>P</code></td>
+<td>the six signed-MW Primaries</td>
+<td>-0.140</td>
+<td>-0.253 to -0.033</td>
+<td>upper limit below zero</td>
+</tr>
+<tr>
+<td>H2: <code>M1</code> minus <code>P</code></td>
+<td>the eight MVA-only Primaries</td>
+<td>-0.135</td>
+<td>-0.360 to -0.0001</td>
+<td>upper limit just below zero</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The failed t guard is why the six signed-MW Primaries read "small gain" and not "gain".</strong> The
+point estimate (-0.147) is below -0.05 and the upper limit is below zero, but the t interval on the
+8 monthly differences at 98.75% (-0.325 to +0.043) covers zero. The bootstrap interval resamples
+only 8 months, which the Method section shows is too narrow, so the gain at the six signed-MW
+Primaries is not secured by the more cautious interval. The t guard also fails for the other three
+counted readings, and H2 at both groups is therefore not secured either.</p>
+<p><strong>The mean CRPS of the three headline arms differs by at most 0.2 points within each group.</strong> From
+seeds 0 and 1 on all 8 folds (one per test month), the mean of the monthly means at the six
+signed-MW Primaries is 3.175 for <code>C</code>, 3.030 for <code>M1</code>, and 3.178 for <code>P</code>. At the eight MVA-only
+Primaries the mean CRPS is 3.694 for <code>C</code>, 3.724 for <code>M1</code>, and 3.891 for <code>P</code>. Pooled over rows, the
+six signed-MW means are 3.203, 3.053, and 3.203, and the eight MVA-only means are 3.704, 3.731, and
+3.893.</p>
+<p><strong>The pre-registered prediction failed for H1 at the six signed-MW Primaries and held for H2.</strong> The
+prediction was "not supported or inconclusive", with H1 within ±0.06 at the six signed-MW Primaries
+and within ±0.16 at the eight MVA-only Primaries, and H2 at most -0.10. H1 at the six signed-MW
+Primaries (-0.147) is outside its range, and the verdict "small gain" is outside the predicted
+verdict. H1 at the eight MVA-only Primaries (+0.022) is inside its range. Both H2 point estimates
+(-0.140 and -0.135) are below -0.10.</p>
+<p><strong>Every pre-registered guard that applies to a gain holds at the six signed-MW Primaries except the
+t guard.</strong> The same sign holds for each of the 5 seeds and the noise floor holds. The four guards
+for a <code>supported</code> verdict also hold: leaving out one Primary or one month keeps the sign, the q01
+and q99 pinball losses are within 0.05 points of the Candidate's, the median error moves with CRPS,
+and swap (a) keeps the sign of H1. At the eight MVA-only Primaries, leaving out one Primary flips
+the sign of H1, the t guard and the noise-floor guard fail, and the upper bound of the q99
+pinball-loss difference from the Candidate is 0.071 points, above the limit of 0.05.</p>
+<p><strong>At the eight MVA-only Primaries the pooled difference from the Candidate rests on two Primaries,
+D8 and D12, in the 2-seed recomputation.</strong> The 5-seed pooled difference is +0.0221 and the 5-seed
+leave-one-Primary-out guard flips the sign (both in <code>score/headline.json</code>), but the file does not
+name the Primary whose removal flips it. A recomputation from the stored forecasts for seeds 0 and 1
+only (24 to 240 h, rows pooled; not stored in a score file) gives a pooled difference of +0.0274.
+Leaving out D8 turns that 2-seed difference to -0.004, and leaving out D12 turns it to -0.028. The
+neural network is therefore not shown to help the other seven MVA-only Primaries, and no pooled
+reading of the eight MVA-only Primaries should be read as an effect on all of them.</p>
+<p><strong>The neural network is worse than the Candidate at the two report-only Primaries.</strong> From seeds 0
+and 1, the mean CRPS over all 16 Primaries is 4.037 for <code>C</code>, 4.191 for <code>M1</code>, and 4.218 for <code>P</code>.
+Combined with the group results, <code>M1</code> minus <code>C</code> at D15 and D18 together is roughly +1.6 points
+(a derived difference from the row-weighted group differences, with no interval and not scored
+separately). The two short-history
+Primaries are 2 of 16, and this loss is the reason <code>production_status</code> is <code>not-for-production</code>.</p>
+<p><strong>The secondary era readings R1 to R3 score the forecasts on experiment 709's injected worlds, and a
+passing known-answer test does not back them, so the page treats them as descriptive.</strong> Era
+weighting is by pass (one injection run over the panel of 16 Primaries), not by event as experiment
+709 does. The era prediction was that <code>M1</code> reads a lasting change and is vetoed on a temporary move.
+<code>M1</code> reads the lasting change (-3.23 against the Candidate in the 7 to 28 days after the onset,
+below the -1.0 threshold), and the veto fires: after a temporary move ends, <code>M1</code> is worse than the
+Candidate by +1.28 (threshold +0.1). The convolution stem <code>E</code> does not add to <code>M1</code> in the 7 to 28
+day slice (-0.02 against a threshold of -0.30). The neural network therefore follows any level
+change, a lasting one or a temporary one, and the pre-registered reading is that the era hypothesis
+is not supported as stated.</p>
+<h2 id="what-the-results-mean">What the results mean</h2>
+<p><strong>The 14 recent days carry information that a random past day does not, and the attention in the
+trunk adds little beyond a learned read-out over those 14 days.</strong> <code>M1</code> beats the placebo at both
+groups (H2), though the t guard fails for H2 and the placebo is itself weaker than the Candidate at
+the eight MVA-only Primaries. Arm <code>K</code> has no attention in the trunk and keeps only the similar-day
+read-out (a learned weighting of the 14 same-half-hour readings) and the output head. <code>M1</code> minus <code>K</code>
+in CRPS is -0.058 [-0.114, +0.006] at the six signed-MW Primaries and -0.010 [-0.118, +0.106] at the
+eight MVA-only Primaries (95%, seeds 0 and 1). The median error of the same contrast at the six
+signed-MW Primaries is -0.129 [-0.230, -0.016], so the trunk attention does improve the median
+there. Arm <code>A</code>, which removes only the within-day attention, is not worse than <code>M1</code>: <code>M1</code> minus <code>A</code>
+is +0.016 and +0.032, and both intervals cover zero. Arm <code>N</code>, which reads only the target day's row
+with no history rows and no power, is much worse (<code>M1</code> minus <code>N</code> is -0.364 and -0.486).</p>
+<p><strong>On experiment 709's injected worlds, the Candidate does not follow a lasting step, and <code>M1</code>, <code>E</code>,
+and <code>K</code> beat it by about the same amount.</strong> The worlds cover 4 test months and seeds 0 and 1. In the
+7 to 28 days after a lasting step begins, CRPS minus the Candidate's is -3.23 for <code>M1</code>, -3.25 for
+<code>E</code>, and -2.75 for <code>K</code>. Experiment 709's forecasts with nothing injected (<code>none</code>) match the stored
+Candidate forecasts to within 4.7e-06 on the 4 bank folds, so the Candidate's era scores are its
+ordinary forecasts. The placebo does not beat the Candidate on this bank (<code>P</code> minus <code>C</code> is about
++0.29 in the same slice). On a temporary move, from the switch to 7 days after the move ends, the
+sign reverses: the arms that follow their history are worse than the Candidate (+1.28 for <code>M1</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Era contrast (CRPS, points of capacity, mean over injection passes)</th>
+<th>Lasting step, 0 to 7 d after onset</th>
+<th>Lasting step, 7 to 28 d after onset</th>
+<th>Temporary move, switch to 7 d after its end</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>M1</code> minus <code>C</code></td>
+<td>-0.575 [-0.867, -0.283]</td>
+<td>-3.23 [-3.741, -2.723]</td>
+<td>+1.28 [+1.08, +1.491]</td>
+</tr>
+<tr>
+<td><code>E</code> minus <code>C</code></td>
+<td>-0.722 [-1.029, -0.414]</td>
+<td>-3.25 [-3.745, -2.764]</td>
+<td>+1.179 [+0.989, +1.378]</td>
+</tr>
+<tr>
+<td><code>K</code> minus <code>C</code></td>
+<td>-0.704 [-1.069, -0.344]</td>
+<td>-2.753 [-3.163, -2.348]</td>
+<td>+0.895 [+0.735, +1.061]</td>
+</tr>
+<tr>
+<td><code>M1</code> minus <code>P</code></td>
+<td>-0.719 [-0.944, -0.503]</td>
+<td>-3.521 [-3.898, -3.146]</td>
+<td>+1.167 [+0.954, +1.393]</td>
+</tr>
+<tr>
+<td><code>E</code> minus <code>M1</code></td>
+<td>-0.146 [-0.247, -0.047]</td>
+<td>-0.02 [-0.157, +0.126]</td>
+<td>-0.101 [-0.151, -0.053]</td>
+</tr>
+</tbody>
+</table>
+<p>Era reading R1 at D8, the Primary with logged real events in the era set, is <code>M1</code> minus <code>C</code> +0.249
+[-0.025, +0.582] and <code>E</code> minus <code>M1</code> -0.091 [-0.228, +0.036], in the same units.</p>
+<p><strong>Replacing the history weather with forecast-like weather keeps the gain at the six signed-MW
+Primaries.</strong> The three history-weather swaps (95%, seeds 0 and 1) are prediction-only checks that
+change an input and report H1 again. Swap (a), which gives every history row the ensemble forecast
+weather and keeps the 14 trailing-temperature and solar-gain columns, gives <code>M1</code> minus <code>C</code> of -0.152
+[-0.258, -0.048] at the six signed-MW Primaries and +0.028 [-0.070, +0.125] at the eight MVA-only
+Primaries. Swap (b), which also zeroes those 14 columns, gives -0.109 [-0.236, +0.010] and +0.234
+[+0.079, +0.365], so zeroing the columns raises the neural network's CRPS by about 0.04 points at
+the six
+signed-MW Primaries and 0.21 at the eight MVA-only Primaries, and the neural network was not trained
+for either swap. Swap (c), the Candidate given reanalysis weather at its lag times, changes the
+Candidate's CRPS by +0.006 [0.000, +0.012] and +0.001 [-0.002, +0.005].</p>
+<h2 id="figures">Figures</h2>
+<p><strong>The per-Primary and per-fold charts keep the six signed-MW Primaries apart from the eight MVA-only
+Primaries.</strong> The charts use seeds 0 and 1, so their dots differ from the 5-seed headline. The
+per-Primary intervals resample the 8 months. The per-fold intervals resample origin days, whose
+24-to-240-hour forecast windows overlap, so the per-fold intervals are too narrow.</p>
+<p><img alt="CRPS minus the Candidate's, by Primary" src="../contrast_by_label.svg" /></p>
+<p><img alt="CRPS minus the Candidate's, by fold" src="../contrast_by_month.svg" /></p>
+<p><img alt="CRPS by Primary" src="../crps_by_label.svg" /></p>
+<p><img alt="CRPS by fold" src="../crps_by_month.svg" /></p>
+<p><strong>Day-ahead and 14-day forecasts of a winter origin (January 2026) at D5, a signed-MW Primary, and
+of a summer origin (June 2026) at D19, an MVA-only Primary, show the median and the 50% and 90%
+bands of the Candidate, <code>M*</code>, and <code>E</code> against the measured power.</strong></p>
+<p><img alt="Day-ahead forecast, winter, D5" src="../series_day_winter_D5.svg" /></p>
+<p><img alt="14-day forecast, winter, D5" src="../series_fourteen_winter_D5.svg" /></p>
+<p><img alt="Day-ahead forecast, summer, D19" src="../series_day_summer_D19.svg" /></p>
+<p><img alt="14-day forecast, summer, D19" src="../series_fourteen_summer_D19.svg" /></p>
+<p><strong>Three load shifts in NGED's logs at signed-MW Primaries and three at MVA-only Primaries show the
+forecasts of <code>M*</code> and the Candidate for the next 24 hours from each origin day against the measured
+power.</strong></p>
+<p><img alt="Logged event at D10" src="../event_signed_mw_D10_0.svg" /></p>
+<p><img alt="Logged event at D14" src="../event_signed_mw_D14_1.svg" /></p>
+<p><img alt="Logged event at D5" src="../event_signed_mw_D5_2.svg" /></p>
+<p><img alt="Logged event at D3" src="../event_mva_only_D3_3.svg" /></p>
+<p><img alt="Logged event at D19" src="../event_mva_only_D19_4.svg" /></p>
+<p><img alt="Logged event at D4" src="../event_mva_only_D4_5.svg" /></p>
+<p><strong>Injected worlds show the neural-network arms and the Candidate on a lasting step and on a
+temporary move, with the onset marked.</strong></p>
+<p><img alt="Lasting step" src="../injected_era.svg" /></p>
+<p><img alt="Temporary move" src="../injected_switch.svg" /></p>
+<p><strong>In the 2026-01 fold at seed 0, the across-day attention of <code>M1</code> and <code>E</code> does not favour rows that
+share the target's weekday, and <code>P</code> shows the same lack of preference.</strong> These charts read the saved
+weights of <code>M1</code>, <code>E</code>, and <code>P</code> with the forecast unchanged, on one fold (the 2026-01 test month) and
+seed 0. The weight on the target row itself is 0.048 for <code>M1</code>, 0.084 for <code>E</code>, and 0.039 for <code>P</code> at
+lead day 1. Averaged over all 16 Primaries (including D15 and D18, which the scoring leaves out),
+every test origin, every half-hour, and the 4 heads, each of the 14 history slots takes between 0.05
+and 0.09 of the weight (a uniform spread over the 15 rows would give 0.067). The rows with the
+target's weekday take 13.7% of the history weight in <code>M1</code> at lead day 1 (14.5% at lead day 7), 12.8%
+in <code>E</code> (14.4%), and 14.3% in <code>P</code> (14.3%). Two of 14 rows is 14.3%, so none of the three networks
+puts extra weight on the rows with the target's weekday.</p>
+<p><strong><code>M1</code> and <code>E</code> give the most recent rows the most weight, and the weekday rows differ from their
+neighbours by at most 0.007 at lead day 1.</strong> At lead day 1, <code>M1</code> falls from 0.083 at slot 1 to
+0.056 at slot 12, and <code>E</code> from 0.085 to 0.054, whereas <code>P</code>, whose slots are placebo rows with no
+age order, runs from 0.058 to 0.077. Because of that gradient, the comparison with neighbouring
+slots is firmer than the comparison with a uniform spread. In <code>M1</code>, slot 6 (the first weekday row)
+takes 0.0725 against 0.0732 and 0.0684 at slots 5 and 7, and slot 13 (the second) takes 0.0582
+against 0.0562 and 0.0651 at slots 12 and 14. In <code>E</code>, slot 6 takes 0.0642 against 0.0667 and
+0.0647, and slot 13 takes 0.0535 against 0.0535 and 0.0605.</p>
+<p><img alt="Mean across-day attention by history slot, lead day 1" src="../attention_by_age_lead1.svg" /></p>
+<p><img alt="Mean across-day attention by history slot, lead day 7" src="../attention_by_age_lead7.svg" /></p>
+<p><strong>Single cases show more structure than the average, and the structure differs between cases.</strong>
+Each case is one origin and one Primary, chosen for display only on outcomes the network never
+reads: an origin whose next-day actual has a large half-hour change (case A), and the origins with
+the highest (case B) and the lowest (case C) mean reanalysis shortwave over the target day at D5.
+On the clear day (case B), <code>M1</code> and <code>E</code> put their largest weights on slots 2 and 6 over the first
+12 half-hours of the target day (0.20 on slot 2 in both, and 0.24 and 0.21 on slot 6). Slot 6 is
+the row with the target's weekday, so this one forecast does favour it, while the average over
+origins does not. <code>P</code> puts its largest weights on slots 3, 14, and 7 over the first 12 half-hours
+of case B, and over the whole day on slots 11, 3, and 8. In case A the largest <code>M1</code> weights fall
+on slots 3, 8, and 5, and in the dull day (case C) on slots 14, 11, and 12, so no single row
+dominates across cases. The cases are three origins, and each is a single forecast.</p>
+<p><img alt="Across-day attention, case A" src="../attention_across_case_a.svg" /></p>
+<p><img alt="Across-day attention, case B" src="../attention_across_case_b.svg" /></p>
+<p><img alt="Across-day attention, case C" src="../attention_across_case_c.svg" /></p>
+<h2 id="checks">Checks</h2>
+<ul>
+<li><strong>The attention extract reproduces the scored forecast.</strong> For each of the 3 cases of <code>M1</code>, <code>E</code>, and
+  <code>P</code>, the extract's quantiles (the 11 quantile columns) differ from the stored forecast of the same
+  arm, Primary, origin, and valid times by at most 1.6e-06 (the largest of 9 differences; limit
+  1e-4), and the forecast with the attention returned is bit-identical to the forecast without it.
+  The runner logs are <code>attention_extract_{M1,E,P}_2026-01_s0.log</code> under <code>work/logs/</code> in the private
+  data folder. A smoke test with an untrained network ran before the one-line device-index fix of
+  the GPU memory cap was committed, so it ran on uncommitted code. The real extract of <code>M1</code> also ran
+  just before that commit, and the real extracts of <code>E</code> and <code>P</code> ran after it. The fix changes only
+  the function that sets the GPU memory cap, and the 1.6e-06 match includes the <code>M1</code> extract.</li>
+<li><strong>Median minus mean forecast, per site.</strong> For <code>M1</code> at seed 0, averaged over all leads of 0 to 14
+  days, the median sits between 0.96 points of capacity below and 0.20 above the mean forecast at
+  the 14 scored Primaries, and 1.99 below at D15. The report script prints 10 of the 16 Primaries;
+  D12 (-0.96) and D15 (-1.99) are among the hidden rows. The spread shifts the median at D12 and
+  D15, so their CRPS may be affected.</li>
+<li><strong>CRPS and the error of the median disagree at two contrasts.</strong> <code>E</code> minus <code>M1</code> at the six
+  signed-MW Primaries is 0.000 in CRPS and -0.009 in normalised median error. <code>M1</code> minus <code>C</code> at the
+  eight MVA-only Primaries is +0.027 in CRPS and -0.035 in median error (95%, seeds 0 and 1): the
+  median is slightly
+  better and the upper tail is worse, which matches the failed q99 guard.</li>
+<li><strong>Audit triggers.</strong> Audit triggers 1 to 5 fired. The Opus audit
+  (<code>briefs/msa_architecture/audit_713.md</code>, in the private data folder) found no implementation fault
+  that changes a headline number, a reading, or the verdict. Trigger 1 (a control fails) fired
+  because the known-answer gate was waived after its checks KA3 (arm <code>M</code> must follow an injected
+  level step) and KA12 (arm <code>G</code> must follow the step within 0.05 of arm <code>M</code>) failed. Trigger 2 (a
+  result contradicts its prediction) fired for H1 at the six signed-MW Primaries. Trigger 3 (CRPS
+  and the error of the median point in different directions) fired at the two contrasts above.
+  Trigger 4 (leaving one Primary out flips a sign) fired at the eight MVA-only Primaries. Trigger 5
+  (a nested arm beats the arm that contains it) fired because arm <code>A</code>, which lacks the within-day
+  attention, scores better than <code>M1</code> (<code>M1</code> minus <code>A</code> is +0.016 and +0.032). Trigger 6 needs a
+  by-hand comparison with the interval widths of experiments 667 and 709, which was not done, and
+  trigger 7 (a later experiment's design depends on this unreplicated result) waits on a decision by
+  the maintainer.</li>
+<li><strong>No weather look-ahead.</strong> <code>e00713_weather_lookahead.py</code> lists, for one origin, the weather source
+  and issue time of every row. The target row uses the 00Z run of the European Centre for
+  Medium-Range Weather Forecasts (ECMWF) ensemble issued before the origin. No history row carries
+  weather valid after the contract origin. The audit found no look-ahead and no power leakage across
+  the cutoff. The history rows use the ERA5 reanalysis and Copernicus Atmosphere Monitoring Service
+  (CAMS) analyses, and the history rows of ages 2 to 5 days could not be built in a live service, so
+  every H1 reading is a ceiling for a live forecast.</li>
+<li><strong>Scorer edits after the audit.</strong> Three edits followed the audit: the tail guard takes each row's
+  month inside each join; the swap-(a) guard flag and the median-error guard flag compare with the
+  sign of H1 rather than with a gain; and the scorer appends the Candidate's era reference once per
+  pass. The era, swaps, and headline scorers were rerun after an Opus code review. No interval,
+  reading, or verdict changed, and two guard flags at the eight MVA-only Primaries changed (swap (a)
+  keeps the sign of H1, and the median error does not move with CRPS).</li>
+<li><strong>Seed reproduction.</strong> The Candidate's seed 0 refitted for 2025-11 reproduces the stored forecast
+  to a maximum absolute difference of 7.4e-05 against a threshold of 1e-3. No other fold was
+  checked.</li>
+<li><strong>Capped reruns.</strong> Arm <code>P</code> hit the 60-pass stage-1 cap in 4 of its 40 fits and was rerun at the
+  120-pass cap, which makes H2 conservative and leaves H1 untouched.</li>
+</ul>
+<h2 id="limitations-disclosed">Limitations disclosed</h2>
+<ul>
+<li><strong>The known-answer gate failed and was waived.</strong> KA3 failed: the follow share of arm <code>M</code>, the
+  fraction of an injected level step by which <code>M</code> moved its median, is 0.142 against the 0.75
+  needed. KA12 failed on arm <code>G</code>. Every statement about following level shifts, and the era readings
+  R1 to R3, is unsupported by a passing known-answer test.</li>
+<li><strong>The neural network is worse than the Candidate at D15 and D18, and the page does not score those
+  two Primaries separately.</strong> The 16-Primary pooled means are given in the Verdict section.</li>
+<li><strong>The comparison of follow shares between the Candidate and <code>M1</code> on experiment 581's bank of
+  injected level steps was planned and could not be run.</strong> The Candidate's stored files under
+  experiment 667 hold experiment 650's random events, not experiment 581's bank. On 6 of 8 folds the
+  forecasts of <code>M1</code> on that bank also include origin days before the fold's first day, so the two
+  follow shares would not be on the same origins. A new inject job that passes experiment 581's bank
+  through the Candidate's saved weights would make the comparison, and is a possible later
+  experiment. The follow share of <code>M1</code> on that bank is not scored on this page. The filter that
+  drops origins with no ensemble row drops 24 to 48 of 160 origins per pass on all 8 folds.</li>
+<li><strong>Era weighting is by pass, not by event.</strong> Experiment 709 weights by event. The audit argues the
+  point estimates agree whenever no pass has an empty slice, and did not compute both weightings.</li>
+<li><strong>Several pre-registered report-only readings are not on this page.</strong> These are the climatology,
+  manual heuristic, and BG2 rows; the four load-shift scenarios (all rows, outside events, inside
+  events, and the 7 days after an event); coverage at q01, q05, q95, and q99; mean band width; the
+  day-1 and days 11 to 14 lead bands; the cold-winter-night, winter, and time-of-day slices;
+  threshold-weighted CRPS; avoidable curtailment cost; and the actual GPU hours. The median error
+  appears beside CRPS for the report-only contrasts in <code>report_only.json</code> and for the two contrasts
+  named under Checks.</li>
+<li><strong>The design's read-out of the across-day attention weights before and after an injected permanent
+  change (design section 6.5) was not built.</strong> The attention maps above cover one fold (2026-01),
+  seed 0, and the arms <code>M1</code>, <code>E</code>, and <code>P</code>. They do not show attention on injected worlds, and the
+  mean weights cannot tell whether the attention of a single origin follows a step.</li>
+<li><strong>The input sets differ.</strong> The Candidate reads neighbour summaries and a table of expected inputs
+  that the MSA neural network lacks, and the neural network reads 14 days of power and reanalysis
+  history weather. The difference between the groups may come from inputs rather than architecture.</li>
+<li><strong>Further scorer limitations.</strong> (1) The headline scorer needs about 20 GB of host memory. (2) No
+  normalised median-error or band-width contrast stands beside H1 and H2 at the pre-registered
+  level. (3) Audit triggers 1 and 5 print only in part, and <code>swaps.json</code> is not printed by the
+  report script. (4) The hash print of design section 5.3 for the Candidate's seeds 2 to 4 is
+  missing. (5) The 17 to 28 day slice of design section 1.10 is not implemented. (6) The era scorer
+  does not enforce the known-answer check KA11, though KA11 passed for all 4 bank folds (maximum
+  difference 0.0). (7) The leave-one-Primary-out and leave-one-month-out tests read "does the sign
+  stay negative", which is the right test for a gain and the wrong label for a loss. (8) Arm <code>G</code> was
+  not fitted on the real folds.</li>
+<li><strong>Seed counts.</strong> Arms <code>A</code>, <code>K</code>, <code>N</code>, and <code>E</code> have seeds 0 and 1 only, and their contrasts are at
+  95%. The headline arms <code>M1</code>, <code>P</code>, and <code>C</code> have 5 seeds.</li>
+</ul>
+<h2 id="lessons">Lessons</h2>
+<ul>
+<li><strong>Score a learned read-out over the history rows, with no trunk attention, before crediting
+  attention.</strong> Arm <code>K</code> is within 0.06 points of <code>M1</code> at both groups in CRPS, though the trunk
+  attention improves the median error at the six signed-MW Primaries.</li>
+<li><strong>Score changes at the eight MVA-only Primaries per Primary before pooling.</strong> In a 2-seed
+  recomputation, two
+  Primaries, D8 and D12, hold the sign of the pooled difference (seeds 0 and 1).</li>
+<li><strong>Do not credit attention for a lasting-step gain until the control arms are scored.</strong> <code>K</code> and <code>E</code>
+  gain about as much as <code>M1</code> on the era bank.</li>
+<li><strong>Diagnose a known-answer gate that the neural network keeps failing before running the real
+  folds.</strong> The follow share of arm <code>M</code> stayed at 0.01 to 0.14 against 0.75 through four gate runs.</li>
+<li><strong>Score the two short-history Primaries, D15 and D18, beside the groups.</strong> Their loss is hidden by
+  the group readings.</li>
+</ul>
+<h2 id="the-known-answer-gate-has-failed-four-times">The known-answer gate has failed four times</h2>
+<p><strong>The gate trains networks on a synthetic world with a known answer, and arm <code>M</code> must follow a level
+step that appears in the history rows.</strong> The check is KA3: in synthetic world W1, arm <code>M</code> must move
+its median by at least 0.75 of a step of 0.30 of capacity (the follow share). Arm <code>M</code> has never come
+near that figure. All four results stay on this page, each with the commit that produced it. An
+earlier attempt at fd76ccb09 crashed at KA6 (a CUDA index error in the canary, before any check
+produced a result), so it is not a gate result. Commit 3ac110652 fixed the canary.</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Commit</th>
+<th>Failed checks</th>
+<th>Numbers</th>
+<th>Cause found</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First gate run (J1)</td>
+<td>3ac110652</td>
+<td>KA2, KA3, KA10, KA12</td>
+<td>Arm <code>N</code> mean absolute error 0.0476 against a limit of 0.02; follow share of <code>M</code> 0.0348; |<code>M</code> − <code>P</code>| 0.0166 against 0.005; follow share of <code>E</code> −0.0197</td>
+<td>The read-out's two query and key maps both started at zero, so neither trained</td>
+</tr>
+<tr>
+<td>Rerun 2</td>
+<td>eb1942601</td>
+<td>KA3</td>
+<td>Follow share of <code>M</code> 0.0099</td>
+<td>The trained network barely read the lead day</td>
+</tr>
+<tr>
+<td>Rerun 3</td>
+<td>90b9de2c8</td>
+<td>KA3</td>
+<td><code>M</code> 0.0186, <code>E</code> 0.1268, <code>G</code> 0.0005, <code>P</code> −0.00007, <code>N</code> 0</td>
+<td>KA2, KA4, KA5, KA6, KA10, and KA12 passed</td>
+</tr>
+<tr>
+<td>Amended gate</td>
+<td>94dfb9652</td>
+<td>KA3, KA12</td>
+<td><code>M</code> 0.1418 at the best-validation state; <code>G</code> 0.0395 against the KA12 limit of <code>M</code> − 0.05 = 0.0918</td>
+<td>KA2, KA4, KA5, KA6, and KA10 passed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The first fault was a bug, which the first gate run found and amendment 1 fixed.</strong> The read-out's
+query map <code>W_q</code> and key map <code>W_k</code> both started at zero, so each gradient (proportional to the other
+map) stayed zero and the read-out never trained. The query map now has the default random
+initialisation, the key map stays at zero, and the untrained network is unchanged (KA1 holds). A new
+check fails on the old initialisation. The fix changes every real fold's network, because the
+read-out now trains there too.</p>
+<p><strong>The second fault was a weak lead-day path, which amendment 2 (<code>design_amendment_2.md</code>) addressed
+after an audit.</strong> The lead day entered only as an embedding on the target row's tokens. In the
+audit, the embedding shrank to a mean length of 0.08, and moving the lead day from 1 to 14 changed
+the median by 0.012 standardised units against a step of 2.1. Amendment 2 adds the one-hot lead day
+to the read-out query and to the head's input, 1,344 parameters in all, with no effect at the start.
+Rerun 3 followed, with a follow share of <code>M</code> of 0.0186.</p>
+<p><strong>Amendment 3 (<code>design_amendment_3.md</code>) raised the budget of the synthetic fits only, and the
+amended gate still failed.</strong> The synthetic fits ran at most 400 passes with a patience of 30, where
+they had run 150 and 8. The real folds' budgets and every threshold were unchanged. The amendment
+came from a diagnostic on the same synthetic world W1 that the gate uses, so it was a post-hoc
+change of the gate's budget. The amended gate stopped every fit by early stopping before the cap: W1
+<code>M</code> at pass 193, <code>P</code> at 205, <code>N</code> at 257, <code>E</code> at 175, <code>G</code> at 199, and W0 <code>M</code> at 350. It took 67
+minutes on one GPU, with a peak of 5,090 MiB.</p>
+<p><strong>Scored at the pre-registered state, the best-validation state of each fit, the amended gate fails
+KA3 and KA12.</strong> The follow share of arm <code>M</code> is 0.1418 against 0.75. In KA12, arm <code>G</code> reaches 0.0395,
+below <code>M</code> minus 0.05 = 0.0918, so the check fails. <strong>Experiment 713 therefore failed its
+pre-registered known-answer gate.</strong></p>
+<p><strong>Secondary readings, which never gate.</strong> The final-pass follow shares of the W1 fits are 0.1117 for
+<code>M</code>, 0.2154 for <code>E</code>, and 0.0297 for <code>G</code>. The follow share of <code>M</code>, read every 20 passes, ranged from
+0.005 to 0.189 with no trend, so a single reading is weak evidence either way. These readings were
+recorded before the run as labelled secondary readings, and none of them is used for the pass or
+fail decision. The best of them, 0.2154 for <code>E</code>, is also below 0.75.</p>
+<p><strong>The audit of the gate found no implementation fault.</strong> <code>ka3_audit.md</code> (in
+<code>data/ml-experiments/briefs/msa_architecture/</code>, an Opus audit) checked the gate and its scorer with
+oracles: a hand-set read-out on the newest history row scores 0.936, and rules that follow the step
+score 1.000 through the same scorer, so the follow share can reach 1. The audit found that the
+history path trains and that the network can read the step. The trained network learns to follow the
+step late, and the validation loss does not reward following: arm <code>M</code> reaches a worse validation
+loss than the placebo <code>P</code> in W1. So the failure is a finding about what this network learns on this
+training budget, and the test is correctly specified.</p>
+<h3 id="diagnostics-after-the-failed-gate-which-are-not-a-gate-result">Diagnostics after the failed gate, which are not a gate result</h3>
+<p><strong>Six diagnostic fits and four replications followed the failed gate. They are diagnostics only,
+they gate nothing, and they support no claim that the gate is passed.</strong> Each run is a single
+trajectory of arm <code>M</code> in synthetic world W1, with the code hash e85b84e2ea04b3cb (the hash
+before the docstring rewrap described below), a cap of 400
+passes, and no confidence interval. The variants changed the gradient-clip norm (1.0 or 10) and the
+learning rate of the lead-day parameters only (the lead-day map <code>w_lead</code>, the lead embedding, and
+the head's 14 lead-day input columns), by a factor of 1 or 10. The first six rows ran at training
+seed 0 on world seed 0, the world that amendment 3 was derived from. V0 reproduces the amended gate.</p>
+<p><strong>The multiplier of 10 was chosen on that same world and seed, after seeing its result, so the first
+V2 figure is an optimistic selection.</strong> The four replications changed the training seed or drew a
+fresh world (world seed 1000, never used before and not used to choose the multiplier). The fixed
+table of weekday-by-half-hour effects kept its own seed in every run.</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Change from the amended gate</th>
+<th>Training seed</th>
+<th>World seed</th>
+<th>Follow at the best-validation state</th>
+<th>Follow at the final pass</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V0</td>
+<td>None (the amended gate)</td>
+<td>0</td>
+<td>0</td>
+<td>0.142</td>
+<td>0.112</td>
+</tr>
+<tr>
+<td>V1</td>
+<td>Clip norm 10</td>
+<td>0</td>
+<td>0</td>
+<td>0.024</td>
+<td>0.276</td>
+</tr>
+<tr>
+<td>V2</td>
+<td>Lead-day learning rate × 10</td>
+<td>0</td>
+<td>0</td>
+<td>0.806</td>
+<td>0.685</td>
+</tr>
+<tr>
+<td>V3</td>
+<td>Clip norm 10 and lead-day learning rate × 10</td>
+<td>0</td>
+<td>0</td>
+<td>0.586</td>
+<td>0.787</td>
+</tr>
+<tr>
+<td>V0N</td>
+<td>None, no early stopping (400 passes)</td>
+<td>0</td>
+<td>0</td>
+<td>0.129</td>
+<td>0.236</td>
+</tr>
+<tr>
+<td>V2N</td>
+<td>Lead-day learning rate × 10, no early stopping (400 passes)</td>
+<td>0</td>
+<td>0</td>
+<td>0.820</td>
+<td>0.395</td>
+</tr>
+<tr>
+<td>Rep1</td>
+<td>As V2</td>
+<td>1</td>
+<td>0</td>
+<td>0.857</td>
+<td>0.815</td>
+</tr>
+<tr>
+<td>Rep2</td>
+<td>As V2</td>
+<td>2</td>
+<td>0</td>
+<td>0.377</td>
+<td>0.649</td>
+</tr>
+<tr>
+<td>Rep3</td>
+<td>As V2</td>
+<td>0</td>
+<td>1000</td>
+<td>0.454</td>
+<td>0.368</td>
+</tr>
+<tr>
+<td>Rep4</td>
+<td>As V0</td>
+<td>0</td>
+<td>1000</td>
+<td>0.063</td>
+<td>0.185</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Arm <code>M</code> reached the 0.75 threshold at the best-validation state on 2 of the 4 runs that used the
+lead-day multiplier (V2 and Rep1), and missed it on the other 2 (Rep2 and Rep3).</strong> The follow share
+at the
+best-validation state varied from 0.377 to 0.857 across training seeds and worlds, and the
+unmodified baseline gave 0.142 and 0.063. The no-early-stopping runs followed more than 0.9 at some
+passes (0.912 for V0N, 0.929 for V2N), but their best-validation states stayed at 0.129 and 0.820,
+so the state that validation loss picks is a noisy selector of the follow share.</p>
+<p><strong>No amendment was made, and the gate remains failed. The maintainer's decision follows below.</strong>
+The diagnostics concern one family of synthetic worlds, one fold, and single runs, so
+they say nothing about the real folds. The options that follow from them, with the reasons, are in
+<code>gate_options.md</code> and the two diagnostic reports (<code>diag_option5/README.md</code> and
+<code>diag_option5/replication/README.md</code>), in <code>data/ml-experiments/briefs/msa_architecture/</code>.</p>
+<h3 id="the-maintainer-waived-the-gate">The maintainer waived the gate</h3>
+<p><strong>On 2026-11-23 the maintainer decided, in these words: "Go ahead with option 1".</strong> Option 1 of
+<code>gate_options.md</code> is to waive KA3 for the real folds and disclose the failure. <strong>The waiver changes
+no threshold.</strong> The gate file <code>work/known_answers_passed.json</code> is written by a separate script,
+<code>e00713_waive_gate.py</code>, with <code>waived: true</code>, the failed checks (KA3 and KA12, with their values at
+the
+amended gate, commit 94dfb9652), the passed checks (KA2, KA4, KA5, KA6, and KA10), the decision
+quoted above, the date, the code record, and the sha256 of <code>e00713_known_answer.py</code>. The script
+refuses to write the file unless the stored last-run results show exactly KA3 and KA12 failing and
+the code hash equals e85b84e2ea04b3cb, and the sha256 of the last-run file and of
+<code>e00713_known_answer.py</code> equal the values pinned in the script. The fit scripts still check the code
+record of the gate file, so a waived gate written under one code hash is refused under another. The
+report script prints the waiver and fires audit trigger 1 (a control fails).</p>
+<p><strong>The code hash of the fit modules changed from e85b84e2ea04b3cb to 30951d79ab4d869a when the
+docstring lines of the experiment's scripts were rewrapped, and the fits were run at the old
+hash.</strong> The hash is the first 16 characters of a SHA-256 over the bytes of the fit modules
+(<code>arms.FIT_CODE_FILES</code>) and the hashes of the imported recipe modules, so any edit to a docstring
+changes it. The gate file and the stage 3 logs of arms <code>M1</code>, <code>E</code>, and <code>P</code> record e85b84e2ea04b3cb.
+The rewrap changed docstring text only: the abstract syntax tree of each changed script, with its
+docstrings removed, is identical before and after (proof script and output in
+<code>briefs/msa_architecture/lint_rewrap_proof/</code> in the private data folder). Ten docstrings were
+reworded, not only rewrapped, because their first sentence was too long for one line: the module
+docstrings of <code>e00713_smoke.py</code> and <code>e00713_token_diagnostic.py</code>, and the docstrings of
+<code>contrast_cells</code> and <code>cmd_contrasts</code> in <code>e00713_figures.py</code>, <code>cmd_headline</code> and <code>cmd_swaps</code> in
+<code>e00713_score.py</code>, <code>audit_triggers</code> and <code>median_minus_mean</code> in <code>e00713_report.py</code>,
+<code>limit_gpu_memory</code> in <code>e00713_attention.py</code>, and <code>run_frame_timing</code> in <code>e00713_inputs.py</code>. Each
+keeps its meaning.</p>
+<p><strong>No fit was rerun, and four scripts now refuse the stored states.</strong> <code>e00713_attention.py extract</code>
+hard-codes no accepted old hash and has no <code>--accept-code-change</code> flag, so it refuses outright.
+<code>e00713_fit.py</code> checks the gate file first, so a resume needs <code>--accept-gate-change
+e85b84e2ea04b3cb</code> as well as <code>--accept-code-change e85b84e2ea04b3cb</code>. <code>e00713_predict.py</code> refuses
+a stage 3 log with another code hash unless <code>--accept-code-change</code> names the old hash.
+<code>e00713_waive_gate.py</code> would refuse to write the waiver again, because it pins the old hash and
+also pins the sha256 of <code>e00713_known_answer.py</code>, which changed from 8fa3cfbdac29 to b90bd59cf987.
+<code>e00713_attention_proof.py</code> now exits with status 1, and all 48 stage 3 logs it reads print
+DIFFERS.</p>
+<p><strong>Option 1 as written covers KA3 only, and the waiver covers KA12 as well.</strong> KA12 also failed at the
+amended gate: arm <code>G</code> followed 0.0395 against the limit of arm <code>M</code> minus 0.05 = 0.0918, so the stem
+of arm <code>G</code> did not follow a step within 0.05 of arm <code>M</code>, which bears on the stem readings of R2 and
+R3. The manager relayed the maintainer's verbatim "Go ahead." in answer to a question that included
+KA12 (<code>G</code> 0.039 against 0.092). The quoted decision above is unchanged, and the waiver record
+carries both statements.</p>
+<p><strong>Option 1 carries its own risk: a null result on the real folds may come from the slow learning the
+gate found.</strong> The gate and the option-5 diagnostics showed that early stopping on validation loss
+can end training before arm <code>M</code> learns to read a step. An H2 near zero then cannot separate "the
+recent days carry little" from "the training budget stops before the read-out learns to use them",
+as the gate and the option-5 diagnostics showed in synthetic world W1. The waiver does not remove
+that ambiguity, and a null H2 therefore does not close the line without this caveat.</p>
+<p><strong>Operator caution: a full rerun of <code>e00713_known_answer.py</code> deletes the gate file, waived or not.</strong>
+The waiver script must be run again after a rerun, and it refuses when the last-run results are not
+those of the amended gate.</p>
+<p><strong>The known-answer gate was waived by the maintainer on 2026-11-23 (design amendment 4), after it
+failed KA3 and KA12. The era secondary set R1 to R3 and any statement about following level shifts
+are therefore reported as unsupported by a passing known-answer test, and every verdict, headline,
+and take-home message of this experiment carries that fact.</strong></p>
+<h2 id="pre-registered-contrasts">Pre-registered contrasts</h2>
+<p><strong>There are two counted contrasts, each at two groups of Primaries, so four counted readings, each
+read at 100 × (1 − 0.05 / 4) = 98.75%.</strong> Each contrast is the treatment minus the reference in CRPS
+on the headline band, with seeds 0 to 4 of both arms. The six signed-MW Primaries are D5, D9, D10,
+D11, D14, and D16. The eight MVA-only Primaries are D2, D3, D4, D8, D12, D19, D21, and D22, and
+every number for them carries the label "reactive power assumed zero".</p>
+<table>
+<thead>
+<tr>
+<th>Id</th>
+<th>Contrast</th>
+<th>Question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H1</td>
+<td><code>M*</code> minus <code>C</code></td>
+<td>Does the MSA network beat the Candidate?</td>
+</tr>
+<tr>
+<td>H2</td>
+<td><code>M*</code> minus <code>P</code></td>
+<td>Do the 14 most recent days carry the gain (real minus placebo)?</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Report-only readings, at 95%, on seeds 0 and 1 of both arms:</strong></p>
+<ul>
+<li><code>M*</code> minus <code>A</code> (named H3: does the within-day attention matter?).</li>
+<li><code>M*</code> minus <code>K</code>, <code>K</code> minus <code>N</code>, and <code>M*</code> minus <code>N</code>.</li>
+<li><code>E</code> minus <code>M*</code>, and <code>G</code> minus <code>M*</code> when arm <code>G</code> is fitted.</li>
+<li>The pairwise differences among <code>M1</code>, <code>M2</code>, and <code>M3</code> on the screen folds.</li>
+<li>Every contrast for all 16 Primaries pooled, and for D15 with D18.</li>
+<li>Every contrast by lead band, by Primary, with one Primary left out, and with one month left out.</li>
+<li>The normalised mean absolute error (MAE) of the median beside every CRPS contrast.</li>
+</ul>
+<h2 id="arms">Arms</h2>
+<table>
+<thead>
+<tr>
+<th>Arm</th>
+<th>What the arm is</th>
+<th>Fitted or stored</th>
+<th>Seeds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>C</code></td>
+<td>The Candidate <code>P7+D50</code> of experiment 667: two power lags, neighbour summaries, table T, mixture head</td>
+<td>Seeds 0 and 1 stored; seeds 2 to 4 refitted into a new root</td>
+<td>0 to 4</td>
+</tr>
+<tr>
+<td><code>M1</code></td>
+<td>MSA network; weather and date-time encoders loaded from the Candidate chain's pre-training and frozen in every stage</td>
+<td>Fitted</td>
+<td>0, 1 (screen folds)</td>
+</tr>
+<tr>
+<td><code>M2</code></td>
+<td>As <code>M1</code>, with the loaded encoders trained in every stage</td>
+<td>Fitted</td>
+<td>0, 1 (screen folds)</td>
+</tr>
+<tr>
+<td><code>M3</code></td>
+<td>As <code>M1</code>, with the encoders initialised at random and trained in every stage</td>
+<td>Fitted</td>
+<td>0, 1 (screen folds)</td>
+</tr>
+<tr>
+<td><code>M*</code></td>
+<td>The arm among <code>M1</code>, <code>M2</code>, and <code>M3</code> with the lowest held-out validation loss</td>
+<td>Selected, then fitted on all 8 folds</td>
+<td>0 to 4</td>
+</tr>
+<tr>
+<td><code>P</code></td>
+<td><code>M*</code> with its 14 history rows replaced by 14 random past days of the same Primary (the placebo)</td>
+<td>Fitted</td>
+<td>0 to 4</td>
+</tr>
+<tr>
+<td><code>A</code></td>
+<td><code>M*</code> without the within-day attention (across-day attention and read-out kept)</td>
+<td>Fitted</td>
+<td>0, 1</td>
+</tr>
+<tr>
+<td><code>K</code></td>
+<td><code>M*</code> with both trunk attentions replaced by the identity: the read-out and the head only, a learned kernel over the 14 same-half-hour readings</td>
+<td>Fitted</td>
+<td>0, 1</td>
+</tr>
+<tr>
+<td><code>N</code></td>
+<td><code>M*</code> with the top row only: no history rows, no power</td>
+<td>Fitted (about 2 minutes)</td>
+<td>0, 1</td>
+</tr>
+<tr>
+<td><code>E</code></td>
+<td><code>M*</code> with a 1-D convolution stem over the 48 half-hours of each history row; secondary</td>
+<td>Fitted</td>
+<td>0, 1</td>
+</tr>
+<tr>
+<td><code>G</code></td>
+<td><code>M*</code> with a recurrent stem in place of the convolution stem; secondary and optional</td>
+<td>Fitted only if the compute plan allows</td>
+<td>0, 1</td>
+</tr>
+</tbody>
+</table>
+<p><strong>This page says "within-day attention" and "across-day attention" and not AlphaFold's "row
+attention" and "column attention", because the two names are easy to swap.</strong> Within-day attention
+lets the 48 tokens of one day attend to each other. Across-day attention lets the 15 tokens at one
+half-hour attend to each other across days.</p>
+<p><strong>Removing the trunk's across-day attention does not give arm <code>N</code>.</strong> The similar-day read-out
+(Method, architecture) is itself a path across days, so a network whose trunk does nothing is still
+a learned kernel over 14 same-half-hour readings with a weekday prior. Arm <code>K</code> is that network.
+<code>M*</code> minus <code>K</code> says what the axial trunk adds to the read-out, and <code>K</code> minus <code>N</code> says what the
+read-out adds to the top row alone.</p>
+<p><strong>Reference rows, never refitted:</strong> the month-by-half-hour climatology
+(<code>baseline_forecasters.climatology.ClimatologyForecaster</code>, trained on each fold's training window),
+and the manual heuristic and BG2 where stored rows cover the scored keys. The scorer states which
+reference rows are missing.</p>
+<h2 id="decision-rule">Decision rule</h2>
+<p><strong>Each group is read on H1, with D the point estimate and [L, U] the 98.75% bootstrap interval. The
+group's reading is the first row that holds.</strong> The three guards are the t guard (the t interval on
+the 8 monthly differences of the seed-averaged forecasts, at 98.75% with 7 degrees of freedom,
+excludes zero on the side the bootstrap interval does), the seed guard (the contrast has the same
+sign for each of the 5 seeds taken alone), and the noise-floor guard (the point estimate is at least
+twice the seed-noise standard error at 5 seeds, 0.034 at the six signed-MW Primaries and 0.090 at
+the eight MVA-only Primaries).</p>
+<table>
+<thead>
+<tr>
+<th>Order</th>
+<th>Group reading</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>clear loss</td>
+<td>L &gt; +τ, and all three guards hold</td>
+</tr>
+<tr>
+<td>2</td>
+<td>loss</td>
+<td>L &gt; 0, and all three guards hold</td>
+</tr>
+<tr>
+<td>3</td>
+<td>gain</td>
+<td>U &lt; 0, D ≤ −τ, and all three guards hold</td>
+</tr>
+<tr>
+<td>4</td>
+<td>small gain</td>
+<td>U &lt; 0, and the seed guard holds for at least 4 of the 5 seeds</td>
+</tr>
+<tr>
+<td>5</td>
+<td>no detectable difference</td>
+<td>L &gt; −δ and U &lt; +δ, with δ = 0.06 at the six signed-MW Primaries and 0.16 at the eight MVA-only Primaries</td>
+</tr>
+<tr>
+<td>6</td>
+<td>cannot tell</td>
+<td>anything else</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The smallest gain worth porting is τ = 0.05 points of CRPS.</strong> The protocol's highest tier is 0.03,
+for a new head. The MSA neural network replaces the Candidate's whole neural network and its input
+pipeline, and a live
+service would need a replacement for ERA5 on the 4 newest history rows, so the threshold is set
+above that tier. The experiment is <code>kind: other</code>, because the Candidate is not the Primary demand
+research default, so the threshold belongs to this plan.</p>
+<p><strong>The experiment's verdict is the first row that holds.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Order</th>
+<th>Verdict</th>
+<th>Condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>refuted</code></td>
+<td>"clear loss" in either group</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>not supported</code></td>
+<td>"loss" in either group; or "no detectable difference" in both groups</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>supported</code></td>
+<td>"gain" in both groups, H2's upper limit below 0 in both groups, and every <code>supported</code> guard holds</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>partly supported</code></td>
+<td>"gain" in one group and no "loss" in the other; or "gain" in both groups with H2's upper limit at or above 0 in a group, or with a <code>supported</code> guard failing</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>small gain</code></td>
+<td>"small gain" in at least one group, with no "gain" and no "loss" in either group</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>inconclusive</code></td>
+<td>anything else</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Reading 4 follows the <code>ml-experiment</code> skill:</strong> an interval that excludes zero in the predicted
+direction but falls under the threshold, or is not secured at the threshold, is <code>small gain</code> and
+never <code>inconclusive</code>. <strong>Reading 5 uses the detectable difference δ and not τ</strong>, because an interval
+inside ±0.05 is out of reach with 5 seeds and 8 months. The write-up words reading 5 as "a
+difference larger than 0.06 (0.16 at the eight MVA-only Primaries) is ruled out; a gain of 0.05 is
+not".</p>
+<p><strong>The guards for <code>supported</code></strong> are these four: the sign of H1 holds with each Primary left out in
+turn and with each month left out in turn; the q01 and q99 pinball loss of <code>M*</code> is within 0.05 of
+the Candidate's in each group (one-sided 95%); the normalised MAE of the median moves the same way
+as CRPS; and H1 keeps its sign in swap (a) of "Three checks on history weather".</p>
+<p><strong>H3, <code>M*</code> minus <code>K</code>, and <code>K</code> minus <code>N</code> change no verdict.</strong> They say which part of the network did
+the work, and they choose the follow-up.</p>
+<p><strong>Stop rule for the line.</strong> A verdict of <code>not supported</code> or <code>refuted</code> closes the last-14-days axial
+line, so the 28-row layout (a follow-up with 14 target rows and 14 history rows) does not run. A
+retrieval follow-up, which picks the 14 history rows by similarity to the target day, may still run
+after <code>not supported</code>, but only when H2 is clearly negative and <code>M*</code> is not clearly worse than <code>C</code>,
+because retrieval tests a different source of information.</p>
+<p><strong>What the design cannot do.</strong> τ is below the detectable difference δ in both groups. A true gain
+of exactly τ will most often read <code>small gain</code> or <code>inconclusive</code>, and a tie can be read as "no
+difference larger than δ", never as "no difference larger than τ".</p>
+<h2 id="detectable-effect">Detectable effect</h2>
+<p><strong>With 5 seeds per arm, the design can detect a difference from the Candidate of about 0.06 points
+of
+CRPS at the six signed-MW Primaries and 0.07 to 0.16 at the eight MVA-only Primaries, and no
+smaller.</strong> The two stored seeds of the Candidate alone would resolve only 0.09 at the six signed-MW
+Primaries and 0.11
+to 0.25 at the eight MVA-only Primaries, which is why the Candidate is refitted for seeds 2 to 4. A
+gain of the size
+that experiments 699, 709, and 711 failed to resolve (0.03 to 0.07) may still end <code>inconclusive</code> or
+<code>small gain</code> here.</p>
+<p><strong>The calculation scores the Candidate's two stored seeds over the 8 folds, on the headline band,
+with valid times from 2026-07-01 dropped.</strong> The seed-noise standard error of a contrast between two
+arms with n seeds each, over 8 months, is the monthly standard deviation of seed 0 minus seed 1
+divided by √(8n). The detectable difference δ is 3.48 standard errors (99.17% two-sided, 80%
+power). It assumes the MSA arm is as noisy as the Candidate.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>CRPS of the seed-mean forecast, pooled over rows</th>
+<th>The same, mean of the 8 monthly means</th>
+<th>Mean over months of seed 0 minus seed 1</th>
+<th>Standard deviation of that difference over 8 months</th>
+<th>Half-hours</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The six signed-MW Primaries</td>
+<td>3.203</td>
+<td>3.175</td>
+<td>+0.001</td>
+<td>0.108</td>
+<td>611,055</td>
+</tr>
+<tr>
+<td>The eight MVA-only Primaries</td>
+<td>3.704</td>
+<td>3.694</td>
+<td>+0.059</td>
+<td>0.285 (0.136 without 2025-11)</td>
+<td>816,768</td>
+</tr>
+<tr>
+<td>D15 and D18</td>
+<td>8.106</td>
+<td>8.002</td>
+<td>+0.127</td>
+<td>0.974</td>
+<td>203,040</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Seeds per arm</th>
+<th>Standard error, six signed-MW Primaries</th>
+<th>Standard error, eight MVA-only Primaries</th>
+<th>Detectable δ, six signed-MW Primaries</th>
+<th>Detectable δ, eight MVA-only Primaries</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>0.027</td>
+<td>0.071 (0.034)</td>
+<td>0.094</td>
+<td>0.25 (0.12)</td>
+</tr>
+<tr>
+<td>5</td>
+<td>0.017</td>
+<td>0.045 (0.022)</td>
+<td>0.059</td>
+<td>0.16 (0.07)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>One seed of the Candidate failed in fold 2025-11 at the eight MVA-only Primaries</strong> (CRPS 3.955
+against 3.263 for the
+other seed, seeds 0 and 1 over 24 to 240 h), which doubles the eight MVA-only Primaries' seed noise.
+The stored arm is used as it
+is. The figures are
+lower bounds, because they leave out the month-to-month variation of the true difference, which the
+month-block bootstrap and the t guard add. The decision rule uses δ = 0.06 at the six signed-MW
+Primaries and 0.16 at
+the eight MVA-only Primaries. Known-answer check KA8 requires the implementer's scorer to reproduce
+the first table.</p>
+<h2 id="screen-and-the-choice-of-m">Screen, and the choice of <code>M*</code></h2>
+<p><strong>The screen follows the standing practice: four folds first, every number labelled interim.</strong> The
+screen folds are 2025-11, 2026-01, 2026-03, and 2026-06, with seeds 0 and 1, for <code>M1</code>, <code>M2</code>, and
+<code>M3</code>. The Candidate's stored forecasts match the screen's folds and recipe exactly.</p>
+<ul>
+<li><strong>Choice of <code>M*</code>, without reading any scored forecast.</strong> <code>M*</code> is the arm with the lowest mean
+  held-out validation loss, where the loss is the unweighted mixture negative log-likelihood of the
+  stage 3 state on the stage 3 validation samples (held-out origin days, all before the fold's
+  cutoff, at lead days 1, 2, 4, 7, 10, and 14), averaged over the 4 screen folds and 2 seeds. An
+  arm within 0.005 of the best loses to the simpler arm, in the order <code>M1</code>, <code>M2</code>, <code>M3</code>. The
+  selection script reads the fit logs only and runs before any MSA forecast is scored.</li>
+<li><strong>Result of the selection.</strong> <code>M*</code> is <code>M1</code>. The mean stage 3 validation loss is 0.4145 for <code>M1</code>,
+  0.4121 for <code>M2</code>, and 0.4132 for <code>M3</code>, all within 0.005 of the best, so the simplest arm wins. The
+  sanity rule and the stop rule did not fire.</li>
+<li><strong>Caveat on the selection.</strong> A later fold's validation days fall inside earlier scored months
+  (fold 2026-03 holds out days in 2025-11 to 2026-02). Those days are training-window data of the
+  later fold, used as every early-stopping set in the recipe uses them. No scored forecast of any
+  arm enters the selection.</li>
+<li><strong>Order of work after the selection.</strong> The fits ran in this order: <code>P</code> on the screen folds; apply
+  the sanity rule and the
+  stop rule; then fit <code>M*</code> on the other four folds (2025-12, 2026-02, 2026-04, 2026-05), <code>P</code> on
+  those four, <code>A</code>, <code>K</code>, <code>N</code>, and <code>E</code> on all 8, seeds 2 to 4 of <code>M*</code> and <code>P</code>, and arm <code>G</code> last if the
+  compute plan allows.</li>
+<li><strong>Sanity rule.</strong> If <code>M*</code> minus <code>P</code> is positive in both groups on the screen folds, stop and audit
+  (audit trigger 1), because a network that gains nothing from real recent days over random days is
+  either broken or indifferent to its history rows.</li>
+<li><strong>Stop rule.</strong> Stop if <code>M*</code> minus <code>C</code> (seeds 0 and 1) on the screen folds is above +0.15 in both
+  groups, or above +0.10 in both groups and positive in at least 3 of 4 folds in both groups. The
+  result is then written up from the screen as <code>not supported</code>, labelled as a screen. The scorer
+  prints the reading a second time with fold 2025-11 left out, because the Candidate's failed seed
+  sits in that fold; the rule itself uses all four folds.</li>
+<li><strong>No tuning on the scored folds.</strong> Width, depth, heads, and learning rates are fixed in the Method
+  section. A change after the screen is labelled post hoc and leaves the pre-registered contrasts
+  unchanged.</li>
+</ul>
+<h2 id="method">Method</h2>
+<p><strong>Every setting below was fixed before the real folds were scored, and none was tuned on the scored
+folds.</strong></p>
+<h3 id="architecture">Architecture</h3>
+<ul>
+<li><strong>The sample is one Primary, one origin day, and one lead day k (1 to 14).</strong> The matrix has 15
+  rows of 48 half-hours: row 0 is the target row (valid times <code>c + 24 (k − 1) h + 0.5 j h</code>, where
+  <code>c</code> is the contract origin) and rows 1 to 14 are the history rows of ages 2 to 15 days, newest
+  first (valid times <code>c − 24 a h + 0.5 j h</code>). That is 720 tokens per sample (48 for arm <code>N</code>).</li>
+<li><strong>Rows are 24-hour blocks that start at 12:00 UTC</strong>, so 14 target rows tile the 672 contract
+  half-hours exactly, and column <code>j</code> of every row has the same time of day. A half-hour is stamped
+  with its period end. The contract origin is 12:00 UTC on day D, the native origin is 3 h earlier
+  (09:00 UTC), and the weather run is the ECMWF ENS 00Z run of day D, available at 09:00 UTC.</li>
+<li><strong>A row holds two local calendar days</strong>, so the day type is set per token, not per row: the local
+  weekday (0 to 6, Europe/London) of the token's own half-hour, or 7 where that local day is a bank
+  holiday in England. Columns are UTC half-hours, so a history row on the other side of a clock
+  change is offset by one hour of local time, which the write-up states as a limitation.</li>
+<li><strong>Every target token has exactly two history tokens of its own weekday in its column</strong>, because
+  the history token of age a is 24 (a + k − 1) h before the target token, and that is a multiple of
+  7 days for two ages in 2 to 15.</li>
+<li><strong>The inputs per batch of B samples</strong> are: <code>top_weather</code> (B, 48, 21), 7 ENS-mean weather columns
+  and 14 B1 columns (B1 is the set of 14 trailing-temperature and solar-gain columns of experiment
+  569); <code>top_spread</code> (B, 48, 7), the ENS spread (zero in stage 1); <code>top_datetime</code> (B, 48, 21), 21
+  solar-geometry, calendar, and holiday columns; <code>hist_weather</code> (B, 14, 48, 21) and <code>hist_datetime</code>
+  (B, 14, 48, 21) at the token's own time; <code>hist_power</code> (B, 14, 48), power over capacity
+  standardised per Primary with the fold's target mean and standard deviation, clipped at ±5, and 0
+  where not visible; <code>hist_visible</code> (B, 14, 48); <code>row_exists</code> (B, 14); <code>day_type_top</code> (B, 48) and
+  <code>day_type_hist</code> (B, 14, 48); the Primary index and <code>lead_day</code> (B,); and the <code>target</code> and <code>weight</code>
+  (B, 48). The weather columns, B1 columns, and their standardisation are the Candidate's.</li>
+<li><strong>Token construction.</strong> Width is 64. The weather encoder (29 → 64 → 32) and the date-time encoder
+  (29 → 64 → 32) are the Candidate's, each reading an 8-wide Primary embedding. Every token is
+  <code>P_w e_w + P_d e_d + tok_emb(primary) + col_emb(j) + row_part</code>, where <code>P_w</code> and <code>P_d</code> are linear
+  maps 32 → 64 without bias, <code>tok_emb</code> is a new 16 × 64 Primary embedding, and <code>col_emb</code> is a
+  learned 48 × 64 time-of-day embedding. The target row's <code>row_part</code> is a lead-day embedding (14 ×
+  64), a map of the 7 spread columns (initialised at zero), and a learned masked-power token. A
+  history row's <code>row_part</code> is an age embedding (14 × 64) plus <code>u z + b</code> where the token is visible
+  (<code>z</code> is the standardised power) and a learned vector where it is not.</li>
+<li><strong>Two axial blocks</strong>, pre-LayerNorm, residual, dropout 0.1. Each block applies within-day
+  attention (4 heads, width 64, over the 48 tokens of each row), then across-day attention (4
+  heads, over the 15 tokens of each column, with a learned bias per head and key row, and rows with
+  <code>row_exists</code> False excluded as keys), then a transition network 64 → 128 → 64 with GELU (the
+  Gaussian error linear unit). The output projection of each attention and the last layer of each
+  transition start at zero, so an untrained trunk is the identity.</li>
+<li><strong>The similar-day read-out</strong> is an addition to the maintainer's sketch, made so that an untrained
+  network gives a weighted mean of similar days, and the maintainer kept it. For the target token at
+  column <code>j</code>, a logit for each visible history row is a scaled dot product of two 64 → 32 maps of
+  the layer-normalised tokens, plus a table <code>β_day[day type of the target token, day type of the
+  history token]</code> (8 × 8) and a per-age bias <code>β_age</code>. A softmax over the visible rows gives weights
+  <code>α</code>, a weighted mean <code>base</code>, and a weighted spread <code>s</code>; with no visible row, <code>base = 0</code>, <code>s = 0</code>,
+  and a flag <code>no_history = 1</code>. The key map and <code>β_age</code> start at zero. The query map has PyTorch's
+  default random initialisation, because with both maps at zero each gradient is proportional to the
+  other map and neither map would ever train. <code>β_day</code> starts at 3.0 for the
+  same day type, 1.5 for two different Monday-to-Friday day types and for Sunday with a bank
+  holiday, and 0 otherwise. A Monday-morning target token therefore starts with about 50% of the
+  weight on the two Monday mornings, 45% on the eight other working-day mornings,
+  and 5% on the
+  four weekend mornings. The read-out query also takes a map <code>w_lead</code> (14 → 32, no bias, default
+  random initialisation) of the one-hot lead day, added to <code>W_q h_0</code> (amendment 2).</li>
+<li><strong>The head is the Candidate's mixture.</strong> A network <code>[h_0 (64), base, s, no_history, one-hot lead
+  day
+  (14)] → 64 → 9</code> gives 3 mixture weights, 3 means, and 3 log standard
+  deviations, initialised as the Candidate's
+  head is (output weights zero, means at −0.5, 0, and +0.5), with <code>base</code> added to the 3 means. The
+  loss is the mixture negative log-likelihood on the standardised target, and the 11 quantiles
+  (0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99) come from the mixture, then are
+  rescaled by the target standard deviation and mean into shares of capacity. No widening factor is
+  applied to any arm. KA1 asserts that an untrained network forecasts a 3-component mixture centred
+  on the day-type-weighted mean of the last 14 days at the same half-hour.</li>
+<li><strong>Parameter count.</strong> The built module is about 129,999 parameters (the encoders 8,128, the token
+  maps and embeddings 10,688, two axial blocks 100,600, the read-out 4,750, and the head 5,833);
+  <code>M1</code> trains 121,871 of them. Arm <code>A</code> has 33,536 fewer parameters than <code>M1</code> (33,280 attention
+  weights and 256 in the two LayerNorms of the removed within-day sublayers), and arm <code>K</code> has 67,192
+  fewer (66,560 attention weights, 120 key-bias values, and 512 in the removed LayerNorms). Both
+  counts are those of the built modules.
+  The Candidate's lag network has about 30,000 parameters. A check script asserts every count, and
+  the count of the built module is the reference.</li>
+<li><strong>Arm differences.</strong> <code>M1</code>, <code>M2</code>, and <code>M3</code> differ only in the encoders: <code>M1</code> and <code>M2</code> load the
+  weather, date-time, and embedding weights from the Candidate chain's pre-training for the same
+  fold and seed (trained on data before the fold cutoff), <code>M1</code> freezes them, and <code>M3</code> starts them at
+  random. <code>A</code> replaces the within-day attention of both blocks with the identity, <code>K</code> replaces both
+  attentions, <code>P</code> changes the batch only, and <code>N</code> builds the target row only (<code>base = 0</code>,
+  <code>no_history = 1</code>).</li>
+<li><strong>Arms <code>E</code> and <code>G</code> add a stem</strong> on the history rows, before the first block. The stem reads two
+  channels per half-hour (the standardised power, 0 where not visible, and the visibility flag).
+  Arm <code>E</code> uses two 1-D convolutions of kernel 5 with zero padding (2 → 16 → 16 channels) and a
+  linear layer 16 → 64, 2,560 parameters, each output seeing 9 half-hours (4.5 h). Arm <code>G</code> uses a
+  bidirectional gated recurrent unit of hidden width 16 per direction and a linear layer 32 → 64,
+  4,032 parameters. The last layer of each stem starts at zero, so an untrained <code>E</code> or <code>G</code> equals an
+  untrained <code>M*</code>. Both stems read only the history power and visibility, which KA5 poisons.</li>
+<li><strong>A free read-out:</strong> every fitted <code>M*</code> is also scored with all history power masked at prediction,
+  which shows how the forecast degrades when telemetry is missing.</li>
+<li><strong>No monthly offset knots.</strong> The Candidate's offset tracks slow level changes; the history rows do
+  that for the MSA network. Arm <code>N</code> has neither.</li>
+</ul>
+<h3 id="training-regime">Training regime</h3>
+<ul>
+<li><strong>Data.</strong> The 16 Primaries, with cleaned power (the half-hours the <code>substation_zero</code> rule flags
+  are dropped and counted per fold) and the D15 and D18 rows before 2025-03-01 cut, everywhere:
+  training rows, history rows, and actuals. Stage 1 uses ERA5 and CAMS weather estimates; stages 2
+  and 3 use ENS forecasts. Calendar columns are present, as in the Candidate, which departs from the
+  skill's advice of a control without them. Arm <code>N</code> and the climatology row show what the calendar
+  and the weather give alone.</li>
+<li><strong>Three stages, as experiment 667.</strong> Stage 1 trains on daily origins from 2019-09 to the cutoff
+  with ERA5 and CAMS target weather, spread zero, targets cut at the cutoff minus 3.5 h, weight 1,
+  and learning rate 5e-4 (2e-4 for the loaded encoders of <code>M2</code>). Stage 2 trains on daily origins in
+  the 730 days before the cutoff (from 2024-04-01) with the ENS 00Z run, targets cut a further 3
+  days, weight 1, and learning rate 2e-4 (5e-4 for the spread map). Stage 3 fine-tunes with
+  targets cut a further 7 days (half weight for the 7 days before), weight 0.5 to the power of age
+  in days over 90, learning rate 2e-4, and synthetic lag-only shifts of experiment 581 added to the
+  history power and never to a target.</li>
+<li><strong>One stated departure: the trunk is kept from stage 1 into stage 2.</strong> The Candidate attaches a
+  fresh mixer in stage 2, because its fine-tuning mixer has more inputs. The MSA trunk has the same
+  inputs in both stages apart from the spread map, so it keeps what 6 years of ERA5 taught it. A
+  second departure is 300 warm-up steps before a constant rate, because of the attention layers.</li>
+<li><strong>A third departure: the MSA network trains on fewer target rows than the Candidate.</strong> The matrix
+  holds the target half-hours from the contract origin (12:00 UTC) to the 672nd half-hour after it.
+  On fold 2026-03 the Candidate's training rows include 37,381 rows before the contract origin
+  (leads
+  0.5 to 2.5 hours) and 175,925 rows after the 672nd half-hour, and the MSA network never trains on
+  them. The 730-day window of stages 2 and 3 is cut by origin day, where the Candidate cuts by valid
+  time, which removes up to 14 origin days for the folds whose window starts after 2024-04-01
+  (2026-05
+  and 2026-06). The scored rows are identical, so no scored number depends on this difference, and
+  nothing leaks.</li>
+<li><strong>A fourth departure, made after two failed gate runs: the lead day has two more paths (amendment
+  2).</strong> The original design gave the lead day one path, the embedding <code>lead_emb</code> added to the
+  tokens of the target row. The first known-answer gate run (J1) failed because the read-out's
+  <code>W_q</code> and <code>W_k</code> both started at zero and never trained (amendment 1). The second J1 run failed
+  KA3 alone, with a follow share of 0.0099 for arm <code>M</code> against the 0.75 threshold. An audit found
+  no implementation fault. The trained network was blind to the lead day: <code>lead_emb</code> shrank to a
+  mean length of 0.08, and setting the lead day to 14 moved the median by 0.012 standardised units
+  against a step of 2.1. A visible step persists to lead day 1 with probability 0.835 but averages
+  0.28 over the 14 lead days, so a lead-blind network does best by ignoring the step. The amendment
+  adds the one-hot lead day to the read-out query through <code>w_lead</code> (448 weights) and to the head's
+  input (896 weights). Both paths start with no effect, so KA1 holds for every arm. No threshold,
+  budget, arm, or decision rule changes. The amendment was made after the audit, and the three
+  failing J1 results (the dead read-out, then KA3 at 0.0099) stay on this page as the reason for it.</li>
+<li><strong>A fifth departure, made after three failed gate runs: a larger budget for the synthetic fits
+  (amendment 3).</strong> The gate has now failed three times, and all three results stay on this page.
+  The first run (commit 3ac110652) failed KA2 (arm <code>N</code> 0.0476 against 0.02), KA3 (arm <code>M</code> 0.0348
+  against 0.75), KA10, and KA12, because the read-out's <code>W_q</code> and <code>W_k</code> were both zero. The second
+  run (eb1942601) failed KA3 alone, at 0.0099, because the network ignored the lead day. The third
+  run (90b9de2c8), with the lead-day path, failed KA3 alone again: arm <code>M</code> 0.0186, arm <code>E</code> 0.1268,
+  arm <code>G</code> 0.0005, arm <code>P</code> −0.00007, arm <code>N</code> 0, with KA2, KA4, KA5, KA6, KA10, and KA12 passing.
+  A diagnostic on the same synthetic world W1 then suggested that the synthetic fits were stopping
+  early. <strong>The amended gate raises the synthetic fits to at most 400 passes with a patience of 30.</strong>
+  The amendment therefore came from a look at the very world that the gate uses, and the page says
+  so. KA3 is still scored at the pre-registered state, the best-validation state of each fit, with
+  the threshold of 0.75. The follow share at the final pass, and every 20 passes, is recorded as a
+  secondary reading that never gates. If the amended gate fails KA3 at the pre-registered state,
+  experiment 713 is reported as failing its gate. Every threshold, the real folds' budgets, and the
+  arm list are unchanged. The amended gate failed KA3 and KA12 (see the section on the known-answer
+  gate above).</li>
+<li><strong>Shared by all stages.</strong> AdamW with weight decay 1e-3 and gradient clipping at 1.0; batch of 256
+  samples; at most 60 passes with patience 8; loss <code>(weight × nll).sum() / weight.sum()</code> over finite
+  targets. A pass visits every (Primary, origin day) once, with one lead day drawn uniformly,
+  seeded by (seed, pass). Block dropout masks every history power token on 25.5% of origin days and
+  the newest history row on 4.5%.</li>
+<li><strong>Under-training is checked and not assumed away.</strong> One lead day per pair means a pass shows one
+  fourteenth of the target half-hours a pass of the Candidate shows. Every fit logs, per stage, the
+  pass at which early stopping fired and whether the cap was hit. A stage that ends at the 60-pass
+  cap is rerun from its starting state at 120 passes before any score of that arm is read, and the
+  report lists every rerun. A rerun repeats the 60 passes of the first attempt, so a capped stage
+  costs
+  up to 180 passes of GPU time in total, and phase 12 of the compute plan covers those reruns.
+  Drawing more lead days per pair is not adopted, because it changes the sample weights within an
+  origin.</li>
+<li><strong>Embargo and validation.</strong> Every training process runs with the cleaned power set to NaN from the
+  fold month's start, and prediction runs in a separate process. Early stopping uses held-out
+  origin days (7 days in every 42, with a purge of 15 days before and 9 days after), grouped by
+  origin day so that the 14 lead days of one origin sit on one side. A training sample in the 6 days
+  after a purge reads a held-out block's power as history; this touches early stopping and the
+  choice of <code>M*</code> only, never a scored forecast.</li>
+<li><strong>Folds and refits.</strong> One refit per month, with the cutoff at 00:00 UTC on the first day of the
+  month and no refit inside the month. The synthetic shifts of stage 3 are drawn over a range
+  that starts 16 days (768 half-hours) before the first target, so that the oldest history rows of
+  the first targets also get shifts.</li>
+<li><strong>Seeds.</strong> Seeds 0 to 4 as the arm table lists. A seed sets the initialisation, the pass order,
+  the lead-day draws, and the dropout draws.</li>
+<li><strong>Saved.</strong> The state after each stage, in this experiment's data folder, and the per-seed
+  forecasts with the Candidate's columns plus <code>seed</code>, <code>actual</code>, <code>lead_hours</code>, and <code>nwp_init_time</code>.</li>
+<li><strong>GPU hours.</strong> About 39 GPU-process-hours without arm <code>G</code> and about 44 with it (the Compute
+  section). The first fit times stage 3 of one fold once on the GPU and once on one CPU thread, and
+  the finished page records both.</li>
+</ul>
+<h3 id="measurement">Measurement</h3>
+<ul>
+<li><strong>Scored rows.</strong> The 8 monthly folds 2025-11 to 2026-06, one contract origin per day at 12:00 UTC
+  (672 half-hours per origin), under the row set id in the front matter. Valid times on or after
+  2026-07-01 are dropped for every arm, because that period is kept for a finalist. The four folds
+  2026-07 to 2026-10 of experiment 667 are not used.</li>
+<li><strong>Actuals.</strong> Cleaned power divided by the capacity in the series-capacity table. A join assertion
+  checks that every arm holds identical (series, forecast origin, valid time) keys before any score
+  is read.</li>
+<li><strong>Headline band.</strong> Leads from 24 h up to but not including 240 h after the 12:00 UTC origin
+  (target rows 2 to 10). Day 1 (0 to 24 h), days 11 to 14, and the protocol's days 1 to 10 band
+  (0 to 240 h) were planned as report-only readings and are not on this page.</li>
+<li><strong>Groups.</strong> The six signed-MW Primaries and the eight MVA-only Primaries, separately. All 16
+  pooled,
+  and D15 with D18, are report-only.</li>
+<li><strong>Metrics.</strong> CRPS, the normalised MAE of the median, coverage and pinball loss at q01, q05, q95,
+  and q99, q05 to q95 coverage and mean band width, threshold-weighted CRPS, and the avoidable
+  curtailment cost (report-only), by lead band, by Primary, and in the cold winter night, winter,
+  and time-of-day slices. The climatology, manual heuristic, and BG2 rows were planned beside them
+  and are not on this page.</li>
+<li><strong>Intervals.</strong> Each contrast uses seed-averaged forecasts (seed mean, then sorted quantiles, as in
+  experiment 667), a per-row loss frame paired on run and valid time, and a month-block bootstrap
+  with whole origin months as blocks and 100,000 resamples. The bootstrap pairs arms on seed, so
+  each seed-averaged arm enters with one pseudo-seed, and the three guards carry the seed noise. A
+  percentile bootstrap over 8 month blocks is too narrow: its "98.75%" half-width is about 2.3
+  standard errors of the monthly mean where a t distribution with 7 degrees of freedom needs 3.3,
+  and experiment 710's 99.17% interval excluded zero while a t test on the same monthly differences
+  gave p = 0.077. The t guard uses the t quantile directly.</li>
+<li><strong>Load shifts.</strong> Because the MSA network reads 14 days of power, the page reports the era set on
+  experiment 709's injected worlds (R1 to R3) for <code>M*</code>, <code>E</code>, <code>P</code>, <code>K</code>, and the Candidate, and the
+  follow share of <code>M*</code> on experiment 581's bank. The follow share of the Candidate on the same bank
+  and origins was not computed (see the limitations). Real logged-event charts for three Primaries
+  of each group show the lead-day-1 forecast of the Candidate and <code>M*</code>. NGED's logs may miss events,
+  so the real-event slices undercount. Every statement about following level shifts carries the
+  waiver sentence (unsupported by a passing known-answer test; amendment 4).</li>
+<li><strong>Figures.</strong> A day-ahead forecast and a full 14-day forecast of one origin, winter and summer, at
+  a signed-MW Primary and an MVA-only Primary, for <code>M*</code>, <code>E</code>, and <code>C</code>; per-Primary and per-fold
+  charts of CRPS and of CRPS
+  minus the Candidate's, split by Primary group; logged-event charts; and the injected-world charts.
+  The training-log table of mean stopping pass per stage and the count of reruns at the cap is
+  printed by <code>e00713_report.py</code>.</li>
+<li><strong>Anonymisation.</strong> Scores and forecasts are of Primaries. The page may say that a gas generator
+  and
+  a solar farm connect at D8, as experiment 709's page does. It never names either generator and
+  never plots or tabulates a metered generator's own time series.</li>
+<li><strong>Standing practices followed:</strong> monthly refits, cleaned data, the D15 and D18 cut, saved models,
+  reused stored predictions, a four-fold screen, tails, example plots, load-shift plots, and a
+  draft pull request. <strong>Earlier advice followed:</strong> experiment 710's leave-one-Primary-out reading,
+  experiment 632's injected-shift read-out for any network that reads lags, and experiment 709's
+  advice to score injected permanent changes and temporary moves together and against a placebo.
+  <strong>Earlier advice departed from:</strong> experiment 710 advises selecting the fine-tune on a
+  recency-weighted held-out set; this design keeps experiment 667's unweighted selection so that the
+  MSA arms and the Candidate share one recipe.</li>
+</ul>
+<h2 id="files">Files</h2>
+<p><strong>Code, in <code>ml-experiments/00713-msa-axial-attention-demand-network-part-1/</code></strong> (each script carries
+the id as <code>e00713_</code>):</p>
+<ul>
+<li><code>e00713_layout.py</code> is pure index arithmetic: sample to grid indices of the 15 rows, the visibility
+  mask, per-token day types, and the placebo draw.</li>
+<li><code>e00713_model.py</code> holds the network, the axial blocks, the two stems, the read-out, the head, and
+  the arm switches.</li>
+<li><code>e00713_inputs.py</code> adapts the Candidate chain's inputs: cleaned power, fold statistics, dense ERA5
+  and CAMS arrays, ENS target-row arrays, and the validation split.</li>
+<li><code>e00713_batch.py</code> assembles batches and runs the per-batch assertions and the poisoned-copy check;
+  <code>e00713_check_batch.py</code>, <code>e00713_check_inputs.py</code>, <code>e00713_check_layout.py</code>, and
+  <code>e00713_check_model.py</code> are the matching checks.</li>
+<li><code>e00713_arms.py</code>, <code>e00713_variants.py</code>, <code>e00713_train.py</code>, <code>e00713_fit.py</code>, and
+  <code>e00713_predict.py</code> define the arms and run the three stages and the prediction;
+  <code>e00713_select.py</code> chooses <code>M*</code> from the fit logs.</li>
+<li><code>e00713_bank.py</code>, <code>e00713_swap_c.py</code>, and <code>e00713_era.py</code> run the prediction-only read-outs: the
+  injected banks, the three weather swaps, and the era set.</li>
+<li><code>e00713_known_answer.py</code> builds the synthetic world and runs KA1 to KA12; <code>e00713_waive_gate.py</code>
+  writes the waiver record; <code>e00713_token_diagnostic.py</code> is the report-only token diagnostic.</li>
+<li><code>e00713_smoke.py</code> is a smoke job of one tiny fit that exercises a crash, a resume, a rebuilt log,
+  a prediction, and a score before the first real fit.</li>
+<li><code>e00713_score.py</code>, <code>e00713_protocol.py</code>, and <code>e00713_report.py</code> compute every contrast, interval,
+  and guard, and print the numbers of this page; <code>e00713_weather_lookahead.py</code> prints the look-ahead
+  check.</li>
+<li><code>e00713_figures.py</code> and <code>e00713_attention.py</code> draw the figures from stored forecasts and, for
+  attention, from a forward pass of the saved weights.</li>
+<li><code>run.sh</code> is the memory-capped wrapper, and <code>chain_seeds.sh</code> is the copy of experiment 667's chain
+  script for seeds 2 to 4.</li>
+</ul>
+<p><strong>Data, never committed, under
+<code>data/ml-experiments/00713-msa-axial-attention-demand-network-part-1/</code>:</strong></p>
+<ul>
+<li><code>work/models/&lt;arm&gt;/</code> holds the saved state after each stage, and <code>work/fits/&lt;arm&gt;/</code> the per-seed
+  forecasts (written by this experiment).</li>
+<li><code>work/logs/&lt;arm&gt;/</code> holds the per-fit stage logs, including the stopping pass of each stage and the
+  GPU peak.</li>
+<li><code>candidate_seeds/</code> holds the refitted Candidate chains for seeds 2 to 4 (written by this
+  experiment).</li>
+<li><code>bank713/</code> and <code>work/bank581/</code> hold the prediction-only read-outs on experiment 709's injected
+  worlds and on experiment 581's bank; <code>swap_c/</code> holds the swap (c) forecasts.</li>
+<li><code>score/</code> holds <code>headline.json</code>, <code>report_only.json</code>, <code>swaps.json</code>, <code>era_r1.json</code>, <code>era_r2_r3.json</code>,
+  <code>screen.json</code>, and <code>candidate.json</code>.</li>
+<li><code>work/known_answers_passed.json</code> records the waived gate.</li>
+<li>Briefs and reviews, in the private <code>data/ml-experiments/briefs/msa_architecture/</code>: <code>design.md</code>,
+  the code reviews, <code>run_log_713.md</code>, and <code>audit_713.md</code>.</li>
+</ul>
+<p><strong>Earlier experiments' files read:</strong> the stored Candidate forecasts, pre-trained encoders, fold
+statistics, and extended inputs of <a href="../../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result/">experiment
+667</a>; the
+injected worlds and the <code>none</code> bank of <a href="../../00709-era-signal-in-the-candidate-part-1/result/">experiment
+709</a>; the injected bank of experiment 581;
+and the code of experiments 397, 422, 428, 510, 558, 559, 560, 572, 574, 578, 581, 606, 610, 632,
+and 710, imported without edits.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
