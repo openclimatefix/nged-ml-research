@@ -560,8 +560,8 @@ change and records each finding that was not taken.
 on real rows of the fold 2025-11's training window, the 2-noise-unit threshold flags a shift on 0.198
 of the rows, four times the bar of 0.05. Phase 0 now tunes the threshold, over the grid 2.0 to 12.0
 in steps of 0.25 noise units, to the smallest value whose share of flagged real rows is at most
-0.05. The rows come from the earliest fold's training window, which lies inside the training window of every fold, and
-never from a scored month. The rows include the 2.5% that sit in logged events, which overstates
+0.05. The rows come from the earliest fold's training window, which lies inside the training
+window of every fold, and never from a scored month. The rows include the 2.5% that sit in logged events, which overstates
 the false alarms slightly, so the tuned threshold errs high. The table prints the miss rate by true
 age band, and Phase 0 stops with a message to the coordinator if no threshold meets the bar, or if
 A1 at the tuned threshold misses more than 0.6 of the shifts with a true age of 3 to 10 days. The
