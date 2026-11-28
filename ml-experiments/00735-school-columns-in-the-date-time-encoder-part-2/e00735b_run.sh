@@ -120,7 +120,11 @@ run_stage() {  # run_stage NAME PHASE-ENV COMMAND ARGS...: time one Python stage
   local name=$1 phase=$2; shift 2
   gpu_guard || { echo "$M $ARM $name not started: GPU busy (exit $EXIT_BUSY)"; return $EXIT_BUSY; }
   local t0; t0=$(date -u +%FT%TZ)
-  E00677_PHASE=$phase py "$D/e00735b_k1.py" "k1_$ARM" "$@" $A > "$R735/logs/${TAG}_$name.log" 2>&1
+  # The stage-1 log is appended to, so that a resumed stage 1 keeps the lines of the seeds that finished earlier
+  # (the R1 reproduction check reads them); every other stage's log is truncated.
+  local log="$R735/logs/${TAG}_$name.log"
+  [ "$name" = pretrain ] || : > "$log"
+  E00677_PHASE=$phase py "$D/e00735b_k1.py" "k1_$ARM" "$@" $A >> "$log" 2>&1
   local code=$?
   phase_time "$name" cuda "$t0" "$(date -u +%FT%TZ)"
   if [ $code -ne 0 ]; then echo "$M $ARM $name FAILED with exit code $code (see $R735/logs/${TAG}_$name.log)"; return 20; fi

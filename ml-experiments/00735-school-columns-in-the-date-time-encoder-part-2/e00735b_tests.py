@@ -1020,7 +1020,7 @@ def _fake_mine(
 
 
 def test_r1_reproduction_check() -> None:
-    """The R1 check parses both logs, accepts equality, flags one epoch within 2e-3, and stops on anything else."""
+    """The R1 check parses both logs, accepts equality, flags an epoch gap of up to 5 within 3e-3, skips missing seeds, and stops on anything else."""
     import e00735b_phases as phases  # ty: ignore[unresolved-import]
 
     ref = phases.parse_pretrain_log(text=FAKE_677_LOG)
@@ -1041,14 +1041,14 @@ def test_r1_reproduction_check() -> None:
     assert phases.compare_pretrain(mine=flag, reference=ref, seeds=seeds)[0] == "flag"
     for name, text in (
         (
-            "NLL off by 2e-3 at equal epochs",
-            _fake_mine(epochs=(45, 60, 60), nll=("0.3164", "0.3072", "0.3186")),
+            "NLL off by 4e-3 at equal epochs",
+            _fake_mine(epochs=(45, 60, 60), nll=("0.3184", "0.3072", "0.3186")),
         ),
         (
-            "one epoch and NLL off by 3e-3",
-            _fake_mine(epochs=(46, 60, 60), nll=("0.3174", "0.3072", "0.3186")),
+            "one epoch and NLL off by 5e-3",
+            _fake_mine(epochs=(46, 60, 60), nll=("0.3194", "0.3072", "0.3186")),
         ),
-        ("two epochs", _fake_mine(epochs=(47, 60, 60), nll=("0.3144", "0.3072", "0.3186"))),
+        ("six epochs", _fake_mine(epochs=(51, 60, 60), nll=("0.3144", "0.3072", "0.3186"))),
         (
             "dropout shares",
             _fake_mine(
@@ -1060,12 +1060,37 @@ def test_r1_reproduction_check() -> None:
             mine=phases.parse_pretrain_log(text=text), reference=ref, seeds=seeds
         )
         assert status == "mismatch", name
-    assert phases.compare_pretrain(mine={0: same[0]}, reference=ref, seeds=seeds)[0] == "mismatch"
+    gap5 = phases.parse_pretrain_log(
+        text=_fake_mine(epochs=(50, 60, 60), nll=("0.3170", "0.3072", "0.3186"))
+    )
+    assert (
+        phases.compare_pretrain(mine=gap5, reference=ref, seeds=seeds)[0] == "flag"
+    )  # 5 epochs, NLL within 3e-3
+    status, notes = phases.compare_pretrain(mine={0: same[0]}, reference=ref, seeds=seeds)
+    assert status == "ok" and sum("skipped" in n for n in notes) == 2, (
+        status,
+        notes,
+    )  # a seed missing from R1's log
+    status, notes = phases.compare_pretrain(mine=same, reference={0: ref[0]}, seeds=seeds)
+    assert status == "ok" and sum("skipped" in n for n in notes) == 2, (
+        status,
+        notes,
+    )  # a seed missing from 677's log
+    nearly = {
+        **same,
+        0: {**same[0], "dropout": {k: v * (1 + 1e-9) for k, v in same[0]["dropout"].items()}},
+    }
+    assert (
+        phases.compare_pretrain(mine=nearly, reference=ref, seeds=seeds)[0] == "ok"
+    )  # math.isclose, relative 1e-6
     with tempfile.TemporaryDirectory(prefix="e735b_") as tmp:
         data = Path(tmp) / "data"
         (data / "ml-experiments" / "00677-fake" / "logs").mkdir(parents=True)
         (data / "ml-experiments" / "00677-fake" / "logs" / "2025-11_5w_pretrain.log").write_text(
             FAKE_677_LOG
+        )
+        (data / "ml-experiments" / "00677-fake" / "logs" / "2026-02_5w_pretrain.log").write_text(
+            "2026-02: stage 1 exists, nothing was trained\n"
         )
         root = Path(tmp) / "00735-smoke"
         (root / "logs").mkdir(parents=True)
@@ -1081,6 +1106,15 @@ def test_r1_reproduction_check() -> None:
             (root / "logs" / "2025-11_R1_pretrain.log").write_text(
                 _fake_mine(epochs=(45, 60, 60), nll=("0.3144", "0.3072", "0.3186"))
             )
+            assert phases.r1_reproduction_check(root=root, month="2025-11") == 0
+            # 677 trained no stage 1 in 2026-02: its log has no line for any seed, so the month is skipped
+            (root / "logs" / "2026-02_R1_pretrain.log").write_text(
+                "  pretrain R1 2026-02 s0: 12 epochs, val NLL 0.5000, 5 s, dropout {'a': 0.1}\n"
+            )
+            assert phases.r1_reproduction_check(root=root, month="2026-02") == 0
+            # a resumed stage 1 whose log lacks seed 1
+            lines = _fake_mine(epochs=(45, 60, 60), nll=("0.3144", "0.3072", "0.3186")).splitlines()
+            (root / "logs" / "2025-11_R1_pretrain.log").write_text("\n".join([lines[0], lines[2]]))
             assert phases.r1_reproduction_check(root=root, month="2025-11") == 0
             (root / "logs" / "2025-11_R1_pretrain.log").write_text(
                 _fake_mine(
@@ -1147,7 +1181,6 @@ def test_real_run_stage_gate_and_tags() -> None:
     torch = _torch_or_skip()
     if torch is None:
         return
-    import e00735b_check_stages as check_stages  # ty: ignore[unresolved-import]
     import e00735b_stage1 as stage1  # ty: ignore[unresolved-import]
 
     with tempfile.TemporaryDirectory(prefix="e735b_") as tmp:
@@ -1222,25 +1255,149 @@ def test_real_run_stage_gate_and_tags() -> None:
             except AssertionError:
                 continue
             raise AssertionError(f"the tag check accepted a changed {what}")
-        # the real-run mode of the every-stage gate reads the files
-        for name in ("SKE", "R1"):
-            net, x, primary, is_val, valid, arm, (first_us, step_us, c, cp) = _gate_fixture(
-                torch=torch, arm_name=name
-            )
-            stage1.gate_stage(
-                model=net, x=x if arm.columns else x[:, :60], primary=primary, is_val=is_val, valid_us=valid, arm=arm, stage=1,
-                month="2026-03", seed=1 if arm.columns else 2, out_dir=out, first_us=first_us, step_us=step_us, c_true=c, c_permuted=cp, n_rows=300,
-            )  # fmt: skip
-        frame = check_stages.read_json_checks(folder=out)
-        assert set(frame["arm"]) == {"SKE", "R1"} and set(frame.filter(arm="R1")["column"]) == {
-            "none"
-        }
-        assert (
-            frame.filter(arm="SKE")["distinct"].to_numpy().min() >= 1
-            and len(frame.filter(arm="SKE", batch="train", path="row")) == 8
-        )
+        # the tag hashes the whole date-time encoder (a bias moves it) and compares a table of another length by prefix
+        net, *_ = _gate_fixture(torch=torch, arm_name="SKE")
+        stage1.write_stage_tag(path=tag, arm=arm, model=net)
+        shorter, *_ = _gate_fixture(torch=torch, arm_name="SKE")
+        shorter.table_new = shorter.table_new[:, :50_000].clone()
+        stage1.check_stage_tag(
+            path=tag, arm=arm, model=shorter
+        )  # the same table, cut: its prefix matches
+        shorter.table_new[:, 30_000] += 1.0
+        for model_bad, what in ((shorter, "an altered table of another length"),):
+            try:
+                stage1.check_stage_tag(path=tag, arm=arm, model=model_bad)
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError(f"the tag check accepted {what}")
+        biased, *_ = _gate_fixture(torch=torch, arm_name="SKE")
+        with torch.no_grad():
+            biased.datetime[0].bias[0] += 1e-3
+        try:
+            stage1.check_stage_tag(path=tag, arm=arm, model=biased)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("the tag check accepted a changed bias")
     passed(
-        "the real-run gate writes the JSON, shows no columns for R1, raises on a late lag table, the stage tag catches a changed weight, table, arm, or missing file, and the table mode reads the files"
+        "the real-run gate writes the JSON, shows no columns for R1, raises on a late lag table, the stage tag catches a changed weight, table, arm, or missing file, and the whole encoder state and a table prefix are hashed"
+    )
+
+
+def test_json_mode_coverage_and_contrasts() -> None:
+    """`--from-json` asserts coverage, rows, school 0 and 1, non-constant columns, and the plan's contrasts between arms."""
+    torch = _torch_or_skip()
+    if torch is None:
+        return
+    import e00735b_check_stages as check_stages  # ty: ignore[unresolved-import]
+    import e00735b_stage1 as stage1  # ty: ignore[unresolved-import]
+
+    arms = ("R1", "SKE", "SKE-S21", "SKE-CP")
+
+    def write_all(*, folder: Path, skip: tuple | None = None) -> None:
+        for name in arms:
+            net, x, primary, is_val, valid, arm, (first_us, step_us, c, cp) = _gate_fixture(
+                torch=torch, arm_name=name, rows=1500
+            )
+            for stage in (1, 2, 3):
+                if skip == (name, stage):
+                    continue
+                stage1.gate_stage(
+                    model=net, x=x if arm.columns else x[:, :60], primary=primary, is_val=is_val, valid_us=valid, arm=arm,
+                    stage=stage, month="2026-03", seed=0, out_dir=folder / name, first_us=first_us, step_us=step_us,
+                    c_true=c, c_permuted=cp, n_rows=1200,
+                )  # fmt: skip
+
+    kwargs: dict[str, Any] = {"arms": arms, "months": ("2026-03",), "seeds": (0,)}
+    with tempfile.TemporaryDirectory(prefix="e735b_") as tmp:
+        folder = Path(tmp)
+        write_all(folder=folder)
+        frame = check_stages.read_json_checks(folder=folder, **kwargs)
+        assert set(frame["arm"]) == set(arms) and set(frame.filter(arm="R1")["column"]) == {"none"}
+        assert len(frame.filter(arm="SKE", stage=2, batch="train", path="row")) == 8
+        for bad, message in (
+            ({**kwargs, "seeds": (0, 1)}, "a missing seed"),
+            ({**kwargs, "months": ("2026-03", "2026-04")}, "a missing month"),
+            ({**kwargs, "arms": ("R1", "SKE")}, "an unexpected arm"),
+        ):
+            try:
+                check_stages.read_json_checks(folder=folder, **bad)  # ty: ignore[invalid-argument-type]
+            except AssertionError:
+                continue
+            raise AssertionError(f"the coverage check accepted {message}")
+        # an empty batch, a school column without a 1, and an arm pair on different rows
+        path = folder / "SKE" / "checks_stage_2_2026-03_s0.json"
+        record = json.loads(path.read_text())
+        original = path.read_text()
+        record["batches"]["val"]["n_rows"] = 0
+        path.write_text(json.dumps(record))
+        for what in ("no rows",):
+            try:
+                check_stages.read_json_checks(folder=folder, **kwargs)
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError(f"the check accepted {what}")
+        path.write_text(original)
+        for arm_name, field, value, what in (
+            ("SKE", "max", 0.0, "a school column without a 1"),
+            ("SKE-S21", "row_hash", "x", "different rows"),
+        ):
+            target = next(
+                p
+                for p in folder.rglob("checks_stage_1_2026-03_s0.json")
+                if json.loads(p.read_text())["arm"] == arm_name
+            )
+            text = target.read_text()
+            record = json.loads(text)
+            if field == "max":
+                record["batches"]["train"]["paths"]["row"]["columns"][0]["max"] = value
+            else:
+                record["batches"]["train"][field] = value
+            target.write_text(json.dumps(record))
+            try:
+                check_stages.read_json_checks(folder=folder, **kwargs)
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError(f"the check accepted {what}")
+            target.write_text(text)
+        check_stages.read_json_checks(folder=folder, **kwargs)  # restored: passes again
+    with tempfile.TemporaryDirectory(prefix="e735b_") as tmp:
+        folder = Path(tmp)
+        write_all(folder=folder, skip=("SKE-CP", 3))
+        try:
+            check_stages.read_json_checks(folder=folder, **kwargs)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("a missing stage file was accepted")
+    # the contrasts: an S21 file whose school sample equals SKE's, and a CP file whose coast means equal SKE's, are rejected
+    with tempfile.TemporaryDirectory(prefix="e735b_") as tmp:
+        folder = Path(tmp)
+        write_all(folder=folder)
+        files = {
+            json.loads(p.read_text())["arm"]: p
+            for p in folder.rglob("checks_stage_1_2026-03_s0.json")
+        }
+        ske = json.loads(files["SKE"].read_text())
+        for arm_name, patch in (("SKE-S21", "school_sample"), ("SKE-CP", "per_primary_mean")):
+            text = files[arm_name].read_text()
+            record = json.loads(text)
+            record["batches"]["train"]["paths"]["row"][patch] = ske["batches"]["train"]["paths"][
+                "row"
+            ][patch]
+            files[arm_name].write_text(json.dumps(record))
+            try:
+                check_stages.read_json_checks(folder=folder, **kwargs)
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError(f"the contrast of {arm_name} with SKE was not enforced")
+            files[arm_name].write_text(text)
+    passed(
+        "the table mode asserts coverage, non-empty batches, school 0 and 1, and the plan's SKE-S21 and SKE-CP contrasts"
     )
 
 

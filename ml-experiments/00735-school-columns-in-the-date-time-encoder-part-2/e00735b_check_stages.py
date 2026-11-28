@@ -169,43 +169,131 @@ def expected_columns(
     return np.where(present[:, None], block, 0.0).astype(np.float32), present
 
 
-def read_json_checks(*, folder: Path) -> pl.DataFrame:
-    """Read the runner's stage-gate files in a folder, assert their contents, and return the table."""
-    files = sorted(folder.glob("checks_stage_*_s*.json"))
-    assert files, ("no checks_stage_*.json file in", str(folder))
-    rows: list[dict[str, object]] = []
-    for file in files:
+PLAN_ARMS: Final = ("R1", "SKE", "SKE-S21", "SKE-CP")
+PLAN_MONTHS: Final = (
+    "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+)  # fmt: skip
+PLAN_SEEDS: Final = (0, 1, 2)
+MIN_SCHOOL_DIFFERENCE: Final = 0.05
+MIN_COAST_PRIMARIES_DIFFERING: Final = 14
+
+
+def read_json_checks(
+    *, folder: Path, arms: tuple[str, ...] = PLAN_ARMS, months: tuple[str, ...] = PLAN_MONTHS,
+    seeds: tuple[int, ...] = PLAN_SEEDS,
+) -> pl.DataFrame:  # fmt: skip
+    """Read the runner's stage-gate files under a folder (one subfolder per arm), assert their coverage and contents, and return the table.
+
+    The files found must be exactly those of every arm, stage 1 to 3, month, and seed that the
+    arguments name. Every batch has rows. An arm with the columns shows them equal to the expected
+    columns on every path; its training row path has S1 to S3 with both 0 and 1 and every column
+    non-constant. R1 shows none. Across arms (for the arms present): SKE-S21's S1 to S3 differ from
+    SKE's on at least 5% of the rows of the same sample, and SKE-CP's coast columns differ from SKE's
+    at 14 or more of the 16 Primaries.
+    """
+    records: dict[tuple[str, int, str, int], dict] = {}
+    for file in sorted(folder.rglob("checks_stage_*_s*.json")):
         record = json.loads(file.read_text())
-        arm, stage = record["arm"], record["stage"]
-        assert arm in cols.ARMS and arm != "R0", (file.name, arm)
-        assert record["n_new"] == cols.ARMS[arm].width, (file.name, record["n_new"])
+        key = (record["arm"], record["stage"], record["month"], record["seed"])
+        assert key not in records, ("two files for", key)
+        records[key] = record
+    expected = {(a, st, m, sd) for a in arms for st in (1, 2, 3) for m in months for sd in seeds}
+    assert set(records) == expected, (
+        "missing:", sorted(expected - set(records))[:6], "unexpected:", sorted(set(records) - expected)[:6],
+    )  # fmt: skip
+    rows: list[dict[str, object]] = []
+    for (arm, stage, month, seed), record in sorted(records.items()):
+        assert arm in cols.ARMS and arm != "R0", arm
+        spec = cols.ARMS[arm]
+        assert record["n_new"] == spec.width, (arm, stage, month, seed, record["n_new"])
         for batch, body in record["batches"].items():
-            for path, entry in body.get("paths", {}).items():
-                if not cols.ARMS[arm].columns:
+            assert body["n_rows"] > 0, (arm, stage, month, seed, batch, "no rows")
+            for path, entry in body["paths"].items():
+                where = (arm, stage, month, seed, batch, path)
+                if not spec.columns:
                     assert (
                         entry["columns"] == []
                         and entry["input_width"] == 21 + record["embedding_dim"]
-                    ), (file.name, batch, path)
+                    ), where
                     rows.append(
                         {
-                            "arm": arm, "stage": stage, "month": record["month"], "seed": record["seed"], "batch": batch,
+                            "arm": arm, "stage": stage, "month": month, "seed": seed, "batch": batch,
                             "path": path, "column": "none", "distinct": 0, "share_of_ones": 0.0,
                         }
                     )  # fmt: skip
                     continue
-                assert entry["equals_expected"] is True, (file.name, batch, path)
-                assert len(entry["columns"]) == cols.N_COLUMNS, (file.name, batch, path)
-                for column in entry["columns"]:
+                assert entry["equals_expected"] is True, where
+                assert len(entry["columns"]) == cols.N_COLUMNS, where
+                for j, column in enumerate(entry["columns"]):
                     if batch == "train" and path == "row":
-                        assert column["distinct"] > 1, (file.name, column)
+                        assert column["distinct"] > 1, (where, column)
+                        if j < cols.SCHOOL_SLICE.stop:
+                            assert column["min"] == 0.0 and column["max"] == 1.0, (
+                                where,
+                                column,
+                                "lacks 0 or 1",
+                            )
                     rows.append(
                         {
-                            "arm": arm, "stage": stage, "month": record["month"], "seed": record["seed"], "batch": batch,
+                            "arm": arm, "stage": stage, "month": month, "seed": seed, "batch": batch,
                             "path": path, "column": column["column"], "distinct": column["distinct"],
                             "share_of_ones": round(column["share_one"], 4),
                         }
                     )  # fmt: skip
+    _check_contrasts(records=records, arms=arms, months=months, seeds=seeds)
     return pl.DataFrame(rows)
+
+
+def _check_contrasts(
+    *, records: dict[tuple[str, int, str, int], dict], arms: tuple[str, ...], months: tuple[str, ...],
+    seeds: tuple[int, ...],
+) -> None:  # fmt: skip
+    """Assert the plan's contrasts between arms on the same rows of the training batch."""
+    for stage in (1, 2, 3):
+        for month in months:
+            for seed in seeds:
+                if "SKE" not in arms:
+                    continue
+                ske = records[("SKE", stage, month, seed)]["batches"]["train"]
+                where = (stage, month, seed)
+                if "SKE-S21" in arms:
+                    other = records[("SKE-S21", stage, month, seed)]["batches"]["train"]
+                    assert other["row_hash"] == ske["row_hash"], (
+                        where,
+                        "SKE and SKE-S21 sampled different rows",
+                    )
+                    a = np.asarray(ske["paths"]["row"]["school_sample"])
+                    b = np.asarray(other["paths"]["row"]["school_sample"])
+                    differ = float((a != b).any(axis=1).mean())
+                    assert differ >= MIN_SCHOOL_DIFFERENCE, (
+                        where,
+                        "SKE-S21's school columns differ from SKE's on only",
+                        differ,
+                    )
+                if "SKE-CP" in arms:
+                    other = records[("SKE-CP", stage, month, seed)]["batches"]["train"]
+                    assert other["row_hash"] == ske["row_hash"], (
+                        where,
+                        "SKE and SKE-CP sampled different rows",
+                    )
+                    means_a = ske["paths"]["row"]["per_primary_mean"]
+                    means_b = other["paths"]["row"]["per_primary_mean"]
+                    assert set(means_a) == set(means_b) and len(means_a) == N_PRIMARIES, (
+                        where,
+                        sorted(means_a),
+                    )
+                    differing = sum(
+                        not np.allclose(
+                            means_a[p][cols.SCHOOL_SLICE.stop :],
+                            means_b[p][cols.SCHOOL_SLICE.stop :],
+                        )
+                        for p in means_a
+                    )
+                    assert differing >= MIN_COAST_PRIMARIES_DIFFERING, (
+                        where,
+                        "SKE-CP's coast columns differ at only",
+                        differing,
+                    )
 
 
 def main() -> int:
@@ -217,7 +305,12 @@ def main() -> int:
     )
     args = parser.parse_args()
     if args.from_json:
-        frame = read_json_checks(folder=Path(args.from_json))
+        frame = read_json_checks(
+            folder=Path(args.from_json),
+            arms=tuple(args.arms),
+            months=tuple(args.months),
+            seeds=tuple(args.seeds),
+        )
         with pl.Config(tbl_rows=2000, tbl_cols=10, tbl_width_chars=180):
             print(frame)
         if args.out:

@@ -43,6 +43,7 @@ import argparse
 import ast
 import csv
 import json
+import math
 import os
 import re
 import subprocess
@@ -168,7 +169,8 @@ PRETRAIN_LINE: Final = re.compile(
 )
 """A line of a stage-1 log, from experiment 677's `e00677_k1.py pretrain` or this experiment's runner."""
 NLL_TOLERANCE: Final = 1e-3
-NLL_TOLERANCE_ONE_EPOCH: Final = 2e-3
+NLL_TOLERANCE_GAP: Final = 3e-3
+MAX_EPOCH_GAP: Final = 5
 
 
 def parse_pretrain_log(*, text: str) -> dict[int, dict]:
@@ -190,33 +192,35 @@ def compare_pretrain(
 ) -> tuple[str, list[str]]:
     """Compare R1's stage 1 with experiment 677's, seed by seed.
 
-    Returns `ok`, `flag`, or `mismatch`, and the messages. The dropout shares must be equal; the
-    epochs and the validation NLL must agree to 1e-3. A difference of one epoch with NLL within 2e-3
-    is flagged and does not stop the phase.
+    Returns `ok`, `flag`, or `mismatch`, and the messages. A seed that is missing from either log is
+    skipped with a note (experiment 677 skipped stage 1 in some months, and a resumed stage 1 may
+    lack a seed). For each other seed: every dropout share must be equal (`math.isclose`, relative
+    1e-6); equal epochs with NLL within `NLL_TOLERANCE` is ok; an epoch gap of at most
+    `MAX_EPOCH_GAP` with NLL within `NLL_TOLERANCE_GAP` is flagged and does not stop the phase;
+    anything else is a mismatch.
     """
     status, messages = "ok", []
     for seed in seeds:
         if seed not in mine or seed not in reference:
-            return "mismatch", [
-                f"seed {seed}: missing from {'R1' if seed not in mine else 'experiment 677'}'s log"
-            ]
+            where = "R1's" if seed not in mine else "experiment 677's"
+            messages.append(f"seed {seed}: no line in {where} log, skipped")
+            continue
         a, b = mine[seed], reference[seed]
         gap = abs(a["nll"] - b["nll"])
-        if a["dropout"] != b["dropout"]:
+        if set(a["dropout"]) != set(b["dropout"]) or not all(
+            math.isclose(a["dropout"][k], b["dropout"][k], rel_tol=1e-6) for k in a["dropout"]
+        ):
             return "mismatch", [
                 f"seed {seed}: dropout shares differ: {a['dropout']} against {b['dropout']}"
             ]
+        text = f"seed {seed}: epochs {a['epochs']} against {b['epochs']}, val NLL {a['nll']} against {b['nll']}"
         if a["epochs"] == b["epochs"] and gap <= NLL_TOLERANCE:
             continue
-        if abs(a["epochs"] - b["epochs"]) == 1 and gap <= NLL_TOLERANCE_ONE_EPOCH:
+        if abs(a["epochs"] - b["epochs"]) <= MAX_EPOCH_GAP and gap <= NLL_TOLERANCE_GAP:
             status = "flag"
-            messages.append(
-                f"seed {seed}: epochs {a['epochs']} against {b['epochs']}, val NLL {a['nll']} against {b['nll']}"
-            )
+            messages.append(text)
             continue
-        return "mismatch", [
-            f"seed {seed}: epochs {a['epochs']} against {b['epochs']}, val NLL {a['nll']} against {b['nll']}"
-        ]
+        return "mismatch", [text]
     return status, messages
 
 

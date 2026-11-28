@@ -137,8 +137,8 @@ def check_table_matches_rows(
     )
 
 
-TABLE_TAG_STEPS: Final = 20_000
-"""Grid steps of `table_new` that the stage tag hashes (every stage's table is at least this long)."""
+TABLE_PREFIX_STEPS: Final = 10_000
+"""Spacing, in grid steps, of the prefixes of `table_new` that the stage tag hashes."""
 GATE_ROWS: Final = 2048
 """Rows in the gate's training batch and validation batch."""
 GATE_SEED: Final = 735
@@ -150,36 +150,66 @@ def _sha(*, array: np.ndarray) -> str:
     return hashlib.sha256(np.ascontiguousarray(array).tobytes()).hexdigest()
 
 
-def table_sha(*, model: Any) -> str:
-    """Return the sha256 of the first `TABLE_TAG_STEPS` grid steps of the model's `table_new`, or `none`."""
+def table_tags(*, model: Any) -> dict[str, Any]:
+    """Return the hashes of the model's `table_new`: its length, the hash of the whole table, and of its prefixes.
+
+    The stage-1 table and the stage-2 and stage-3 tables may differ in length, but each is a prefix
+    of the same deterministic table, so the tag also hashes every prefix whose length is a multiple
+    of `TABLE_PREFIX_STEPS`.
+    """
     table = getattr(model, "table_new", None)
     if table is None:
-        return "none"
-    assert table.shape[1] >= TABLE_TAG_STEPS, table.shape
-    return _sha(array=table[:, :TABLE_TAG_STEPS].detach().cpu().numpy())
+        return {"n_grid": 0, "full": "none", "prefix": {}}
+    array = table.detach().cpu().numpy()
+    n_grid = int(array.shape[1])
+    prefixes = {
+        str(k): _sha(array=array[:, :k])
+        for k in range(TABLE_PREFIX_STEPS, n_grid + 1, TABLE_PREFIX_STEPS)
+    }
+    return {"n_grid": n_grid, "full": _sha(array=array), "prefix": prefixes}
 
 
-def weight_sha(*, model: Any) -> str:
-    """Return the sha256 of the date-time encoder's first-layer weight (`datetime.0.weight`)."""
-    return _sha(array=model.datetime[0].weight.detach().cpu().numpy())
+def datetime_sha(*, model: Any) -> str:
+    """Return the sha256 of the whole state of `model.datetime`: every parameter (weights and biases of both layers), by name."""
+    digest = hashlib.sha256()
+    for name, value in sorted(model.datetime.state_dict().items()):
+        digest.update(name.encode())
+        digest.update(np.ascontiguousarray(value.detach().cpu().numpy()).tobytes())
+    return digest.hexdigest()
 
 
 def write_stage_tag(*, path: Path, arm: cols.ArmB, model: Any) -> None:
-    """Write the arm, the `table_new` hash, and the `datetime.0.weight` hash beside a stage-1 checkpoint."""
+    """Write the arm, the `table_new` hashes, and the hash of the date-time encoder's whole state beside a stage-1 checkpoint."""
     write_json(
         path=path,
-        payload={"arm": arm.name, "table_new_sha256": table_sha(model=model), "datetime_0_weight_sha256": weight_sha(model=model)},
+        payload={"arm": arm.name, "table_new": table_tags(model=model), "datetime_state_sha256": datetime_sha(model=model)},
     )  # fmt: skip
 
 
 def check_stage_tag(*, path: Path, arm: cols.ArmB, model: Any) -> None:
-    """Raise `AssertionError` unless the model's `table_new` and `datetime.0.weight` match the stage-1 tag."""
+    """Raise `AssertionError` unless the model's `table_new` and date-time encoder state match the stage-1 tag.
+
+    The whole table is compared when its length equals the tag's; otherwise the longest prefix whose
+    length is a multiple of `TABLE_PREFIX_STEPS` and at most the shorter length is compared.
+    """
     assert path.exists(), ("the stage-1 tag is missing", str(path))
     tag = json.loads(path.read_text())
     assert tag["arm"] == arm.name, (tag["arm"], arm.name)
-    assert tag["table_new_sha256"] == table_sha(model=model), "table_new differs from stage 1's"
-    assert tag["datetime_0_weight_sha256"] == weight_sha(model=model), (
-        "datetime.0.weight differs from stage 1's"
+    now, then = table_tags(model=model), tag["table_new"]
+    assert (now["n_grid"] == 0) == (then["n_grid"] == 0), (
+        "table_new is present in only one of the two"
+    )
+    if now["n_grid"]:
+        if now["n_grid"] == then["n_grid"]:
+            assert now["full"] == then["full"], "table_new differs from stage 1's"
+        k = min(now["n_grid"], then["n_grid"]) // TABLE_PREFIX_STEPS * TABLE_PREFIX_STEPS
+        assert k > 0, (now["n_grid"], then["n_grid"])
+        assert now["prefix"][str(k)] == then["prefix"][str(k)], (
+            "table_new differs from stage 1's over the first",
+            k,
+        )
+    assert tag["datetime_state_sha256"] == datetime_sha(model=model), (
+        "the date-time encoder differs from stage 1's"
     )
 
 
@@ -288,9 +318,19 @@ def gate_stage(  # noqa: PLR0915
                         entry["columns"].append(
                             {
                                 "column": col, "distinct": len(np.unique(v)),
+                                "min": float(v.min()), "max": float(v.max()),
                                 "share_one": float((v == 1.0).mean()), "share_nonzero": float((v != 0.0).mean()),
                             }
                         )  # fmt: skip
+                    if name == "row":
+                        entry["per_primary_mean"] = {
+                            str(p): new[pb == p].mean(axis=0).tolist() for p in np.unique(pb)
+                        }
+                        entry["school_sample"] = (
+                            new[:, cols.SCHOOL_SLICE].astype(np.int8).tolist()
+                            if batch == "train"
+                            else []
+                        )
                     if batch == "train" and name == "row":
                         assert all(c["distinct"] > 1 for c in entry["columns"]), (
                             arm.name,
@@ -301,7 +341,10 @@ def gate_stage(  # noqa: PLR0915
                 else:
                     entry["equals_expected"] = None
                 paths[name] = entry
-            batches[batch] = {"n_rows": len(rows), "paths": paths}
+            row_hash = hashlib.sha256(
+                vb.astype(np.int64).tobytes() + pb.astype(np.int64).tobytes()
+            ).hexdigest()
+            batches[batch] = {"n_rows": len(rows), "row_hash": row_hash, "paths": paths}
     finally:
         model.train(was_training)
     payload = {
