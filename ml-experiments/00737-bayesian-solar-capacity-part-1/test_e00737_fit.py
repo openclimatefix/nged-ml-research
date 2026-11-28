@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -21,7 +23,7 @@ for _n in ("39", "40", "653", "660"):
 import e00737_fit as fit
 import e00737_forward as fwd
 import e00737_inputs as inputs
-from e00737_common import GRID_LENGTH, N_QUARTERS, grid_end_times, quarter_index
+from e00737_common import GRID_LENGTH, N_QUARTERS, RIDGE_SCALE_GRID, grid_end_times, quarter_index
 
 
 def test_faiman_cell_temperature_known_answer() -> None:
@@ -236,3 +238,78 @@ def test_lag1_inflation_is_one_for_white_noise_and_large_for_an_ar1_series() -> 
     high = fit.lag1_inflation(z=ar1, rows=rows, day=day, daylight=daylight)
     assert low < 1.3
     assert high > 3.0
+
+
+def _collinear_world(*, truth: float) -> dict:
+    """Build a noise-free world whose baseline holds a column that is almost the solar column."""
+    rng = np.random.default_rng(5)
+    data = _synthetic(truth_per_quarter=np.full(N_QUARTERS, truth), outliers=False)
+    solar = data["solar"]
+    extra = solar + 0.05 * rng.uniform(size=len(solar)) * (solar > 0.0)
+    data["base"] = np.column_stack([data["base"], extra])
+    data["y"] = data["base"] @ np.array([0.5, 0.2, 0.3]) - truth * solar
+    return data
+
+
+def _capacity_at_ridge_scale(*, data: dict, scale: float) -> float:
+    ridge_abs = scale * inputs.RIDGE_PER_COLUMN * float((data["base"] ** 2).sum(axis=0).mean())
+    return float(fit.fit_student_t(prior=fit.flat_prior(), ridge_abs=ridge_abs, **data).capacity[0])
+
+
+def test_smallest_ridge_scale_recovers_a_noise_free_capacity_and_the_default_shrinks_it() -> None:
+    truth = 3.0
+    data = _collinear_world(truth=truth)
+    smallest = min(RIDGE_SCALE_GRID)
+    assert _capacity_at_ridge_scale(data=data, scale=smallest) == pytest.approx(truth, rel=0.01)
+    share_at_one = _capacity_at_ridge_scale(data=data, scale=1.0) / truth
+    share_at_smallest = _capacity_at_ridge_scale(data=data, scale=smallest) / truth
+    assert share_at_smallest > share_at_one
+    assert share_at_one < 0.95
+
+
+@dataclass
+class _StubData:
+    base: np.ndarray
+    ridge_abs: float
+    rows: np.ndarray
+    quarter: np.ndarray
+    daylight: np.ndarray
+    day: np.ndarray
+
+
+def test_ridge_scale_reaches_the_fit_of_every_arm_that_carries_the_baseline_ridge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[float] = []
+
+    def stub(**kwargs: object) -> str:
+        seen.append(float(kwargs["ridge_abs"]))  # ty: ignore[invalid-argument-type]
+        return "fit"
+
+    monkeypatch.setattr(fit, "fit_student_t", stub)
+    n = 96
+    rows = np.arange(n)
+    data = _StubData(
+        base=np.ones((n, fit.SEASONAL_COLUMNS)),
+        ridge_abs=2.0,
+        rows=rows,
+        quarter=np.zeros(n, dtype=int),
+        daylight=np.ones(n, dtype=bool),
+        day=rows // 48,
+    )
+    forecast = np.zeros(n)
+    model = SimpleNamespace(
+        data=data,
+        terms={fit.PRIOR_DC_AC: np.ones(n)},
+        inputs=SimpleNamespace(forecast=forecast),
+    )
+    power = np.ones(n)
+    prior = fit.flat_prior()
+    assert fit.fit_arm(model=model, power=power, prior=prior, ridge_scale=0.1) == "fit"  # ty: ignore[invalid-argument-type]
+    assert seen[-1] == pytest.approx(0.2)
+    fit.fit_daily(model=model, power=power, prior=prior, ridge_scale=0.1)  # ty: ignore[invalid-argument-type]
+    unscaled = inputs.ridge_precision(seasonal=np.add.reduceat(data.base, [0, 48], axis=0))
+    assert seen[-1] == pytest.approx(0.1 * unscaled)
+    fit.fit_residual_arm(model=model, power=power, prior=prior, ridge_scale=0.1)  # ty: ignore[invalid-argument-type]
+    # Every row is in quarter 0, so the mean squared column norm over 18 columns is n / 18.
+    assert seen[-1] == pytest.approx(0.1 * inputs.RIDGE_PER_COLUMN * n / N_QUARTERS)

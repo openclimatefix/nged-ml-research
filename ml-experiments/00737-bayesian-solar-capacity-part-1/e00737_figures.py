@@ -275,13 +275,16 @@ def fleet_figures(*, growth_sd: float) -> None:
     )
 
 
-def posterior_world(*, model: PrimaryModel, spec: WorldSpec, growth_sd: float) -> pl.DataFrame:
+def posterior_world(
+    *, model: PrimaryModel, spec: WorldSpec, growth_sd: float, ridge_scale: float
+) -> pl.DataFrame:
     """Fit arms A, F, and Qt to a tuning world and to the real record, and return the increments.
 
     Args:
         model: The Primary's model inputs.
         spec: The tuning world's recipe.
         growth_sd: The growth standard deviation of arm A.
+        ridge_scale: The multiplier of the baseline's ridge precision.
 
     Returns:
         One row per arm and quarter: the injected capacity, the fitted increment, and 80% bounds.
@@ -294,8 +297,10 @@ def posterior_world(*, model: PrimaryModel, spec: WorldSpec, growth_sd: float) -
     }
     rows = []
     for arm, prior in priors.items():
-        injected = fit_arm(model=model, power=world.power, prior=prior)
-        control = fit_arm(model=model, power=model.inputs.power, prior=prior)
+        injected = fit_arm(model=model, power=world.power, prior=prior, ridge_scale=ridge_scale)
+        control = fit_arm(
+            model=model, power=model.inputs.power, prior=prior, ridge_scale=ridge_scale
+        )
         increment = injected.capacity - control.capacity
         for q in range(N_QUARTERS):
             half = 1.2815515655446004 * injected.sd[q]
@@ -330,17 +335,20 @@ def _posterior_chart(*, frame: pl.DataFrame, title: str) -> alt.TopLevelMixin:
     return (band + line + truth).properties(width=WIDTH, height=HEIGHT, title=title)
 
 
-def posterior_figures(*, growth_sd: float) -> None:
+def posterior_figures(*, growth_sd: float, ridge_scale: float) -> None:
     """Draw the four posterior figures on tuning-seed worlds of one Primary.
 
     Args:
         growth_sd: The tuned growth standard deviation.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
     """
     start = time.time()
     model = build_model(inputs=load_primary(site=FIGURE_PRIMARY))
     for k, shape in enumerate(("ramp", "step", "accelerating")):
         spec = WorldSpec(FIGURE_PRIMARY, "tuning", POSTERIOR_SIZE_MW, shape, POSTERIOR_SEED + k)
-        frame = posterior_world(model=model, spec=spec, growth_sd=growth_sd)
+        frame = posterior_world(
+            model=model, spec=spec, growth_sd=growth_sd, ridge_scale=ridge_scale
+        )
         _save(
             chart=_posterior_chart(
                 frame=frame, title=f"Posterior of arms A, F, and Qt: {shape} fleet of 2.5 MW"
@@ -351,9 +359,9 @@ def posterior_figures(*, growth_sd: float) -> None:
     for kind in ("cloud", "transfer"):
         spec = WorldSpec(FIGURE_PRIMARY, kind, POSTERIOR_SIZE_MW, "ramp", POSTERIOR_SEED)
         frames.append(
-            posterior_world(model=model, spec=spec, growth_sd=growth_sd).with_columns(
-                world=pl.lit(kind)
-            )
+            posterior_world(
+                model=model, spec=spec, growth_sd=growth_sd, ridge_scale=ridge_scale
+            ).with_columns(world=pl.lit(kind))
         )
     both = pl.concat(frames)
     panels: list[Any] = [
@@ -393,7 +401,7 @@ def real_figure() -> None:
         chart=(band + line).properties(
             width=WIDTH,
             height=HEIGHT,
-            title="Fitted capacity of the six Primaries: median (line) and range (band)",
+            title=f"Fitted capacity of {len(paths)} Primaries: median (line) and range (band)",
         ),
         name="real_capacity_path",
     )
@@ -408,12 +416,14 @@ def make_figures(*, part: str) -> None:
     import json
 
     tuned = OUT / "tuned.json"
-    growth_sd = json.loads(tuned.read_text())["growth_sd"] if tuned.exists() else GROWTH_SD_GRID[1]
+    record = json.loads(tuned.read_text()) if tuned.exists() else {}
+    growth_sd = record.get("growth_sd", GROWTH_SD_GRID[1])
+    ridge_scale = record.get("ridge_scale", 1.0)
     if part == "forward":
         forward_figures()
     elif part == "fleets":
         fleet_figures(growth_sd=growth_sd)
     elif part == "posterior":
-        posterior_figures(growth_sd=growth_sd)
+        posterior_figures(growth_sd=growth_sd, ridge_scale=ridge_scale)
     else:
         real_figure()

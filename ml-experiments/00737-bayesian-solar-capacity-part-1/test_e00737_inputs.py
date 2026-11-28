@@ -26,11 +26,13 @@ import e00039_common as c39  # ty: ignore[unresolved-import]
 import e00653_common as c653  # ty: ignore[unresolved-import]
 import e00737_gates as gates
 import e00737_inputs as inputs
+import e00737_worlds as worlds
 import polars as pl
 from e00737_common import CUT, GRID_LENGTH, GRID_START
 from e00737_forward import PRIOR_FLEET
 
 SITE = "D5"
+GATE_PRIMARIES = ("D5", "D9", "D10", "D11", "D14", "D16")
 SERIES_ID = 5
 
 
@@ -177,65 +179,230 @@ def test_the_scan_interpolates_a_fractional_delay_linearly() -> None:
     assert _delay(curve=curve, half_hours=1.0)[10] == 9.0
 
 
-def _g4_with_power_delayed(*, fixture: inputs.PrimaryInputs, half_hours: int) -> dict[str, Any]:
-    unit = inputs.unit_term(inputs=fixture, fleet=PRIOR_FLEET)
-    power = -2.0 * np.roll(unit, half_hours)
-    return gates.g4(inputs={SITE: dataclasses.replace(fixture, power=power)})
+def _unit(*, fixture: inputs.PrimaryInputs) -> np.ndarray:
+    return inputs.unit_term(inputs=fixture, fleet=PRIOR_FLEET)
 
 
-def test_g4_passes_when_the_real_power_follows_the_model(
+def _g4(
+    *,
+    fixture: inputs.PrimaryInputs,
+    power: np.ndarray,
+    farm: np.ndarray | None,
+    others: list[np.ndarray] | None = None,
+) -> dict[str, Any]:
+    """Run G4 on six Primaries: D5 reads `power`, the other five read `others` (default on time)."""
+    farms = [] if farm is None else [farm]
+    on_time = -2.0 * _unit(fixture=fixture)
+    powers = [power, *(others if others is not None else [on_time] * 5)]
+    assert len(powers) == len(GATE_PRIMARIES)
+    sites = {
+        site: dataclasses.replace(fixture, power=each)
+        for site, each in zip(GATE_PRIMARIES, powers, strict=True)
+    }
+    return gates.g4(inputs=sites, farms=farms)
+
+
+def test_g4_passes_when_the_power_is_on_time_relative_to_a_farm(
     fixture_inputs: inputs.PrimaryInputs,
 ) -> None:
-    record = _g4_with_power_delayed(fixture=fixture_inputs, half_hours=0)
+    unit = _unit(fixture=fixture_inputs)
+    record = _g4(fixture=fixture_inputs, power=-2.0 * unit, farm=unit)
     assert record["primaries"][SITE]["best_shift"] == pytest.approx(0.0)
-    assert record["pooled_best_shift"] == pytest.approx(0.0)
+    assert record["primaries"][SITE]["farm_reference_shift"] == pytest.approx(0.0)
+    assert record["pooled_difference"] == pytest.approx(0.0)
     assert record["passed"] is True
     assert record["diagnostic_integer_shift"]["primaries"][SITE]["best_shift"] == 0
 
 
-def test_g4_scan_recovers_the_delay_of_a_late_power_series(
+def test_g4_fails_a_primary_one_half_hour_later_than_a_farm_like_series(
     fixture_inputs: inputs.PrimaryInputs,
 ) -> None:
-    # With no west lean, a power series one half-hour late shows a best shift of +1.0, which the
-    # pooled range [-0.5, +1.5] allows (the real fleet's lean already gives about +1.1).
-    one = _g4_with_power_delayed(fixture=fixture_inputs, half_hours=1)
-    assert one["primaries"][SITE]["best_shift"] == pytest.approx(1.0, abs=0.25)
-    # A series two half-hours late (the lean plus the old loader's extra half-hour) fails.
-    two = _g4_with_power_delayed(fixture=fixture_inputs, half_hours=2)
-    assert two["primaries"][SITE]["best_shift"] >= 1.75
-    assert two["passed"] is False
-    early = _g4_with_power_delayed(fixture=fixture_inputs, half_hours=-2)
-    assert early["passed"] is False
+    unit = _unit(fixture=fixture_inputs)
+    late = _g4(fixture=fixture_inputs, power=-2.0 * np.roll(unit, 1), farm=unit)
+    assert late["primaries"][SITE]["difference"] == pytest.approx(1.0, abs=0.25)
+    # One Primary outside the bound leaves five inside: the gate passes and excludes that Primary.
+    assert late["primaries"][SITE]["within_bound"] is False
+    assert late["excluded_primaries"] == [SITE]
+    assert late["passed"] is True
+    # Half a half-hour later is inside both ranges.
+    half = _g4(fixture=fixture_inputs, power=-1.0 * (unit + np.roll(unit, 1)), farm=unit)
+    assert half["primaries"][SITE]["difference"] == pytest.approx(0.5, abs=0.25)
+    assert half["passed"] is True
+    assert half["excluded_primaries"] == []
+    two = _g4(fixture=fixture_inputs, power=-2.0 * np.roll(unit, 2), farm=unit)
+    assert two["excluded_primaries"] == [SITE]
+    early = _g4(fixture=fixture_inputs, power=-2.0 * np.roll(unit, -1), farm=unit)
+    assert early["excluded_primaries"] == [SITE]
 
 
-def test_g4_fails_a_lean_series_that_is_one_half_hour_later_again(
+def test_g4_needs_four_of_six_primaries_within_the_bound(
     fixture_inputs: inputs.PrimaryInputs,
 ) -> None:
-    unit = inputs.unit_term(inputs=fixture_inputs, fleet=PRIOR_FLEET)
-    lean = -2.0 * (0.9 * np.roll(unit, 1) + 0.1 * np.roll(unit, 2))  # about 1.1 half-hours late
-    corrected = dataclasses.replace(fixture_inputs, power=lean)
-    assert gates.g4(inputs={SITE: corrected})["passed"] is True
-    uncorrected = dataclasses.replace(fixture_inputs, power=np.roll(lean, 1))  # about 2.1
-    record = gates.g4(inputs={SITE: uncorrected})
-    assert record["pooled_best_shift"] >= 2.0 - 1e-9
+    unit = _unit(fixture=fixture_inputs)
+    late = -2.0 * (0.4 * unit + 0.6 * np.roll(unit, 1))  # about 0.6 half-hours late: inside
+    later = -2.0 * (0.1 * unit + 0.9 * np.roll(unit, 1))  # about 0.9 half-hours late: outside
+    on_time = -2.0 * unit
+    # Two outside: four inside passes, and the two are excluded.
+    two = _g4(
+        fixture=fixture_inputs,
+        power=later,
+        farm=unit,
+        others=[later, late, on_time, on_time, on_time],
+    )
+    assert two["excluded_primaries"] == ["D5", "D9"]
+    assert abs(two["pooled_difference"]) <= 0.5
+    assert two["passed"] is True
+    # Three outside: only three inside, so the gate fails although the pooled difference passes.
+    three = _g4(
+        fixture=fixture_inputs,
+        power=later,
+        farm=unit,
+        others=[later, later, on_time, on_time, on_time],
+    )
+    assert three["excluded_primaries"] == ["D5", "D9", "D10"]
+    assert abs(three["pooled_difference"]) <= 0.5
+    assert three["passed"] is False
+    # Every Primary 0.65 half-hours late is inside each Primary's bound but outside the pooled one.
+    slow = -2.0 * (0.35 * unit + 0.65 * np.roll(unit, 1))
+    pooled = _g4(fixture=fixture_inputs, power=slow, farm=unit, others=[slow] * 5)
+    assert pooled["excluded_primaries"] == []
+    assert pooled["pooled_difference"] > 0.5
+    assert pooled["passed"] is False
+
+
+def test_g4_reference_follows_a_farm_that_is_itself_late(
+    fixture_inputs: inputs.PrimaryInputs,
+) -> None:
+    unit = _unit(fixture=fixture_inputs)
+    lean = 0.9 * np.roll(unit, 1) + 0.1 * np.roll(unit, 2)  # about 1.1 half-hours late
+    record = _g4(fixture=fixture_inputs, power=-2.0 * lean, farm=lean, others=[-2.0 * lean] * 5)
+    assert record["primaries"][SITE]["best_shift"] >= 1.0
+    assert record["passed"] is True
+    record = _g4(
+        fixture=fixture_inputs,
+        power=-2.0 * np.roll(lean, 1),
+        farm=lean,
+        others=[-2.0 * np.roll(lean, 1)] * 5,
+    )
+    assert record["pooled_difference"] >= 0.75
     assert record["passed"] is False
 
 
 def test_g4_ignores_a_winter_evening_demand_peak(fixture_inputs: inputs.PrimaryInputs) -> None:
-    unit = inputs.unit_term(inputs=fixture_inputs, fleet=PRIOR_FLEET)
+    unit = _unit(fixture=fixture_inputs)
     slot = np.arange(GRID_LENGTH) % 48
     month = (fixture_inputs.end_time - np.timedelta64(30, "m")).astype("datetime64[M]").astype(
         int
     ) % 12 + 1
     evening = np.where(np.isin(month, gates.WINTER_MONTHS) & (slot >= 32) & (slot <= 38), 5.0, 0.0)
-    power = -2.0 * unit + evening
-    record = gates.g4(inputs={SITE: dataclasses.replace(fixture_inputs, power=power)})
+    record = _g4(fixture=fixture_inputs, power=-2.0 * unit + evening, farm=unit)
     assert record["primaries"][SITE]["best_shift"] == 0
     assert record["diagnostic_summer_minus_winter"]["decides_gate"] is False
 
 
-def test_unreadable_contrast_fails_the_gate(fixture_inputs: inputs.PrimaryInputs) -> None:
-    empty = dataclasses.replace(fixture_inputs, power=np.full(GRID_LENGTH, np.nan))
-    record = gates.g4(inputs={SITE: empty})
-    assert record["primaries"][SITE]["readable"] is False
-    assert record["passed"] is False
+def test_unreadable_contrast_or_missing_farms_fail_the_gate(
+    fixture_inputs: inputs.PrimaryInputs,
+) -> None:
+    unit = _unit(fixture=fixture_inputs)
+    empty = _g4(fixture=fixture_inputs, power=np.full(GRID_LENGTH, np.nan), farm=unit)
+    assert empty["primaries"][SITE]["readable"] is False
+    assert empty["excluded_primaries"] == [SITE]
+    assert empty["passed"] is True  # the other five are inside
+    no_farms = _g4(fixture=fixture_inputs, power=-2.0 * unit, farm=None)
+    assert no_farms["primaries"][SITE]["readable"] is False
+    assert no_farms["passed"] is False
+
+
+def test_farm_to_grid_shifts_a_period_end_label_to_the_start_index() -> None:
+    start = np.datetime64(GRID_START.replace(tzinfo=None), "us")
+    step = np.timedelta64(30, "m")
+    # A row stamped with the end of grid index 0, 5, and the last index lands on that index.
+    times = np.array([start + step, start + 6 * step, start + GRID_LENGTH * step])
+    out = inputs.farm_to_grid(times=times, power=np.array([2.0, 4.0, 6.0]), capacity_mw=2.0)
+    assert len(out) == GRID_LENGTH
+    assert out[0] == 1.0
+    assert out[5] == 2.0
+    assert out[GRID_LENGTH - 1] == 3.0
+    assert np.isfinite(out).sum() == 3
+    # A row stamped with the grid's own start (the end of index -1) and a NaN reading are dropped.
+    dropped = inputs.farm_to_grid(
+        times=np.array([start, start + 2 * step]), power=np.array([1.0, np.nan]), capacity_mw=1.0
+    )
+    assert not np.isfinite(dropped).any()
+
+
+def test_the_cut_drops_rows_after_the_cut_in_the_real_loaders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hour = timedelta(hours=1)
+    cams_times = [CUT - hour, CUT, CUT + hour, CUT + 2 * hour]
+    pl.DataFrame(
+        {
+            "site": SITE,
+            "time": pl.Series(cams_times, dtype=pl.Datetime("us", "UTC")),
+            "ghi_w_m2": [1.0, 2.0, 3.0, 4.0],
+            "clear_sky_ghi_w_m2": [1.0, 2.0, 3.0, 4.0],
+            "reliability": 1.0,
+        }
+    ).write_parquet(tmp_path / "cams.parquet")
+    monkeypatch.setattr(c39, "CAMS_DEMAND_POINTS_PATH", tmp_path / "cams.parquet")
+    cams = inputs.load_cams(site=SITE)
+    assert cams["ghi_w_m2"].to_list() == [1.0, 2.0]
+    farm_times = pl.Series(
+        [CUT - timedelta(minutes=30), CUT, CUT + timedelta(minutes=30)],
+        dtype=pl.Datetime("us", "UTC"),
+    )
+    pl.DataFrame(
+        {"time_series_id": SERIES_ID, "time": farm_times, "power": [1.0, 2.0, 3.0]}
+    ).write_parquet(tmp_path / "farms.parquet")
+    pl.DataFrame({"time_series_id": [SERIES_ID], "effective_capacity_mw": [1.0]}).write_parquet(
+        tmp_path / "sites.parquet"
+    )
+    monkeypatch.setattr(inputs, "FARMS_PATH", tmp_path / "farms.parquet")
+    monkeypatch.setattr(inputs, "FARM_IDS", (SERIES_ID,))
+    monkeypatch.setattr(inputs, "pv_sites", lambda: pl.read_parquet(tmp_path / "sites.parquet"))
+    farm = inputs.load_farm_per_unit(farm=0)
+    # The row stamped at the cut is the last half-hour; the row after it is never read.
+    assert farm[GRID_LENGTH - 1] == 2.0
+    assert farm[GRID_LENGTH - 2] == 1.0
+    assert np.isfinite(farm).sum() == 2
+
+
+def test_the_cut_check_rejects_a_timestamp_after_the_cut() -> None:
+    late = np.array([np.datetime64(CUT.replace(tzinfo=None), "us") + np.timedelta64(1, "us")])
+    with pytest.raises(ValueError, match="after the cut"):
+        inputs.assert_cut(times=late, what="probe")
+
+
+def test_a_world_lowers_the_net_power_by_day_and_leaves_the_night_alone(
+    fixture_inputs: inputs.PrimaryInputs,
+) -> None:
+    spec = next(s for s in worlds.world_specs(primary=SITE) if s.name == "main_5_ramp_737101")
+    world = worlds.build_world(inputs=fixture_inputs, spec=spec)
+    assert (world.injected >= 0.0).all()
+    assert world.injected.max() > 0.0
+    assert np.array_equal(world.power, fixture_inputs.power - world.injected, equal_nan=True)
+    assert (world.injected[~fixture_inputs.sun_up] == 0.0).all()
+    lowered = world.power[fixture_inputs.sun_up] <= fixture_inputs.power[fixture_inputs.sun_up]
+    assert lowered[np.isfinite(world.power[fixture_inputs.sun_up])].all()
+
+
+def test_g2_and_g3_pass_on_the_fixture_and_fail_on_a_broken_injection(
+    fixture_inputs: inputs.PrimaryInputs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert gates.g2(inputs={SITE: fixture_inputs})["passed"] is True
+    assert gates.g3(inputs={SITE: fixture_inputs})["passed"] is True
+    spec = next(s for s in worlds.world_specs(primary=SITE) if s.name == "main_5_ramp_737101")
+    world = worlds.build_world(inputs=fixture_inputs, spec=spec)
+    broken = dataclasses.replace(world, injected=np.zeros_like(world.injected))
+    assert worlds.check_injection(inputs=fixture_inputs, world=broken)["passed"] is False
+    real_build = gates.build_world
+
+    def leaky(*, inputs: inputs.PrimaryInputs, spec: worlds.WorldSpec) -> worlds.World:
+        built = real_build(inputs=inputs, spec=spec)
+        return dataclasses.replace(
+            built, injected=built.injected + 1e-3 * np.nan_to_num(inputs.power)
+        )
+
+    monkeypatch.setattr(gates, "build_world", leaky)
+    assert gates.g3(inputs={SITE: fixture_inputs})["passed"] is False

@@ -5,11 +5,16 @@
     e00737_run.py review-mark                write the code hash into review_stage1.ok (after the
                                              review of that code; a person or the manager runs it)
     e00737_run.py freeze-code                write code.sha256 (needs a review marker of this code)
+    e00737_run.py tune-ridge --worker i --of n  30 synthetic draws at each ridge scale, sharded
+    e00737_run.py tune-ridge-collect          the ridge scale into ridge.json
+    e00737_run.py tune-growth --worker i --of n the 120 tuning worlds at each growth standard
+                                             deviation, at the chosen ridge scale, sharded by
+                                             Primary
+    e00737_run.py tune-collect                the growth standard deviation and the ridge scale
+                                             into tuned.json
     e00737_run.py g1-reference                one fit of the real record that G1 and G1b read
     e00737_run.py g1 --worker i --of n        the 100 + 100 synthetic fits of G1 and G1b, sharded
     e00737_run.py g1-collect                  G1 and G1b into gates.json
-    e00737_run.py tune --worker i --of n      the 120 tuning worlds, sharded by Primary
-    e00737_run.py tune-collect                the growth standard deviation into tuned.json
     e00737_run.py unit                        the timed first unit; prints the CPU-hour projection
     e00737_run.py fit --worker i --of n       the bulk: every world, sharded by Primary
     e00737_run.py smoke                       G2 on every world file, and every world is present
@@ -19,9 +24,10 @@
 
 `run.sh` sets the environment and the memory-capped scope. Every output goes under `OUT`. Every
 stage prints `OUT` first. The stages after `gates` refuse to start without `review_stage1.ok`
-holding the current code hash and `code.sha256` holding the same hash, and the stages that fit also
-need `gates.json` to record a pass. A stage that fails writes
-`OUT/failed/stage_<stage>_worker_<i>.json` and exits with code 3.
+holding the current code hash and `code.sha256` holding the same hash. The tuning stages also need
+`gates.json` to record a pass of G2, G3, and G4. The stages after the tuning (G1 and G1b, the first
+unit, and the bulk) need `tuned.json`, and the stages from the first unit on also need G1 and G1b.
+A stage that fails writes `OUT/failed/stage_<stage>_worker_<i>.json` and exits with code 3.
 """
 
 from __future__ import annotations
@@ -37,6 +43,7 @@ from typing import Any
 
 import numpy as np
 from e00737_common import (
+    EM_MAX_ITER,
     EXIT_FAILED,
     EXPECTED_INJECTED_WORLDS,
     EXPECTED_TUNING_WORLDS,
@@ -47,6 +54,11 @@ from e00737_common import (
     OUT,
     PAST_ONLY_CUTS,
     PRIMARIES,
+    RIDGE_DRAWS,
+    RIDGE_SCALE_GRID,
+    RIDGE_SEED,
+    RIDGE_STEP_GROWTH_SD,
+    Tuned,
     atomic_json,
     atomic_npz,
     time_log,
@@ -63,14 +75,18 @@ from e00737_forward import FleetParams
 from e00737_inputs import PrimaryInputs, build_fit_data, load_primary, placebo_sky, unit_term
 from e00737_phases import (
     CODE_SHA,
+    GATES_BEFORE_TUNING,
     MARKER_REVIEW,
     STOP_CPU_HOURS,
     assert_blas_pinned,
     code_hash,
+    read_record,
     require_budget,
     require_code_frozen,
+    require_finished,
     require_gates,
     require_review,
+    require_ridge_scale,
     require_tuned,
     require_unit,
     run_shard,
@@ -92,11 +108,13 @@ STAGES: tuple[str, ...] = (
     "gates",
     "review-mark",
     "freeze-code",
+    "tune-ridge",
+    "tune-ridge-collect",
+    "tune-growth",
+    "tune-collect",
     "g1-reference",
     "g1",
     "g1-collect",
-    "tune",
-    "tune-collect",
     "unit",
     "fit",
     "smoke",
@@ -106,7 +124,7 @@ STAGES: tuple[str, ...] = (
 )
 UNIT_PRIMARY: str = PRIMARIES[0]
 UNIT_WORLD: str = "main_2.5_ramp_737101"
-PLAN_ESTIMATE_CPU_HOURS: float = 16.9
+PLAN_ESTIMATE_CPU_HOURS: float = 17.5
 """The plan's estimate, printed beside the projection."""
 TUNING_WORLDS_PER_PRIMARY: int = 20
 
@@ -161,18 +179,23 @@ def real_record_extras(*, inputs: PrimaryInputs, model: PrimaryModel) -> dict[st
     }
 
 
-def task_control(*, site: str, store: Path, growth_sd: float) -> None:
+def task_control(*, site: str, store: Path, growth_sd: float, ridge_scale: float) -> None:
     """Fit every arm to the real record of one Primary.
 
     Args:
         site: The Primary's label.
         store: The folder that holds the `fits` and `worlds` folders.
         growth_sd: The tuned growth standard deviation.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
     """
     start = time.time()
     model = get_model(site=site)
     fits = fit_all_arms(
-        model=model, power=model.inputs.power, growth_sd=growth_sd, oracle_term=None
+        model=model,
+        power=model.inputs.power,
+        growth_sd=growth_sd,
+        ridge_scale=ridge_scale,
+        oracle_term=None,
     )
     atomic_npz(
         arrays={
@@ -184,7 +207,9 @@ def task_control(*, site: str, store: Path, growth_sd: float) -> None:
     time_log(stage="fit", task=f"control_{site}", start=start, out=store)
 
 
-def task_ocontrol(*, site: str, seed: int, store: Path, growth_sd: float) -> None:
+def task_ocontrol(
+    *, site: str, seed: int, store: Path, growth_sd: float, ridge_scale: float
+) -> None:
     """Fit arm A with a seed's fleet term to the real record, the control of arm O.
 
     Args:
@@ -192,6 +217,7 @@ def task_ocontrol(*, site: str, seed: int, store: Path, growth_sd: float) -> Non
         seed: The seed whose mismatched fleet gives the term.
         store: The output folder.
         growth_sd: The tuned growth standard deviation.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
     """
     start = time.time()
     model = get_model(site=site)
@@ -201,6 +227,7 @@ def task_ocontrol(*, site: str, seed: int, store: Path, growth_sd: float) -> Non
         model=model,
         power=model.inputs.power,
         prior=random_walk_prior(growth_sd=growth_sd),
+        ridge_scale=ridge_scale,
         solar=term,
     )
     atomic_npz(
@@ -214,13 +241,14 @@ def task_ocontrol(*, site: str, seed: int, store: Path, growth_sd: float) -> Non
     time_log(stage="fit", task=f"ocontrol_{site}_{seed}", start=start, out=store)
 
 
-def task_placebo(*, site: str, store: Path, growth_sd: float) -> None:
+def task_placebo(*, site: str, store: Path, growth_sd: float, ridge_scale: float) -> None:
     """Fit arm A to the real record with the placebo sky.
 
     Args:
         site: The Primary's label.
         store: The output folder.
         growth_sd: The tuned growth standard deviation.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
     """
     import dataclasses
 
@@ -237,7 +265,12 @@ def task_placebo(*, site: str, store: Path, growth_sd: float) -> None:
         terms={PRIOR_FLEET.dc_ac_ratio: unit_term(inputs=twin, fleet=PRIOR_FLEET)[data.rows]},
         q_basis=np.empty((0, 4)),
     )
-    fit = fit_arm(model=model, power=real.power, prior=random_walk_prior(growth_sd=growth_sd))
+    fit = fit_arm(
+        model=model,
+        power=real.power,
+        prior=random_walk_prior(growth_sd=growth_sd),
+        ridge_scale=ridge_scale,
+    )
     atomic_npz(
         arrays={
             "A_cap": fit.capacity,
@@ -249,7 +282,7 @@ def task_placebo(*, site: str, store: Path, growth_sd: float) -> None:
     time_log(stage="fit", task=f"placebo_{site}", start=start, out=store)
 
 
-def task_world(*, site: str, name: str, store: Path, growth_sd: float) -> None:
+def task_world(*, site: str, name: str, store: Path, growth_sd: float, ridge_scale: float) -> None:
     """Build one injected world, check G2 on it, write it, and fit every arm.
 
     Args:
@@ -257,6 +290,7 @@ def task_world(*, site: str, name: str, store: Path, growth_sd: float) -> None:
         name: The world's name.
         store: The output folder.
         growth_sd: The tuned growth standard deviation.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
 
     Raises:
         RuntimeError: When gate G2 fails for the built world.
@@ -274,13 +308,16 @@ def task_world(*, site: str, name: str, store: Path, growth_sd: float) -> None:
         model=model,
         power=world.power,
         growth_sd=growth_sd,
+        ridge_scale=ridge_scale,
         oracle_term=oracle_term(model=model, fleet=world.fleet),
     )
     atomic_npz(arrays=fits_to_arrays(fits=fits), path=store / "fits" / site / f"{name}.npz")
     time_log(stage="fit", task=f"world_{site}_{name}", start=start, out=store)
 
 
-def task_past(*, site: str, quarter: int, store: Path, growth_sd: float) -> None:
+def task_past(
+    *, site: str, quarter: int, store: Path, growth_sd: float, ridge_scale: float
+) -> None:
     """Fit arm A to the real record cut at the end of a quarter (the past-only sample).
 
     Args:
@@ -288,11 +325,17 @@ def task_past(*, site: str, quarter: int, store: Path, growth_sd: float) -> None
         quarter: The zero-based quarter whose end is the cut.
         store: The output folder.
         growth_sd: The tuned growth standard deviation.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
     """
     start = time.time()
     model = get_model(site=site)
     power = np.where(model.inputs.quarter <= quarter, model.inputs.power, np.nan)
-    fit = fit_arm(model=model, power=power, prior=random_walk_prior(growth_sd=growth_sd))
+    fit = fit_arm(
+        model=model,
+        power=power,
+        prior=random_walk_prior(growth_sd=growth_sd),
+        ridge_scale=ridge_scale,
+    )
     atomic_npz(
         arrays={
             "A_cap": fit.capacity,
@@ -304,49 +347,96 @@ def task_past(*, site: str, quarter: int, store: Path, growth_sd: float) -> None
     time_log(stage="fit", task=f"past_{site}_{quarter}", start=start, out=store)
 
 
-def task_tune_control(*, site: str, store: Path) -> None:
+@lru_cache(maxsize=1)
+def ridge_reference() -> dict[str, np.ndarray]:
+    """Fit arm A to the first Primary's real record at the unscaled ridge, once for each process.
+
+    The synthetic series of the ridge draws take their baseline and noise scales from this fit.
+
+    Returns:
+        The baseline and scales, as `g1_reference` returns them.
+    """
+    from e00737_gates import g1_model, g1_reference
+
+    return g1_reference(
+        model=g1_model(), tuned=Tuned(growth_sd=RIDGE_STEP_GROWTH_SD, ridge_scale=1.0)
+    )
+
+
+def task_tune_ridge(*, draw: int, store: Path) -> None:
+    """Fit one synthetic series at each ridge scale and store the capacity errors.
+
+    Args:
+        draw: The draw's number.
+        store: The output folder.
+    """
+    from e00737_gates import g1_model, ridge_draw
+
+    start = time.time()
+    errors = ridge_draw(model=g1_model(), reference=ridge_reference(), draw=draw)
+    atomic_npz(arrays={"error": errors}, path=store / "tuning" / "ridge" / f"draw_{draw:03d}.npz")
+    time_log(stage="tune", task=f"tune_ridge_{draw:03d}", start=start, out=store)
+
+
+def task_tune_control(*, site: str, store: Path, ridge_scale: float) -> None:
     """Fit arm A to the real record at each growth standard deviation of the grid.
 
     Args:
         site: The Primary's label.
         store: The output folder.
+        ridge_scale: The chosen ridge scale.
     """
     start = time.time()
     model = get_model(site=site)
-    caps = [
-        fit_arm(
-            model=model, power=model.inputs.power, prior=random_walk_prior(growth_sd=sg)
-        ).capacity
-        for sg in GROWTH_SD_GRID
-    ]
+    caps = growth_fits(model=model, power=model.inputs.power, ridge_scale=ridge_scale)
     atomic_npz(
         arrays={"cap": np.array(caps), "scored": model.inputs.scored},
-        path=store / "tuning" / site / "control.npz",
+        path=store / "tuning" / site / "growth_control.npz",
     )
-    time_log(stage="tune", task=f"tune_control_{site}", start=start, out=store)
+    time_log(stage="tune", task=f"tune_growth_control_{site}", start=start, out=store)
 
 
-def task_tune_world(*, site: str, name: str, store: Path) -> None:
+def task_tune_world(*, site: str, name: str, store: Path, ridge_scale: float) -> None:
     """Fit arm A to one tuning world at each growth standard deviation of the grid.
 
     Args:
         site: The Primary's label.
         name: The tuning world's name.
         store: The output folder.
+        ridge_scale: The chosen ridge scale.
     """
     start = time.time()
     model = get_model(site=site)
     spec = next(s for s in tuning_specs(primary=site) if s.name == name)
     world = build_world(inputs=model.inputs, spec=spec)
-    caps = [
-        fit_arm(model=model, power=world.power, prior=random_walk_prior(growth_sd=sg)).capacity
-        for sg in GROWTH_SD_GRID
-    ]
+    caps = growth_fits(model=model, power=world.power, ridge_scale=ridge_scale)
     atomic_npz(
         arrays={"cap": np.array(caps), "truth": world.truth},
-        path=store / "tuning" / site / f"{name}.npz",
+        path=store / "tuning" / site / f"growth_{name}.npz",
     )
-    time_log(stage="tune", task=f"tune_{site}_{name}", start=start, out=store)
+    time_log(stage="tune", task=f"tune_growth_{site}_{name}", start=start, out=store)
+
+
+def growth_fits(*, model: PrimaryModel, power: np.ndarray, ridge_scale: float) -> list[np.ndarray]:
+    """Fit arm A at each growth standard deviation of the grid and return the capacity paths.
+
+    Args:
+        model: The Primary's model inputs.
+        power: The power to fit (a tuning world's, or the real record's).
+        ridge_scale: The chosen ridge scale.
+
+    Returns:
+        One capacity path for each growth standard deviation, in the grid's order.
+    """
+    return [
+        fit_arm(
+            model=model,
+            power=power,
+            prior=random_walk_prior(growth_sd=sd),
+            ridge_scale=ridge_scale,
+        ).capacity
+        for sd in GROWTH_SD_GRID
+    ]
 
 
 def primaries_of(*, worker: int, of: int) -> list[str]:
@@ -362,18 +452,18 @@ def primaries_of(*, worker: int, of: int) -> list[str]:
     return [p for k, p in enumerate(PRIMARIES) if k % of == worker]
 
 
-def fit_tasks(*, primaries: list[str], store: Path, growth_sd: float) -> list[tuple[str, dict]]:
+def fit_tasks(*, primaries: list[str], store: Path, tuned: Tuned) -> list[tuple[str, dict]]:
     """List the bulk-fit tasks of some Primaries, in the order that satisfies their dependencies.
 
     Args:
         primaries: The Primaries' labels.
         store: The output folder.
-        growth_sd: The tuned growth standard deviation.
+        tuned: The tuned growth standard deviation and ridge scale.
 
     Returns:
         Pairs of a task name and its keyword arguments (the function is chosen by the prefix).
     """
-    common = {"store": store, "growth_sd": growth_sd}
+    common = {"store": store, "growth_sd": tuned.growth_sd, "ridge_scale": tuned.ridge_scale}
     tasks: list[tuple[str, dict]] = []
     for site in primaries:
         tasks.append((f"control_{site}", {"kind": "control", "site": site, **common}))
@@ -410,23 +500,35 @@ def run_fit_task(*, kind: str, **kwargs: Any) -> None:
     }[kind](**kwargs)
 
 
-def tune_tasks(*, primaries: list[str], store: Path) -> list[tuple[str, dict]]:
-    """List the tuning tasks of some Primaries.
+def tune_tasks(
+    *, primaries: list[str], store: Path, part: str, ridge_scale: float | None, worker: int, of: int
+) -> list[tuple[str, dict]]:
+    """List one worker's tuning tasks for one part of the tuning.
 
     Args:
-        primaries: The Primaries' labels.
+        primaries: The Primaries' labels (the growth part's tasks are sharded by Primary).
         store: The output folder.
+        part: `ridge` (the synthetic draws) or `growth` (the tuning worlds).
+        ridge_scale: The chosen ridge scale (None for part `ridge`).
+        worker: This worker's index (the ridge part's draws are sharded by draw).
+        of: The number of workers.
 
     Returns:
         Pairs of a task name and its keyword arguments.
     """
+    if part == "ridge":
+        draws = shard(items=list(range(RIDGE_DRAWS)), worker=worker, of=of)
+        return [
+            (f"tune_ridge_{d:03d}", {"kind": "ridge", "draw": d, "store": store}) for d in draws
+        ]
+    common = {"store": store, "ridge_scale": ridge_scale}
     tasks: list[tuple[str, dict]] = []
     for site in primaries:
-        tasks.append((f"tune_control_{site}", {"kind": "control", "site": site, "store": store}))
+        tasks.append((f"tune_growth_control_{site}", {"kind": "control", "site": site, **common}))
         tasks += [
             (
-                f"tune_{site}_{s.name}",
-                {"kind": "world", "site": site, "name": s.name, "store": store},
+                f"tune_growth_{site}_{s.name}",
+                {"kind": "world", "site": site, "name": s.name, **common},
             )
             for s in tuning_specs(primary=site)
         ]
@@ -437,42 +539,86 @@ def run_tune_task(*, kind: str, **kwargs: Any) -> None:
     """Run one tuning task by its kind.
 
     Args:
-        kind: `control` or `world`.
+        kind: `ridge`, `control`, or `world`.
         **kwargs: The task's keyword arguments.
     """
-    (task_tune_control if kind == "control" else task_tune_world)(**kwargs)
+    {"ridge": task_tune_ridge, "control": task_tune_control, "world": task_tune_world}[kind](
+        **kwargs
+    )
+
+
+def tune_ridge_collect() -> dict[str, Any]:
+    """Choose the ridge scale with the lowest median largest capacity error on synthetic draws.
+
+    The error of a draw is the largest absolute gap, over the 18 quarters, between the fitted and
+    the injected capacity. A tie goes to the larger ridge scale.
+
+    Returns:
+        The record written to `ridge.json`.
+
+    Raises:
+        RuntimeError: When a draw file is missing.
+    """
+    from e00737_score import load_npz
+
+    folder = OUT / "tuning" / "ridge"
+    files = [folder / f"draw_{d:03d}.npz" for d in range(RIDGE_DRAWS)]
+    missing = [f.name for f in files if not f.exists()]
+    if missing:
+        msg = f"{len(missing)} ridge draw files are missing, such as {missing[0]}"
+        raise RuntimeError(msg)
+    errors = np.array([load_npz(path=f)["error"] for f in files])
+    medians = np.median(errors, axis=0)
+    best = int(np.argmin(medians))  # the first minimum, and the grid runs from the larger scale
+    record = {
+        "ridge_scale": RIDGE_SCALE_GRID[best],
+        "grid": list(RIDGE_SCALE_GRID),
+        "growth_sd_held_at": RIDGE_STEP_GROWTH_SD,
+        "median_max_capacity_error_mw": [float(m) for m in medians],
+        "n_draws": len(files),
+        "seeds": [RIDGE_SEED, RIDGE_SEED + RIDGE_DRAWS - 1],
+        "code_hash": code_hash(),
+    }
+    atomic_json(obj=record, path=OUT / "ridge.json")
+    return record
 
 
 def tune_collect() -> dict[str, Any]:
-    """Choose the growth standard deviation with the lowest median path error on the tuning worlds.
+    """Choose the growth standard deviation with the lowest median path error, at the ridge scale.
 
     Returns:
-        The record written to `tuned.json`.
+        The record written to `tuned.json`, which holds the chosen ridge scale too.
+
+    Raises:
+        RuntimeError: When the number of tuning worlds is not `EXPECTED_TUNING_WORLDS`.
     """
     from e00737_score import load_npz, path_error
 
+    ridge = read_record(name="ridge.json")
     errors: list[list[float]] = [[] for _ in GROWTH_SD_GRID]
     for site in PRIMARIES:
         folder = OUT / "tuning" / site
-        control = load_npz(path=folder / "control.npz")
+        control = load_npz(path=folder / "growth_control.npz")
         scored = control["scored"].astype(bool)
         for spec in tuning_specs(primary=site):
-            arrays = load_npz(path=folder / f"{spec.name}.npz")
+            arrays = load_npz(path=folder / f"growth_{spec.name}.npz")
             for k in range(len(GROWTH_SD_GRID)):
                 increment = arrays["cap"][k] - control["cap"][k]
                 errors[k].append(
                     path_error(truth=arrays["truth"], estimate=increment, scored=scored)
                 )
-    medians = [float(np.nanmedian(e)) for e in errors]
     n_worlds = len(errors[0])
     if n_worlds != EXPECTED_TUNING_WORLDS:
         msg = f"{n_worlds} tuning worlds were found, expected {EXPECTED_TUNING_WORLDS}"
         raise RuntimeError(msg)
-    best = GROWTH_SD_GRID[int(np.argmin(medians))]
+    medians = [float(np.nanmedian(e)) for e in errors]
     record = {
-        "growth_sd": best,
+        "growth_sd": GROWTH_SD_GRID[int(np.argmin(medians))],
+        "ridge_scale": ridge["ridge_scale"],
         "grid": list(GROWTH_SD_GRID),
         "median_path_error": medians,
+        "ridge_grid": ridge["grid"],
+        "ridge_median_max_capacity_error_mw": ridge["median_max_capacity_error_mw"],
         "n_worlds": n_worlds,
         "code_hash": code_hash(),
     }
@@ -495,8 +641,9 @@ def project_cpu_hours(*, timing: dict[str, float]) -> dict[str, float]:
     seconds = {
         "gates and figures": 0.5 * 3600.0,
         "g1 and g1b (200 fits plus the reference)": (2 * G1_DRAWS + 1) * fit_a,
-        "tune (360 world fits plus 18 control fits)": (
-            EXPECTED_TUNING_WORLDS * len(GROWTH_SD_GRID) + n_primaries * len(GROWTH_SD_GRID)
+        "tune (90 ridge fits, then 126 records at 3 growth sds)": (
+            RIDGE_DRAWS * len(RIDGE_SCALE_GRID)
+            + (EXPECTED_TUNING_WORLDS + n_primaries) * len(GROWTH_SD_GRID)
         )
         * fit_a,
         "fit: injected worlds": EXPECTED_INJECTED_WORLDS * timing["world"],
@@ -512,29 +659,90 @@ def project_cpu_hours(*, timing: dict[str, float]) -> dict[str, float]:
     return hours
 
 
+def unit_convergence(*, store: Path) -> dict[str, dict[str, dict[str, Any]]]:
+    """Read the convergence flag and iteration count of every arm of the first unit's fits.
+
+    Args:
+        store: The unit's output folder.
+
+    Returns:
+        For the control and the world, each arm's `converged` and `n_iter`.
+    """
+    out: dict[str, dict[str, dict[str, Any]]] = {}
+    for label, name in (("control", "control"), ("world", UNIT_WORLD)):
+        with np.load(store / "fits" / UNIT_PRIMARY / f"{name}.npz") as f:
+            out[label] = {
+                key[: -len("_info")]: {"converged": bool(f[key][1]), "n_iter": int(f[key][0])}
+                for key in sorted(f.files)
+                if key.endswith("_info")
+            }
+    return out
+
+
+def worst_case_timing(*, timing: dict[str, float], iterations: int) -> dict[str, float]:
+    """Scale the measured fit times to 30 iterations of every fit (the worst case).
+
+    Args:
+        timing: The measured timing of `project_cpu_hours`.
+        iterations: The iterations that the control's arm A fit used.
+
+    Returns:
+        The timing with the fit times multiplied by `EM_MAX_ITER` over `iterations` (the load time
+        is unchanged).
+    """
+    factor = max(1.0, EM_MAX_ITER / max(1, iterations))
+    return {k: v if k == "load" else v * factor for k, v in timing.items()}
+
+
 def stage_unit() -> None:
-    """Run the first unit in a subfolder, time it, and print the projection for the manager."""
-    growth_sd = require_tuned()
+    """Run the first unit in a subfolder, time it, and print the projection for the manager.
+
+    Raises:
+        RuntimeError: When any fit of the first unit did not converge (the record is still written).
+    """
+    tuned = require_tuned()
     store = OUT / "unit"
     t0 = time.perf_counter()
     get_model(site=UNIT_PRIMARY)
     load_s = time.perf_counter() - t0
     t0 = time.perf_counter()
-    task_control(site=UNIT_PRIMARY, store=store, growth_sd=growth_sd)
+    task_control(
+        site=UNIT_PRIMARY,
+        store=store,
+        growth_sd=tuned.growth_sd,
+        ridge_scale=tuned.ridge_scale,
+    )
     control_s = time.perf_counter() - t0
     t0 = time.perf_counter()
-    task_world(site=UNIT_PRIMARY, name=UNIT_WORLD, store=store, growth_sd=growth_sd)
+    task_world(
+        site=UNIT_PRIMARY,
+        name=UNIT_WORLD,
+        store=store,
+        growth_sd=tuned.growth_sd,
+        ridge_scale=tuned.ridge_scale,
+    )
     world_s = time.perf_counter() - t0
     with np.load(store / "fits" / UNIT_PRIMARY / "control.npz") as f:
         fit_a = float(f["A_info"][7])
         iterations = {arm: int(f[f"{arm}_info"][0]) for arm in ("A", "F", "Qt", "O", "R")}
     timing = {"load": load_s, "control": control_s, "world": world_s, "fit_a": fit_a}
     hours = project_cpu_hours(timing=timing)
+    worst = project_cpu_hours(timing=worst_case_timing(timing=timing, iterations=iterations["A"]))
+    convergence = unit_convergence(store=store)
+    not_converged = [
+        f"{label}/{arm}"
+        for label, arms in convergence.items()
+        for arm, info in arms.items()
+        if not info["converged"]
+    ]
     record = {
         "timing_seconds": timing,
         "iterations_of_the_control_fits": iterations,
+        "convergence_of_the_first_fits": convergence,
+        "not_converged": not_converged,
         "projected_cpu_hours": hours,
         "projected_total_cpu_hours": hours["total"],
+        "worst_case_30_iterations_cpu_hours": worst,
         "stop_cpu_hours": STOP_CPU_HOURS,
         "code_hash": code_hash(),
     }
@@ -543,13 +751,17 @@ def stage_unit() -> None:
     for key, value in timing.items():
         print(f"  {key}: {value:.1f} s")
     print(f"  iterations of the control fits: {iterations}")
-    print("projected CPU-hours at one thread per worker:")
+    print(f"  convergence of the first fits (flag, iterations): {convergence}")
+    print("projected CPU-hours at one thread per worker (measured | every fit at 30 iterations):")
     for key, value in hours.items():
-        print(f"  {key}: {value:.2f}")
+        print(f"  {key}: {value:.2f} | {worst[key]:.2f}")
     print(
         f"the plan estimated {PLAN_ESTIMATE_CPU_HOURS} CPU-hours and stops at {STOP_CPU_HOURS:.0f}"
     )
     time_log(stage="unit", task="first_unit", start=time.time() - (load_s + control_s + world_s))
+    if not_converged:
+        msg = f"fits of the first unit did not converge: {not_converged} (see unit_timing.json)"
+        raise RuntimeError(msg)
 
 
 def world_from_files(
@@ -674,31 +886,32 @@ def stage_gates() -> None:
 
 
 def stage_g1_collect() -> None:
-    """Add G1 and G1b to `gates.json`."""
+    """Add G1 and G1b to `gates.json`, which the current code must have written (no restamp)."""
     from e00737_gates import collect_g1
 
-    record = collect_g1()
     path = OUT / "gates.json"
-    out = json.loads(path.read_text()) if path.exists() else {}
+    out = read_record(name="gates.json")  # refuses when the record is missing or of other code
+    record = collect_g1()
     out.update(record)
-    out["code_hash"] = code_hash()
     atomic_json(obj=out, path=path)
     print(json.dumps(record, indent=1, default=float))
     if not all(v["passed"] for v in record.values()):
         sys.exit("gate G1 or G1b failed")
 
 
-def run_g1_task(*, draw: int, heavy: bool) -> None:
+def run_g1_task(*, growth_sd: float, ridge_scale: float, draw: int, heavy: bool) -> None:
     """Run one G1 or G1b draw as a timed task.
 
     Args:
+        growth_sd: The tuned growth standard deviation.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
         draw: The draw's number.
         heavy: Whether this is a G1b draw.
     """
     from e00737_gates import run_g1_draw
 
     start = time.time()
-    run_g1_draw(draw=draw, heavy=heavy)
+    run_g1_draw(tuned=Tuned(growth_sd=growth_sd, ridge_scale=ridge_scale), draw=draw, heavy=heavy)
     time_log(stage="g1", task=f"g1{'b' if heavy else ''}_{draw}", start=start)
 
 
@@ -753,13 +966,22 @@ def stage_g1_reference_or_draws(*, args: argparse.Namespace) -> None:
     """
     require_review(marker=MARKER_REVIEW)
     require_code_frozen()
+    tuned = require_tuned()
     if args.stage == "g1-reference":
         from e00737_gates import write_g1_reference
 
-        write_g1_reference()
+        write_g1_reference(tuned=tuned)
         return
     tasks = [
-        (f"g1{'b' if heavy else ''}_{d:03d}", {"draw": d, "heavy": heavy})
+        (
+            f"g1{'b' if heavy else ''}_{d:03d}",
+            {
+                "growth_sd": tuned.growth_sd,
+                "ridge_scale": tuned.ridge_scale,
+                "draw": d,
+                "heavy": heavy,
+            },
+        )
         for d in range(G1_DRAWS)
         for heavy in (False, True)
     ]
@@ -774,21 +996,40 @@ def stage_fit(*, args: argparse.Namespace) -> None:
     """
     require_fit_stage()
     require_budget(check_projection=True)
-    growth_sd = require_tuned()
+    unconverged = require_unit().get("not_converged")
+    if unconverged:
+        msg = f"refusing to fit: the first unit's fits did not converge: {unconverged}"
+        raise RuntimeError(msg)
+    tuned = require_tuned()
     tasks = fit_tasks(
-        primaries=primaries_of(worker=args.worker, of=args.of), store=OUT, growth_sd=growth_sd
+        primaries=primaries_of(worker=args.worker, of=args.of), store=OUT, tuned=tuned
     )
     run_shard(names_and_kwargs=tasks, fn=run_fit_task)
 
 
+def require_tune_stage() -> None:
+    """Stop unless the review marker, the frozen code, and G2, G3, and G4 allow a tuning stage."""
+    require_review(marker=MARKER_REVIEW)
+    require_code_frozen()
+    require_gates(required=GATES_BEFORE_TUNING)
+
+
 def stage_tune(*, args: argparse.Namespace) -> None:
-    """Fit this worker's tuning worlds.
+    """Fit this worker's share of the ridge draws (`tune-ridge`) or tuning worlds (`tune-growth`).
 
     Args:
         args: The parsed arguments.
     """
-    require_fit_stage()
-    tasks = tune_tasks(primaries=primaries_of(worker=args.worker, of=args.of), store=OUT)
+    require_tune_stage()
+    part = "ridge" if args.stage == "tune-ridge" else "growth"
+    tasks = tune_tasks(
+        primaries=primaries_of(worker=args.worker, of=args.of),
+        store=OUT,
+        part=part,
+        ridge_scale=None if part == "ridge" else require_ridge_scale(),
+        worker=args.worker,
+        of=args.of,
+    )
     run_shard(names_and_kwargs=tasks, fn=run_tune_task)
 
 
@@ -796,6 +1037,10 @@ def stage_score() -> None:
     """Score the stored fits."""
     require_fit_stage()
     require_unit()
+    tuned = require_tuned()
+    require_finished(
+        names=[name for name, _ in fit_tasks(primaries=list(PRIMARIES), store=OUT, tuned=tuned)]
+    )
     import e00737_score as score
 
     score.run_score()
@@ -843,7 +1088,14 @@ def dispatch(*, args: argparse.Namespace) -> None:
         "gates": stage_gates,
         "review-mark": review_mark,
         "freeze-code": freeze_code,
-        "tune-collect": lambda: (require_fit_stage(), print(json.dumps(tune_collect(), indent=1))),
+        "tune-ridge-collect": lambda: (
+            require_tune_stage(),
+            print(json.dumps(tune_ridge_collect(), indent=1)),
+        ),
+        "tune-collect": lambda: (
+            require_tune_stage(),
+            print(json.dumps(tune_collect(), indent=1)),
+        ),
         "unit": lambda: (require_fit_stage(), stage_unit()),
         "score": stage_score,
         "report": stage_report,
@@ -851,7 +1103,8 @@ def dispatch(*, args: argparse.Namespace) -> None:
     with_args: dict[str, Callable[..., None]] = {
         "g1-reference": stage_g1_reference_or_draws,
         "g1": stage_g1_reference_or_draws,
-        "tune": stage_tune,
+        "tune-ridge": stage_tune,
+        "tune-growth": stage_tune,
         "fit": stage_fit,
         "figures": stage_figures,
     }

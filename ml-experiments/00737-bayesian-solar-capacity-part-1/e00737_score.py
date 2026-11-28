@@ -244,11 +244,12 @@ def verdict_row(
         row, verdict = 1, "invalid"
     elif c1 == "reversed" or c2 == "R":
         row, verdict = 2, "refuted"
-    elif n_converged_primaries < 5 or c1 != "pass" or bars == "unreadable":
+    elif c1 == "pass" and c2 == "N" and c2_ci_upper < C2_THRESHOLD:
+        # Row 6 comes before row 7 in the plan's table, so it applies even when a bar cannot be
+        # read or fewer than 5 Primaries converged.
+        row, verdict = 6, "not supported"
+    elif n_converged_primaries < 5 or c1 != "pass" or bars == "unreadable" or c2 == "N":
         pass
-    elif c2 == "N":
-        if c2_ci_upper < C2_THRESHOLD:
-            row, verdict = 6, "not supported"
     elif c2 == "M":
         row, verdict = (3, "supported") if bars == "pass" else (4, "partly supported")
     else:
@@ -447,12 +448,31 @@ def contrast(*, metrics: pl.DataFrame, rival: str) -> tuple[np.ndarray, list[np.
     return np.array([float(np.median(v)) for v in per]), per
 
 
-def evaluate_bars(*, metrics: pl.DataFrame, extras: dict[str, dict]) -> dict[str, dict]:
+def included_primaries(*, gates: dict[str, Any]) -> list[str]:
+    """Return the Primaries that enter the real-record results: those that gate G4 did not exclude.
+
+    Args:
+        gates: The parsed `gates.json`.
+
+    Returns:
+        The Primaries, in the order of `PRIMARIES`.
+    """
+    excluded = set(gates["G4"]["excluded_primaries"])
+    return [p for p in PRIMARIES if p not in excluded]
+
+
+def evaluate_bars(
+    *, metrics: pl.DataFrame, extras: dict[str, dict], included: list[str]
+) -> dict[str, dict]:
     """Evaluate the seven bars on arm A.
+
+    Bars B1 to B4, B6, and B7 keep all six Primaries. Bar B5 reads only the `included` Primaries,
+    because the worlds it uses carry the real farms' timing.
 
     Args:
         metrics: The metric table.
         extras: The per-Primary extras of `collect_metrics`.
+        included: The Primaries that gate G4 did not exclude.
 
     Returns:
         For each bar, a record with `ok` (True, False, or None) and the values behind it.
@@ -490,16 +510,20 @@ def evaluate_bars(*, metrics: pl.DataFrame, extras: dict[str, dict]) -> dict[str
         "mismatched_median": mis_median,
         "matched_median": match_median,
     }
-    farm_median = float(np.median(a.filter(pl.col("kind") == "farm")["share"].to_numpy()))
+    kept = pl.col("primary").is_in(included)
+    farm_median = float(np.median(a.filter(kept & (pl.col("kind") == "farm"))["share"].to_numpy()))
     ramp_median = float(
         np.median(
-            main.filter((pl.col("size") == 2.5) & (pl.col("shape") == "ramp"))["share"].to_numpy()
+            main.filter(kept & (pl.col("size") == 2.5) & (pl.col("shape") == "ramp"))[
+                "share"
+            ].to_numpy()
         )
     )
     out["B5"] = {
         "ok": farm_median >= ramp_median - B5_MAX_DROP,
         "farm_median": farm_median,
         "ramp_median": ramp_median,
+        "primaries": included,
     }
     shifts, moves = {}, {}
     for p in PRIMARIES:
@@ -518,9 +542,13 @@ def evaluate_bars(*, metrics: pl.DataFrame, extras: dict[str, dict]) -> dict[str
         gap = np.abs(fit["A_cap"] - main_fit["A_cap"])
         pick = np.zeros(N_QUARTERS, dtype=bool)
         pick[quarters] = True
-        moves[p] = float(gap[pick & scored].max())
+        moves[p] = float(gap[pick & scored].max()) if (pick & scored).any() else float("nan")
     out["B6"] = {"ok": float(np.median(list(shifts.values()))) <= B6_MAX, "shift": shifts}
-    out["B7"] = {"ok": float(np.median(list(moves.values()))) <= B7_MAX_MW, "move_mw": moves}
+    finite_moves = [v for v in moves.values() if np.isfinite(v)]
+    out["B7"] = {
+        "ok": bool(float(np.median(finite_moves)) <= B7_MAX_MW) if finite_moves else None,
+        "move_mw": moves,
+    }
     return out
 
 
@@ -580,16 +608,18 @@ def normal_cdf(*, x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
-def real_record_aggregates(*, extras: dict[str, dict]) -> dict[str, object]:
+def real_record_aggregates(*, extras: dict[str, dict], included: list[str]) -> dict[str, object]:
     """Return the aggregates of the real-record fits (arm A and its comparisons).
 
     Every aggregate is a ratio, a share, or a count. The private tables keep every Primary's value,
     and the figure's array (`real_path.npz`) holds each Primary's capacity as a multiple of its own
     mean. The probability that capacity rises uses a normal approximation that treats the
-    quarters' posterior errors as independent, so it is approximate.
+    quarters' posterior errors as independent, so it is approximate. Only the `included` Primaries
+    enter.
 
     Args:
         extras: The per-Primary extras of `collect_metrics`.
+        included: The Primaries that gate G4 did not exclude.
 
     Returns:
         The aggregates and their per-Primary values.
@@ -597,7 +627,7 @@ def real_record_aggregates(*, extras: dict[str, dict]) -> dict[str, object]:
     ratios, rising, r_over_a, wide, per_primary, paths = {}, {}, {}, [], {}, []
     table = pl.read_parquet(CAPACITY_TABLE_649)
     overlap, readable = 0, 0
-    for p in PRIMARIES:
+    for p in included:
         control = extras[p]["control"]
         scored = extras[p]["scored"]
         raw, sd = control["A_cap"], control["A_sd"]
@@ -639,6 +669,7 @@ def real_record_aggregates(*, extras: dict[str, dict]) -> dict[str, object]:
         "median_r_over_a": float(np.nanmedian(list(r_over_a.values()))),
         "overlap_with_649": {"count": overlap, "of": readable},
         "share_of_quarters_interval_wider_than_half_median": float(np.mean(wide)),
+        "primaries": included,
         "per_primary": per_primary,
         "ratios": ratios,
         "rising": rising,
@@ -646,7 +677,7 @@ def real_record_aggregates(*, extras: dict[str, dict]) -> dict[str, object]:
     }
 
 
-def past_only_gap(*, extras: dict[str, dict]) -> dict[str, float]:
+def past_only_gap(*, extras: dict[str, dict], included: list[str]) -> dict[str, float]:
     """Return how far a past-only fit's last quarter is from the whole-record fit's.
 
     For each Primary and each cut, the gap is the absolute difference of arm A's capacity in the
@@ -655,12 +686,13 @@ def past_only_gap(*, extras: dict[str, dict]) -> dict[str, float]:
 
     Args:
         extras: The per-Primary extras of `collect_metrics`.
+        included: The Primaries that gate G4 did not exclude.
 
     Returns:
         The median and the largest gap over the 24 fits (NaN where a mean is not positive).
     """
     gaps = []
-    for p in PRIMARIES:
+    for p in included:
         control = extras[p]["control"]
         scored = extras[p]["scored"]
         mean = float(np.clip(control["A_cap"], 0.0, None)[scored].mean())
@@ -685,9 +717,10 @@ def run_score() -> None:
     c2_medians, c2_values = contrast(metrics=metrics, rival="Qt")
     c2_lo, c2_hi = median_of_medians_interval(values=c2_values)
     c1_lo, c1_hi = median_of_medians_interval(values=c1_values)
-    bars = evaluate_bars(metrics=metrics, extras=extras)
-    g5 = g5_record(extras=extras)
     gates = json.loads((OUT / "gates.json").read_text())
+    included = included_primaries(gates=gates)
+    bars = evaluate_bars(metrics=metrics, extras=extras, included=included)
+    g5 = g5_record(extras=extras)
     gates_ok = all(gates[g]["passed"] is True for g in ("G1", "G1b", "G2", "G3", "G4")) and bool(
         g5["passed"]
     )
@@ -712,8 +745,9 @@ def run_score() -> None:
             "C2": {"medians": c2_medians.tolist(), "state": c2, "ci": [c2_lo, c2_hi]},
             "bars": {k: dict(v) for k, v in bars.items()},
             "G5": g5,
-            "real": real_record_aggregates(extras=extras),
-            "past_only": past_only_gap(extras=extras),
+            "real_record_primaries": included,
+            "real": real_record_aggregates(extras=extras, included=included),
+            "past_only": past_only_gap(extras=extras, included=included),
             "verdict_row": row,
             "verdict": verdict,
             "n_converged_primaries": n_converged,

@@ -9,8 +9,9 @@ weighted root mean square of its residuals. The posterior at the converged weigh
 and its capacity block comes from the Cholesky factor of the normal equations.
 
 The priors: every baseline coefficient has a zero-mean Gaussian prior whose precision is the ridge
-penalty of `studies.pv_separation`, and the capacities follow a Gaussian random walk with a positive
-drift (arm A), one flat capacity (arm F), or independent flat priors (arm Qt).
+penalty of `studies.pv_separation` times a tuned ridge scale. The capacities follow a Gaussian
+random walk with a positive drift (arm A), one flat capacity (arm F), or independent flat priors
+(arm Qt).
 """
 
 from __future__ import annotations
@@ -492,6 +493,7 @@ def fit_arm(
     model: PrimaryModel,
     power: np.ndarray,
     prior: CapacityPrior,
+    ridge_scale: float,
     solar: np.ndarray | None = None,
     init: EmState | None = None,
     max_iter: int = EM_MAX_ITER,
@@ -503,6 +505,7 @@ def fit_arm(
         model: The Primary's model inputs.
         power: The world's power on the grid (NaN where there is no reading).
         prior: The capacity prior.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
         solar: The unit solar term at the rows (the prior fleet at its ratio by default).
         init: A warm start.
         max_iter: The most iterations.
@@ -521,20 +524,23 @@ def fit_arm(
         rows=data.rows,
         day=data.day,
         prior=prior,
-        ridge_abs=data.ridge_abs,
+        ridge_abs=ridge_scale * data.ridge_abs,
         init=init,
         max_iter=max_iter,
         evidence=evidence,
     )
 
 
-def fit_daily(*, model: PrimaryModel, power: np.ndarray, prior: CapacityPrior) -> FitResult:
+def fit_daily(
+    *, model: PrimaryModel, power: np.ndarray, prior: CapacityPrior, ridge_scale: float
+) -> FitResult:
     """Fit arm Ad: the same model on the sums of each day's daylight half-hours.
 
     Args:
         model: The Primary's model inputs.
         power: The world's power on the grid.
         prior: The capacity prior.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
 
     Returns:
         The fit; each row of it is one day, and the variance has no autocorrelation inflation.
@@ -547,7 +553,7 @@ def fit_daily(*, model: PrimaryModel, power: np.ndarray, prior: CapacityPrior) -
     base = np.add.reduceat(data.base[keep], starts, axis=0)
     solar = np.add.reduceat(model.terms[PRIOR_DC_AC][keep], starts)
     quarter = data.quarter[keep][starts]
-    ridge_abs = ridge_precision(seasonal=base[:, :SEASONAL_COLUMNS])
+    ridge_abs = ridge_scale * ridge_precision(seasonal=base[:, :SEASONAL_COLUMNS])
     return fit_student_t(
         y=y,
         base=base,
@@ -563,7 +569,12 @@ def fit_daily(*, model: PrimaryModel, power: np.ndarray, prior: CapacityPrior) -
 
 
 def fit_free_ratio(
-    *, model: PrimaryModel, power: np.ndarray, prior: CapacityPrior, start: EmState
+    *,
+    model: PrimaryModel,
+    power: np.ndarray,
+    prior: CapacityPrior,
+    ridge_scale: float,
+    start: EmState,
 ) -> tuple[FitResult, float]:
     """Fit arm Af: choose the DC:AC ratio from the grid by the highest Gaussian evidence.
 
@@ -573,6 +584,7 @@ def fit_free_ratio(
         model: The Primary's model inputs.
         power: The world's power on the grid.
         prior: The capacity prior.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
         start: Arm A's final weights and scales.
 
     Returns:
@@ -584,6 +596,7 @@ def fit_free_ratio(
             model=model,
             power=power,
             prior=prior,
+            ridge_scale=ridge_scale,
             solar=model.terms[ratio],
             init=start,
             max_iter=WARM_ITER,
@@ -595,7 +608,9 @@ def fit_free_ratio(
     return best
 
 
-def fit_residual_arm(*, model: PrimaryModel, power: np.ndarray, prior: CapacityPrior) -> FitResult:
+def fit_residual_arm(
+    *, model: PrimaryModel, power: np.ndarray, prior: CapacityPrior, ridge_scale: float
+) -> FitResult:
     """Fit arm R: the residual of experiment 734's stored forecast, with a quarterly level.
 
     The baseline holds only the 18 quarterly levels, because the stored forecast has already
@@ -605,6 +620,7 @@ def fit_residual_arm(*, model: PrimaryModel, power: np.ndarray, prior: CapacityP
         model: The Primary's model inputs.
         power: The world's power on the grid.
         prior: The capacity prior.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision.
 
     Returns:
         The fit.
@@ -623,7 +639,7 @@ def fit_residual_arm(*, model: PrimaryModel, power: np.ndarray, prior: CapacityP
         rows=data.rows[ok],
         day=data.day[ok],
         prior=prior,
-        ridge_abs=RIDGE_PER_COLUMN * float((levels**2).sum(axis=0).mean()),
+        ridge_abs=ridge_scale * RIDGE_PER_COLUMN * float((levels**2).sum(axis=0).mean()),
     )
 
 
@@ -687,6 +703,7 @@ def fit_all_arms(
     model: PrimaryModel,
     power: np.ndarray,
     growth_sd: float,
+    ridge_scale: float,
     oracle_term: np.ndarray | None,
 ) -> WorldFits:
     """Fit the eight arms of one world.
@@ -695,6 +712,7 @@ def fit_all_arms(
         model: The Primary's model inputs.
         power: The world's power on the grid.
         growth_sd: The tuned growth standard deviation of arm A, megawatts per quarter.
+        ridge_scale: The tuned multiplier of the baseline's ridge precision, used by every arm.
         oracle_term: The unit solar term of the injected fleet at the fit rows for arm O, or None
             to reuse arm A's fit (a world with no injected fleet, or whose fleet is the prior's).
 
@@ -709,24 +727,34 @@ def fit_all_arms(
         cap[arm], sd[arm], info[arm] = fit.capacity, fit.sd, _info(fit=fit, ratio=ratio)
 
     rw = random_walk_prior(growth_sd=growth_sd)
-    fit_a = fit_arm(model=model, power=power, prior=rw)
+    fit_a = fit_arm(model=model, power=power, prior=rw, ridge_scale=ridge_scale)
     put(arm="A", fit=fit_a)
-    put(arm="F", fit=fit_arm(model=model, power=power, prior=flat_prior()))
-    put(arm="Qt", fit=fit_arm(model=model, power=power, prior=independent_prior()))
+    put(arm="F", fit=fit_arm(model=model, power=power, prior=flat_prior(), ridge_scale=ridge_scale))
+    put(
+        arm="Qt",
+        fit=fit_arm(model=model, power=power, prior=independent_prior(), ridge_scale=ridge_scale),
+    )
     start = time.perf_counter()
     cap["Q"] = fit_quarters(model=model, power=power)
     sd["Q"] = np.full(N_QUARTERS, np.nan)
     info["Q"] = np.array(
         [0, 1.0, np.nan, np.nan, 1.0, PRIOR_DC_AC, np.nan, time.perf_counter() - start]
     )
-    put(arm="Ad", fit=fit_daily(model=model, power=power, prior=rw))
-    fit_af, ratio = fit_free_ratio(model=model, power=power, prior=rw, start=fit_a.state)
+    put(arm="Ad", fit=fit_daily(model=model, power=power, prior=rw, ridge_scale=ridge_scale))
+    fit_af, ratio = fit_free_ratio(
+        model=model, power=power, prior=rw, ridge_scale=ridge_scale, start=fit_a.state
+    )
     put(arm="Af", fit=fit_af, ratio=ratio)
     if oracle_term is None:
         put(arm="O", fit=fit_a)
     else:
-        put(arm="O", fit=fit_arm(model=model, power=power, prior=rw, solar=oracle_term))
-    put(arm="R", fit=fit_residual_arm(model=model, power=power, prior=rw))
+        put(
+            arm="O",
+            fit=fit_arm(
+                model=model, power=power, prior=rw, solar=oracle_term, ridge_scale=ridge_scale
+            ),
+        )
+    put(arm="R", fit=fit_residual_arm(model=model, power=power, prior=rw, ridge_scale=ridge_scale))
     return WorldFits(capacity=cap, sd=sd, info=info)
 
 

@@ -20,7 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
-from e00737_common import EXIT_FAILED, OUT, atomic_json
+from e00737_common import EXIT_FAILED, OUT, Tuned, atomic_json
 
 CODE_SHA: Final[Path] = OUT / "code.sha256"
 """Hash of the scoring code, written by `freeze-code`."""
@@ -37,6 +37,8 @@ BLAS_VARIABLES: Final[tuple[str, ...]] = (
 """The variables that `run.sh` sets to 1, one thread per numerical library."""
 GATES_REQUIRED: Final[tuple[str, ...]] = ("G1", "G1b", "G2", "G3", "G4")
 """The gates of `gates.json` that must hold before the bulk fits (G5 is read at scoring)."""
+GATES_BEFORE_TUNING: Final[tuple[str, ...]] = ("G2", "G3", "G4")
+"""The gates that must hold before the tuning. G1 and G1b run after it, with the tuned values."""
 
 
 def assert_blas_pinned() -> None:
@@ -115,10 +117,14 @@ def read_record(*, name: str) -> dict:
     return record
 
 
-def require_gates() -> None:
-    """Stop unless `gates.json` records a pass for G1, G1b, G2, G3, and G4 and the other checks."""
+def require_gates(*, required: tuple[str, ...] = GATES_REQUIRED) -> None:
+    """Stop unless `gates.json` records a pass for the gates named and for the other checks.
+
+    Args:
+        required: The gates that must have passed (all of `GATES_REQUIRED` by default).
+    """
     record = read_record(name="gates.json")
-    failed = [g for g in GATES_REQUIRED if record.get(g, {}).get("passed") is not True]
+    failed = [g for g in required if record.get(g, {}).get("passed") is not True]
     failed.extend(
         check
         for check in ("attributes", "known_answers", "quarters")
@@ -128,13 +134,23 @@ def require_gates() -> None:
         sys.exit(f"refusing to run: gates {failed} have not passed")
 
 
-def require_tuned() -> float:
-    """Stop unless `tuned.json` holds the growth standard deviation chosen by the current code.
+def require_tuned() -> Tuned:
+    """Stop unless `tuned.json` holds the values chosen by the current code.
 
     Returns:
-        The chosen growth standard deviation, megawatts per quarter.
+        The chosen growth standard deviation and ridge scale.
     """
-    return float(read_record(name="tuned.json")["growth_sd"])
+    record = read_record(name="tuned.json")
+    return Tuned(growth_sd=float(record["growth_sd"]), ridge_scale=float(record["ridge_scale"]))
+
+
+def require_ridge_scale() -> float:
+    """Stop unless `ridge.json` holds the ridge scale chosen by the current code.
+
+    Returns:
+        The chosen ridge scale.
+    """
+    return float(read_record(name="ridge.json")["ridge_scale"])
 
 
 def require_unit() -> dict:
@@ -172,25 +188,60 @@ def require_budget(*, check_projection: bool = False) -> None:
     """Stop at the CPU-hour line, spent or projected by the first-unit stage.
 
     The marker `cpu_budget_extended.ok` in `OUT` lets a run past the line (the manager writes it).
+    A refusal raises, so that the runner writes a failure record and exits with code 3.
 
     Args:
         check_projection: Also stop when the first-unit projection is over the line.
+
+    Raises:
+        RuntimeError: When the spent or projected CPU-hours are over the stop.
     """
     if (OUT / BUDGET_MARKER).exists():
         return
     spent = spent_cpu_hours()
     if spent > STOP_CPU_HOURS:
-        sys.exit(
+        msg = (
             f"refusing to run: {spent:.1f} CPU-hours spent, over the {STOP_CPU_HOURS:.0f} stop "
             f"(ask the manager; marker {BUDGET_MARKER})"
         )
+        raise RuntimeError(msg)
     if check_projection:
         projected = float(require_unit()["projected_total_cpu_hours"])
         if projected > STOP_CPU_HOURS:
-            sys.exit(
+            msg = (
                 f"refusing to run: the first unit projects {projected:.1f} CPU-hours, over the "
                 f"{STOP_CPU_HOURS:.0f} stop (ask the manager; marker {BUDGET_MARKER})"
             )
+            raise RuntimeError(msg)
+
+
+def require_finished(*, names: list[str]) -> None:
+    """Stop unless every task has a done marker of the current code and `OUT/failed/` is empty.
+
+    Args:
+        names: The names of the tasks that must have finished.
+
+    Raises:
+        RuntimeError: When a done marker is missing or holds another code hash, or a failure
+            record exists.
+    """
+    here = code_hash()
+    unfinished = [
+        n
+        for n in names
+        if not (OUT / "done" / f"{n}.ok").exists()
+        or not (OUT / "done" / f"{n}.ok").read_text().startswith(f"code_hash={here} ")
+    ]
+    failures = (
+        sorted(p.name for p in (OUT / "failed").glob("*.json")) if (OUT / "failed").exists() else []
+    )
+    if unfinished or failures:
+        msg = (
+            f"refusing to score: {len(unfinished)} of {len(names)} tasks have no done marker for "
+            f"the current code (such as {unfinished[:3]}), and {len(failures)} failure records "
+            f"exist (such as {failures[:3]})"
+        )
+        raise RuntimeError(msg)
 
 
 def shard(*, items: list, worker: int, of: int) -> list:

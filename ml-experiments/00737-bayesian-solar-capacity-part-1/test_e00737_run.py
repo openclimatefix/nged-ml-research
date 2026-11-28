@@ -105,6 +105,10 @@ def test_verdict_mapping_covers_every_row() -> None:
     assert _row(c2="S", bars="fail") == (6, "not supported")
     assert _row(c2="N", c2_ci_upper=0.01) == (6, "not supported")
     assert _row(c2="N", c2_ci_upper=0.2) == (7, "inconclusive")
+    # Row 6 is tested before row 7's unreadable bars and unconverged fits.
+    assert _row(c2="N", c2_ci_upper=0.01, bars="unreadable") == (6, "not supported")
+    assert _row(c2="N", c2_ci_upper=0.01, n_converged_primaries=3) == (6, "not supported")
+    assert _row(c2="N", c2_ci_upper=0.01, c1="fail") == (7, "inconclusive")
     assert _row(c2="R") == (2, "refuted")
     assert _row(c1="reversed") == (2, "refuted")
     assert _row(c1="fail") == (7, "inconclusive")
@@ -234,7 +238,7 @@ def test_budget_stop_and_extension_marker(scratch_out: Path) -> None:
         "fit,a,cpu,2026-01-01T00:00:00,2026-01-02T03:00:00\n"
     )  # 27 hours
     assert phases.spent_cpu_hours() == pytest.approx(27.0)
-    with pytest.raises(SystemExit, match="CPU-hours"):
+    with pytest.raises(RuntimeError, match="CPU-hours"):
         phases.require_budget()
     (scratch_out / phases.BUDGET_MARKER).write_text("ok\n")
     phases.require_budget()
@@ -244,7 +248,7 @@ def test_projection_over_the_stop_refuses(scratch_out: Path) -> None:
     (scratch_out / "unit_timing.json").write_text(
         json.dumps({"code_hash": phases.code_hash(), "projected_total_cpu_hours": 40.0})
     )
-    with pytest.raises(SystemExit, match="projects"):
+    with pytest.raises(RuntimeError, match="projects"):
         phases.require_budget(check_projection=True)
 
 
@@ -298,3 +302,161 @@ def test_scratch_redirect_needs_a_guard(monkeypatch: pytest.MonkeyPatch, tmp_pat
     monkeypatch.delenv("E00737_SCRATCH")
     monkeypatch.setenv("E00737_OUT", str(tmp_path / "scratch" / "x"))
     assert common._output_folder() == tmp_path / "scratch" / "x"
+
+
+def test_scoring_needs_every_done_marker_of_the_current_code_and_no_failures(
+    scratch_out: Path,
+) -> None:
+    phases.require_finished(names=[])
+    phases.run_task(name="a", fn=lambda: None)
+    with pytest.raises(RuntimeError, match="1 of 2"):
+        phases.require_finished(names=["a", "b"])
+    phases.run_task(name="b", fn=lambda: None)
+    phases.require_finished(names=["a", "b"])
+    (scratch_out / "done" / "b.ok").write_text("code_hash=stale 2026 peak_rss_gb=1\n")
+    with pytest.raises(RuntimeError, match="1 of 2"):
+        phases.require_finished(names=["a", "b"])
+    phases.run_task(name="b", fn=lambda: None)
+    phases.require_finished(names=["a", "b"])
+    (scratch_out / "failed").mkdir(exist_ok=True)
+    (scratch_out / "failed" / "old.json").write_text("{}")
+    with pytest.raises(RuntimeError, match="1 failure records"):
+        phases.require_finished(names=["a", "b"])
+
+
+def test_g1_collect_refuses_a_gates_record_of_other_code(
+    scratch_out: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import e00737_run as run
+
+    monkeypatch.setattr(run, "OUT", scratch_out)
+    monkeypatch.setattr(phases, "OUT", scratch_out)
+    with pytest.raises(SystemExit, match="does not exist"):
+        run.stage_g1_collect()
+    (scratch_out / "gates.json").write_text(json.dumps({"code_hash": "stale"}))
+    with pytest.raises(SystemExit, match="different code"):
+        run.stage_g1_collect()
+    assert json.loads((scratch_out / "gates.json").read_text()) == {"code_hash": "stale"}
+
+
+def test_worst_case_timing_scales_the_fit_times_to_30_iterations() -> None:
+    import e00737_run as run
+
+    timing = {"load": 10.0, "control": 100.0, "world": 200.0, "fit_a": 20.0}
+    worst = run.worst_case_timing(timing=timing, iterations=10)
+    assert worst == {"load": 10.0, "control": 300.0, "world": 600.0, "fit_a": 60.0}
+    assert run.worst_case_timing(timing=timing, iterations=30) == timing
+
+
+def test_ridge_draws_use_seeds_that_differ_from_the_tuning_and_g1_seeds() -> None:
+    seeds = set(range(common.RIDGE_SEED, common.RIDGE_SEED + common.RIDGE_DRAWS))
+    assert (min(seeds), max(seeds)) == (737100, 737129)
+    assert seeds.isdisjoint(common.TUNING_SEEDS)
+    g1_seeds = {common.G1_SEED + d + h for d in range(common.G1_DRAWS) for h in (0, 100_000)}
+    assert seeds.isdisjoint(g1_seeds)
+    assert 1.0 in common.RIDGE_SCALE_GRID
+    assert common.RIDGE_SCALE_GRID[0] == max(common.RIDGE_SCALE_GRID)  # a tie goes to the first
+
+
+def test_tuning_gates_leave_out_g1_and_g1b_but_the_bulk_needs_them(scratch_out: Path) -> None:
+    record: dict[str, object] = {g: {"passed": True} for g in ("G2", "G3", "G4", "attributes")}
+    record |= {"known_answers": {"passed": True}, "quarters": {"passed": True}}
+    record["code_hash"] = phases.code_hash()
+    (scratch_out / "gates.json").write_text(json.dumps(record))
+    phases.require_gates(required=phases.GATES_BEFORE_TUNING)
+    with pytest.raises(SystemExit, match="G1"):
+        phases.require_gates()
+
+
+def test_tuned_record_holds_both_values_and_every_fit_task_carries_them(scratch_out: Path) -> None:
+    import e00737_run as run
+
+    path = scratch_out / "tuned.json"
+    path.write_text(
+        json.dumps({"growth_sd": 0.6, "ridge_scale": 0.01, "code_hash": phases.code_hash()})
+    )
+    tuned = phases.require_tuned()
+    assert tuned == common.Tuned(growth_sd=0.6, ridge_scale=0.01)
+    path.write_text(json.dumps({"growth_sd": 0.6, "code_hash": "stale"}))
+    with pytest.raises(SystemExit, match="different code"):
+        phases.require_tuned()
+    tasks = run.fit_tasks(primaries=[common.PRIMARIES[0]], store=scratch_out, tuned=tuned)
+    assert tasks
+    for name, kwargs in tasks:
+        assert kwargs["growth_sd"] == 0.6, name
+        assert kwargs["ridge_scale"] == 0.01, name
+
+
+def test_tune_collect_picks_the_ridge_scale_first_and_then_the_growth_sd(
+    scratch_out: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import e00737_run as run
+
+    monkeypatch.setattr(run, "OUT", scratch_out)
+    folder = scratch_out / "tuning" / "ridge"
+    folder.mkdir(parents=True)
+    rng = np.random.default_rng(0)
+    for d in range(common.RIDGE_DRAWS):
+        # Scale 1 gives the largest error and the smallest scale the lowest, in every draw.
+        errors = np.array([0.30, 0.10, 0.05]) + rng.uniform(0.0, 0.01, size=3)
+        np.savez(folder / f"draw_{d:03d}.npz", error=errors)
+    record = run.tune_ridge_collect()
+    assert record["ridge_scale"] == 0.01
+    assert record["seeds"] == [737100, 737129]
+    truth = np.linspace(0.0, 4.0, common.N_QUARTERS)
+    scored = np.ones(common.N_QUARTERS, dtype=bool)
+    growth_error = [0.3, 0.2, 0.05]  # the largest growth sd is the best
+    for site in common.PRIMARIES:
+        folder = scratch_out / "tuning" / site
+        folder.mkdir(parents=True)
+        np.savez(folder / "growth_control.npz", cap=np.zeros((3, common.N_QUARTERS)), scored=scored)
+        for spec in worlds.tuning_specs(primary=site):
+            # An estimate of truth x (1 - e) has a path error of exactly e.
+            cap = np.array([truth * (1 - e) for e in growth_error])
+            np.savez(folder / f"growth_{spec.name}.npz", cap=cap, truth=truth)
+    tuned = run.tune_collect()
+    assert tuned["ridge_scale"] == 0.01
+    assert tuned["growth_sd"] == 0.60
+    assert tuned["median_path_error"] == pytest.approx(growth_error)
+    assert json.loads((scratch_out / "tuned.json").read_text())["ridge_scale"] == 0.01
+
+
+def test_ridge_tie_goes_to_the_larger_scale(
+    scratch_out: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import e00737_run as run
+
+    monkeypatch.setattr(run, "OUT", scratch_out)
+    folder = scratch_out / "tuning" / "ridge"
+    folder.mkdir(parents=True)
+    for d in range(common.RIDGE_DRAWS):
+        np.savez(folder / f"draw_{d:03d}.npz", error=np.array([0.2, 0.1, 0.1]))
+    assert run.tune_ridge_collect()["ridge_scale"] == 0.1
+
+
+def test_ridge_tasks_are_sharded_by_draw_and_growth_tasks_by_primary(scratch_out: Path) -> None:
+    import e00737_run as run
+
+    shards = [
+        run.tune_tasks(
+            primaries=list(common.PRIMARIES[:1]),
+            store=scratch_out,
+            part="ridge",
+            ridge_scale=None,
+            worker=w,
+            of=3,
+        )
+        for w in range(3)
+    ]
+    names = sorted(name for shard in shards for name, _ in shard)
+    assert len(names) == common.RIDGE_DRAWS == len(set(names))
+    growth = run.tune_tasks(
+        primaries=list(common.PRIMARIES[:1]),
+        store=scratch_out,
+        part="growth",
+        ridge_scale=0.1,
+        worker=0,
+        of=1,
+    )
+    assert len(growth) == 1 + 20
+    assert all(kwargs["ridge_scale"] == 0.1 for _, kwargs in growth)

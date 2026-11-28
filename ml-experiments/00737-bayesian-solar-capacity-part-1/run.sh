@@ -5,7 +5,8 @@
 # invocation only prints this help.
 #
 # Usage:  SLOT_CPUS=<cpu list> run.sh --go <stage> [arguments] [--workers N]
-#         stages: gates review-mark freeze-code g1-reference g1 g1-collect tune tune-collect unit
+#         stages: gates review-mark freeze-code tune-ridge tune-ridge-collect tune-growth
+#         tune-collect g1-reference g1 g1-collect unit
 #         fit smoke score report figures (see `e00737_run.py --help`). `--workers N` starts N
 #         workers (`--worker i --of N`) inside
 #         the one scope, through `run_workers.sh`, and exits with the worst worker's exit code. A
@@ -15,8 +16,8 @@
 # Rules it sets:
 #   - one scope at a time: `systemd-run --user --scope`, `MemoryMax=$SLOT_MEM`, `MemorySwapMax=0`,
 #     `OOMPolicy=continue`, `AllowedCPUs=$SLOT_CPUS`, and `taskset -c` on the same list. SLOT_MEM
-#     defaults to 4G for each worker, and to at most 16G for the whole scope (the plan's peak is
-#     about 1 GB a worker): 4G for one worker, 16G for `--workers 4` or more;
+#     defaults to 2.5G for each worker, and to at most 16G for the whole scope (the plan's peak is
+#     about 1 GB a worker): 2.5G for one worker, 15G for 6 workers, 16G for 7 or more;
 #   - one thread per worker for every numerical library (OMP, MKL, OpenBLAS, Polars, and Rayon);
 #   - at least 25 GB available at launch, and one-minute load below 24, or the wrapper refuses;
 #   - the venv's Python called directly (never `uv run` inside the scope), with this folder and the
@@ -28,7 +29,7 @@
 # `scratch` path component).
 set -euo pipefail
 if [ "${1:-}" != "--go" ] || [ -z "${2:-}" ]; then
-    sed -n '2,27p' "$0" >&2
+    sed -n '2,28p' "$0" >&2
     echo "refusing to run: pass --go and a stage (nothing was started)" >&2
     exit 64
 fi
@@ -81,9 +82,9 @@ if ! [[ "$workers" =~ ^[0-9]+$ ]]; then
     exit 64
 fi
 per_worker=$((workers > 1 ? workers : 1))
-default_gb=$((4 * per_worker))
-if [ "$default_gb" -gt 16 ]; then default_gb=16; fi
-: "${SLOT_MEM:=${default_gb}G}"
+default_mb=$((2560 * per_worker))
+if [ "$default_mb" -gt 16384 ]; then default_mb=16384; fi
+: "${SLOT_MEM:=${default_mb}M}"
 if [ -n "${E00737_OUT:-}" ]; then
     echo "WARNING: E00737_OUT is set, so every output goes to ${E00737_OUT}, not to the data folder" >&2
 fi

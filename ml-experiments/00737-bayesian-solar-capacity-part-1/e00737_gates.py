@@ -16,18 +16,22 @@ from typing import Any, Final
 
 import numpy as np
 from e00737_common import (
+    FARM_IDS,
     G1_COVERAGE,
     G1_DRAWS,
     G1_SEED,
     G1_TOLERANCE,
     G1B_MIN_SHARE,
-    GATE_GROWTH_SD,
     GRID_LENGTH,
     HALF_HOURS_PER_DAY,
     INTERVAL_Z,
     N_QUARTERS,
     OUT,
     PRIMARIES,
+    RIDGE_SCALE_GRID,
+    RIDGE_SEED,
+    RIDGE_STEP_GROWTH_SD,
+    Tuned,
     atomic_json,
 )
 from e00737_fit import PrimaryModel, build_model, fit_arm, random_walk_prior
@@ -42,6 +46,7 @@ from e00737_inputs import (
     PrimaryInputs,
     assert_cut,
     build_fit_data,
+    load_farm_per_unit,
     load_primary,
     unit_term,
 )
@@ -95,10 +100,21 @@ FAIMAN_EXPECTED_C: Final[float] = 40.7
 SHIFTS: Final[tuple[int, ...]] = (-1, 0, 1)
 SCAN_SHIFTS: Final[tuple[float, ...]] = tuple(float(k) for k in np.arange(-2.0, 2.0001, 0.25))
 """Shifts of the model's unit contrast that G4 scans, in half-hours."""
-G4_POOLED_RANGE: Final[tuple[float, float]] = (-0.5, 1.5)
-"""The pooled best shift passes G4 when it lies in this closed range, in half-hours."""
-G4_PRIMARY_RANGE: Final[tuple[float, float]] = (-1.0, 2.0)
-"""Each Primary's best shift passes G4 when it lies strictly inside this range, in half-hours."""
+G4_POOLED_DIFFERENCE: Final[float] = 0.5
+"""The pooled best shift of the Primaries passes G4 when it is within this many half-hours of the
+metered farms' pooled best shift."""
+G4_PRIMARY_DIFFERENCE: Final[float] = 0.75
+"""A Primary's best shift is within bounds when it is within this many half-hours of the mean best
+shift of the metered farms' contrast against that Primary's sky."""
+G4_MIN_PRIMARIES_WITHIN: Final[int] = 4
+"""Primaries that must be within `G4_PRIMARY_DIFFERENCE` for G4 to pass. A Primary outside the bound
+is excluded from the real-record results."""
+G4_MIN_FARM_MONTHS: Final[int] = 5
+"""Months of April to September that a farm's contrast needs, against one Primary's sky."""
+G4_V2_POOLED_RANGE: Final[tuple[float, float]] = (-0.5, 1.5)
+"""Version 2's pooled pass range, kept as a diagnostic that does not decide the gate."""
+G4_V2_PRIMARY_RANGE: Final[tuple[float, float]] = (-1.0, 2.0)
+"""Version 2's per-Primary pass range (strict), kept as a diagnostic only."""
 G4_MIN_DAYS: Final[int] = 3
 """Days needed in each tercile, for one half-hour of one month, to count as readable."""
 G4_MIN_RELIABLE_SHARE: Final[float] = 0.9
@@ -530,29 +546,96 @@ def shift_passes(*, best: float, bounds: tuple[float, float], strict: bool) -> b
     return low < best < high if strict else low <= best <= high
 
 
-def g4(*, inputs: dict[str, PrimaryInputs]) -> dict[str, Any]:
-    """Gate G4 (version 2, scan): the half-hour timing convention, on the real series.
+def farm_reference(*, inp: PrimaryInputs, farms: list[np.ndarray]) -> dict[str, Any]:
+    """Return the metered farms' best shifts of the same contrast against one Primary's sky.
+
+    Each farm's output per unit of capacity replaces the Primary's power in `tercile_contrast`
+    (with its sign flipped, so that it dips at midday like net load), over the half-hours where
+    the farm has a reading and the sky is reliable. The scan and the prior fleet are those of the
+    Primary's own contrast. The farm file is end-labelled, so each farm is correctly indexed.
+
+    Args:
+        inp: The Primary's inputs, which supply the sky, the days, and the model's unit output.
+        farms: Each farm's output per unit of capacity on the grid, NaN where missing.
+
+    Returns:
+        The best shift of each readable farm (`shifts`), and the farms' contrast and model curves
+        and the daylight half-hours (`real`, `model`, `slots`, for pooling).
+    """
+    unit = unit_term(inputs=inp, fleet=PRIOR_FLEET)
+    slots = daylight_slots(inputs=inp)
+    shifts: list[float] = []
+    real_curves, model_curves = [], []
+    for farm in farms:
+        rows = np.isfinite(farm) & inp.reliable
+        real, info = tercile_contrast(inputs=inp, values=-np.nan_to_num(farm), rows=rows)
+        model, _ = tercile_contrast(inputs=inp, values=unit, rows=rows)
+        if info["months_used"] < G4_MIN_FARM_MONTHS:
+            continue
+        shift, _ = scan_correlation(real_curve=real, model_curve=model, slots=slots)
+        if shift == UNREADABLE_SHIFT:
+            continue
+        shifts.append(shift)
+        real_curves.append(real)
+        model_curves.append(model)
+    return {"shifts": shifts, "real": real_curves, "model": model_curves, "slots": slots}
+
+
+def pooled_farm_shift(
+    *, real_curves: list[np.ndarray], model_curves: list[np.ndarray], slots: np.ndarray
+) -> float:
+    """Return the best shift of the farms' contrast curves averaged over every Primary and farm.
+
+    Args:
+        real_curves: The farms' contrast curves, one for each readable pair of a Primary and a farm.
+        model_curves: The model's contrast curves of the same pairs.
+        slots: The half-hours of the day to correlate over.
+
+    Returns:
+        The best shift (-99 when there are no curves or no shift is readable).
+    """
+    if not real_curves:
+        return float(UNREADABLE_SHIFT)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        real = np.nanmean(real_curves, axis=0)
+        model = np.nanmean(model_curves, axis=0)
+    return scan_correlation(real_curve=real, model_curve=model, slots=slots)[0]
+
+
+def g4(*, inputs: dict[str, PrimaryInputs], farms: list[np.ndarray]) -> dict[str, Any]:
+    """Gate G4 (version 3): the half-hour timing convention, against the metered farms.
 
     For each Primary, the real power and the model's unit solar output are each contrasted between
     the sunniest and the dullest tercile of the days of the same month (April to September,
     weekdays), so that the demand's seasonal swing cancels. The model's contrast is delayed by each
     shift from -2 to +2 half-hours in steps of 0.25 (interpolating linearly), and the best shift is
     the one that correlates best with the real contrast over the daylight half-hours. The fleet mix
-    is the prior mix. The gate passes when the pooled best shift lies in `G4_POOLED_RANGE`, each
-    Primary's best shift lies strictly inside `G4_PRIMARY_RANGE`, and the CAMS hours that are dark
-    at both of their half-hours carry no irradiance. A Primary with no readable contrast fails the
-    gate. The best integer shift of the same contrast and the registered summer-minus-winter
-    version are kept as diagnostics that do not decide the gate.
+    is the prior mix. The metered farms, whose file is end-labelled and so correctly indexed, give
+    the reference for the same method: each farm's contrast against the same Primary's sky has its
+    own best shift, because the Primaries are net load and sit later than the farms by the fleet's
+    lean and the demand response. The gate passes when at least `G4_MIN_PRIMARIES_WITHIN` of the
+    Primaries have a best shift, minus the mean best shift of the farms against their sky, within
+    `G4_PRIMARY_DIFFERENCE`, the pooled best shift of the Primaries minus the pooled best shift of
+    the farms lies within `G4_POOLED_DIFFERENCE`, and the CAMS hours that are dark at both of their
+    half-hours carry no irradiance. A Primary or a farm reference with no readable contrast is not
+    within the bound. Each Primary outside the bound is listed in `excluded_primaries`, and the
+    score stage leaves it out of the real-record results. The best
+    integer shift, the registered summer-minus-winter version, and version 2's absolute ranges are
+    kept as diagnostics that do not decide the gate.
 
     Args:
         inputs: The Primaries' inputs by label.
+        farms: Each metered farm's output per unit of capacity on the grid (private).
 
     Returns:
-        A record with `passed`, each Primary's best shift and correlation curve, the pooled ones,
-        and the diagnostics.
+        A record with `passed`, `excluded_primaries`, each Primary's best shift, farm reference and
+        correlation curve, the pooled ones, and the diagnostics. It holds shifts as numbers and no
+        farm identifiers.
     """
     records: dict[str, dict[str, Any]] = {}
     real_all, model_all, slots_all = [], [], []
+    farm_real_all, farm_model_all = [], []
     old_real_all, old_model_all = [], []
     diagnostic: dict[str, dict[str, Any]] = {}
     integer_diagnostic: dict[str, dict[str, Any]] = {}
@@ -564,6 +647,14 @@ def g4(*, inputs: dict[str, PrimaryInputs]) -> dict[str, Any]:
         model, _ = tercile_contrast(inputs=inp, values=unit, rows=rows)
         slots = daylight_slots(inputs=inp)
         shift, corr = scan_correlation(real_curve=real, model_curve=model, slots=slots)
+        reference = farm_reference(inp=inp, farms=farms)
+        farm_real_all += reference["real"]
+        farm_model_all += reference["model"]
+        reference_shift = (
+            float(np.mean(reference["shifts"])) if reference["shifts"] else float(UNREADABLE_SHIFT)
+        )
+        readable = shift != UNREADABLE_SHIFT and bool(reference["shifts"])
+        difference = shift - reference_shift if readable else float("nan")
         integer_shift, integer_corr = shifted_correlation(
             real_curve=real, model_curve=model, slots=slots
         )
@@ -573,8 +664,13 @@ def g4(*, inputs: dict[str, PrimaryInputs]) -> dict[str, Any]:
         night_max = float(ghi[dark & inp.hourly["reliable"].to_numpy()].max())
         records[site] = {
             "best_shift": shift,
+            "farm_reference_shift": reference_shift,
+            "farms_used": len(reference["shifts"]),
+            "farm_reference_min": float(min(reference["shifts"], default=np.nan)),
+            "farm_reference_max": float(max(reference["shifts"], default=np.nan)),
+            "difference": difference,
             "correlation": corr,
-            "readable": shift != UNREADABLE_SHIFT,
+            "readable": readable,
             "months_used": info["months_used"],
             "daylight_half_hours": int(slots.sum()),
             "dark_hour_max_ghi_w_m2": night_max,
@@ -592,34 +688,53 @@ def g4(*, inputs: dict[str, PrimaryInputs]) -> dict[str, Any]:
         }
         old_real_all.append(old_real)
         old_model_all.append(old_model)
+    pooled_slots = np.any(slots_all, axis=0)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         pooled_real = np.nanmean(real_all, axis=0)
         pooled_model = np.nanmean(model_all, axis=0)
-    pooled_slots = np.any(slots_all, axis=0)
     pooled_shift, pooled_corr = scan_correlation(
         real_curve=pooled_real, model_curve=pooled_model, slots=pooled_slots
     )
+    farm_pooled_shift = pooled_farm_shift(
+        real_curves=farm_real_all, model_curves=farm_model_all, slots=pooled_slots
+    )
+    pooled_readable = UNREADABLE_SHIFT not in (pooled_shift, farm_pooled_shift)
+    pooled_difference = pooled_shift - farm_pooled_shift if pooled_readable else float("nan")
     pooled_integer_shift, pooled_integer_corr = shifted_correlation(
         real_curve=pooled_real, model_curve=pooled_model, slots=pooled_slots
     )
     old_pooled_shift, old_pooled_corr = best_shift(
         real_curve=np.mean(old_real_all, axis=0), model_curve=np.mean(old_model_all, axis=0)
     )
-    passed = (
-        shift_passes(best=pooled_shift, bounds=G4_POOLED_RANGE, strict=False)
-        and all(
-            shift_passes(best=float(r["best_shift"]), bounds=G4_PRIMARY_RANGE, strict=True)
-            for r in records.values()
+    for r in records.values():
+        r["within_bound"] = bool(
+            r["readable"] and abs(float(r["difference"])) <= G4_PRIMARY_DIFFERENCE
         )
+    excluded = [site for site, r in records.items() if not r["within_bound"]]
+    passed = (
+        pooled_readable
+        and abs(pooled_difference) <= G4_POOLED_DIFFERENCE
+        and len(records) - len(excluded) >= G4_MIN_PRIMARIES_WITHIN
         and all(float(r["dark_hour_max_ghi_w_m2"]) <= NIGHT_GHI_MAX_W_M2 for r in records.values())
+    )
+    v2_passed = shift_passes(best=pooled_shift, bounds=G4_V2_POOLED_RANGE, strict=False) and all(
+        shift_passes(best=float(r["best_shift"]), bounds=G4_V2_PRIMARY_RANGE, strict=True)
+        for r in records.values()
     )
     return {
         "passed": bool(passed),
-        "version": "2-scan",
+        "version": "3-farm-reference",
+        "excluded_primaries": excluded,
         "pooled_best_shift": pooled_shift,
+        "pooled_farm_reference_shift": farm_pooled_shift,
+        "pooled_difference": pooled_difference,
         "pooled_correlation": pooled_corr,
         "primaries": records,
+        "diagnostic_v2_absolute_ranges": {
+            "decides_gate": False,
+            "passed_if_it_decided": bool(v2_passed),
+        },
         "diagnostic_integer_shift": {
             "decides_gate": False,
             "pooled_best_shift": pooled_integer_shift,
@@ -646,30 +761,35 @@ def stage0_gates() -> dict[str, Any]:
     """
     missing = missing_attributes()
     inputs = {p: load_primary(site=p) for p in PRIMARIES}
+    farms = [load_farm_per_unit(farm=k) for k in range(len(FARM_IDS))]
     return {
         "attributes": {"passed": not missing, "missing": missing},
         "known_answers": known_answers(),
         "quarters": quarter_counts(inputs=inputs),
         "G2": g2(inputs=inputs),
         "G3": g3(inputs=inputs),
-        "G4": g4(inputs=inputs),
+        "G4": g4(inputs=inputs, farms=farms),
     }
 
 
 # --- G1 and G1b ----------------------------------------------------------------------------
 
 
-def g1_reference(*, model: PrimaryModel) -> dict[str, np.ndarray]:
+def g1_reference(*, model: PrimaryModel, tuned: Tuned) -> dict[str, np.ndarray]:
     """Fit arm A to the real record once, for the synthetic series' baseline and noise scales.
 
     Args:
         model: The first Primary's model inputs.
+        tuned: The tuned growth standard deviation and ridge scale.
 
     Returns:
         The baseline's contribution at the fit rows, and the daylight and night scales.
     """
     fit = fit_arm(
-        model=model, power=model.inputs.power, prior=random_walk_prior(growth_sd=GATE_GROWTH_SD)
+        model=model,
+        power=model.inputs.power,
+        prior=random_walk_prior(growth_sd=tuned.growth_sd),
+        ridge_scale=tuned.ridge_scale,
     )
     n_base = model.data.base.shape[1]
     return {
@@ -678,22 +798,23 @@ def g1_reference(*, model: PrimaryModel) -> dict[str, np.ndarray]:
     }
 
 
-def g1_draw(
-    *, model: PrimaryModel, reference: dict[str, np.ndarray], draw: int, heavy: bool
-) -> dict:
-    """Fit one synthetic series: baseline, the prior's own fleet, and noise.
+def synthetic_series(
+    *, model: PrimaryModel, reference: dict[str, np.ndarray], seed: int, heavy: bool
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build one synthetic series: baseline, the prior's own fleet, and noise.
 
     Args:
         model: The first Primary's model inputs.
         reference: `g1_reference`'s output.
-        draw: The draw's number.
-        heavy: Use Student-t noise with 4 degrees of freedom at the daytime scale (G1b) instead of
-            Gaussian noise at each class's scale (G1).
+        seed: The random seed of the noise.
+        heavy: Use Student-t noise with 4 degrees of freedom at the daytime scale instead of
+            Gaussian noise at each class's scale.
 
     Returns:
-        The fitted capacities, their standard deviations, and the truth.
+        The power on the grid (NaN outside the fit rows), and the injected capacity of each
+        quarter.
     """
-    rng = np.random.default_rng(G1_SEED + draw + (100_000 if heavy else 0))
+    rng = np.random.default_rng(seed)
     data = model.data
     truth = capacity_path(shape="ramp", size_mw=G1_SIZE_MW)
     sigma_day, sigma_night = reference["sigma"]
@@ -708,7 +829,37 @@ def g1_draw(
     )
     power = np.full(GRID_LENGTH, np.nan)
     power[data.rows] = series
-    fit = fit_arm(model=model, power=power, prior=random_walk_prior(growth_sd=GATE_GROWTH_SD))
+    return power, truth
+
+
+def g1_draw(
+    *, model: PrimaryModel, reference: dict[str, np.ndarray], tuned: Tuned, draw: int, heavy: bool
+) -> dict:
+    """Fit one synthetic series of G1 (or G1b).
+
+    Args:
+        model: The first Primary's model inputs.
+        reference: `g1_reference`'s output.
+        tuned: The tuned growth standard deviation and ridge scale.
+        draw: The draw's number.
+        heavy: Use Student-t noise with 4 degrees of freedom at the daytime scale (G1b) instead of
+            Gaussian noise at each class's scale (G1).
+
+    Returns:
+        The fitted capacities, their standard deviations, and the truth.
+    """
+    power, truth = synthetic_series(
+        model=model,
+        reference=reference,
+        seed=G1_SEED + draw + (100_000 if heavy else 0),
+        heavy=heavy,
+    )
+    fit = fit_arm(
+        model=model,
+        power=power,
+        prior=random_walk_prior(growth_sd=tuned.growth_sd),
+        ridge_scale=tuned.ridge_scale,
+    )
     return {
         "capacity": fit.capacity.tolist(),
         "sd": fit.sd.tolist(),
@@ -716,6 +867,35 @@ def g1_draw(
         "converged": fit.converged,
         "n_iter": fit.n_iter,
     }
+
+
+def ridge_draw(*, model: PrimaryModel, reference: dict[str, np.ndarray], draw: int) -> np.ndarray:
+    """Fit one Gaussian synthetic series at each ridge scale and return the capacity errors.
+
+    Args:
+        model: The first Primary's model inputs.
+        reference: `g1_reference`'s output, fitted at the unscaled ridge.
+        draw: The draw's number, from 0 to `RIDGE_DRAWS` - 1.
+
+    Returns:
+        For each ridge scale of `RIDGE_SCALE_GRID`, the largest absolute gap between the fitted and
+        the injected capacity over the 18 quarters, megawatts.
+    """
+    power, truth = synthetic_series(
+        model=model, reference=reference, seed=RIDGE_SEED + draw, heavy=False
+    )
+    prior = random_walk_prior(growth_sd=RIDGE_STEP_GROWTH_SD)
+    return np.array(
+        [
+            float(
+                np.abs(
+                    fit_arm(model=model, power=power, prior=prior, ridge_scale=scale).capacity
+                    - truth
+                ).max()
+            )
+            for scale in RIDGE_SCALE_GRID
+        ]
+    )
 
 
 def g1_collect(*, draws: list[dict], heavy: bool) -> dict[str, Any]:
@@ -757,10 +937,14 @@ def g1_model() -> PrimaryModel:
     return build_model(inputs=load_primary(site=G1_PRIMARY))
 
 
-def write_g1_reference() -> None:
-    """Write the reference fit that every G1 draw reads."""
+def write_g1_reference(*, tuned: Tuned) -> None:
+    """Write the reference fit that every G1 draw reads.
+
+    Args:
+        tuned: The tuned growth standard deviation and ridge scale.
+    """
     model = g1_model()
-    ref = g1_reference(model=model)
+    ref = g1_reference(model=model, tuned=tuned)
     path = OUT / "g1" / "reference.npz"
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name("reference.tmp.npz")
@@ -778,14 +962,17 @@ def read_g1_reference() -> dict[str, np.ndarray]:
         return {k: f[k] for k in f.files}
 
 
-def run_g1_draw(*, draw: int, heavy: bool) -> None:
+def run_g1_draw(*, tuned: Tuned, draw: int, heavy: bool) -> None:
     """Fit one draw of G1 or G1b and write its record.
 
     Args:
+        tuned: The tuned growth standard deviation and ridge scale.
         draw: The draw's number.
         heavy: Whether this is a G1b draw.
     """
-    record = g1_draw(model=g1_model(), reference=read_g1_reference(), draw=draw, heavy=heavy)
+    record = g1_draw(
+        model=g1_model(), reference=read_g1_reference(), tuned=tuned, draw=draw, heavy=heavy
+    )
     atomic_json(obj=record, path=OUT / "g1" / f"{'g1b' if heavy else 'g1'}_{draw:03d}.json")
 
 

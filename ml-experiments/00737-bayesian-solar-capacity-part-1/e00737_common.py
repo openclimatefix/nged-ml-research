@@ -13,7 +13,7 @@ import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import numpy as np
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -92,8 +92,21 @@ DRIFT_MW_PER_QUARTER: Final[float] = 0.10
 FIRST_QUARTER_MEAN_MW: Final[float] = 2.0
 FIRST_QUARTER_SD_MW: Final[float] = 2.0
 GROWTH_SD_GRID: Final[tuple[float, ...]] = (0.15, 0.30, 0.60)
-GATE_GROWTH_SD: Final[float] = 0.30
-"""Growth standard deviation used by gates G1 and G1b, which run before the tuning."""
+RIDGE_SCALE_GRID: Final[tuple[float, ...]] = (1.0, 0.1, 0.01)
+"""Multipliers of the baseline's ridge precision (`RIDGE_PER_COLUMN`) that the tuning compares."""
+RIDGE_STEP_GROWTH_SD: Final[float] = 0.30
+"""Growth standard deviation held fixed while the tuning chooses the ridge scale."""
+
+
+class Tuned(NamedTuple):
+    """The two values that the tuning chooses, read from `tuned.json` by every scored fit."""
+
+    growth_sd: float
+    """Growth standard deviation of the random-walk prior, megawatts per quarter."""
+    ridge_scale: float
+    """Multiplier of the baseline's ridge precision."""
+
+
 QT_MEAN_MW: Final[float] = 2.0
 QT_SD_MW: Final[float] = 5.0
 DOF: Final[float] = 4.0
@@ -138,6 +151,11 @@ EXPECTED_TUNING_WORLDS: Final[int] = 120
 # --- Gates, scoring, and the run ------------------------------------------------------------
 G1_DRAWS: Final[int] = 100
 G1_SEED: Final[int] = 737900
+RIDGE_DRAWS: Final[int] = 30
+"""Synthetic draws on which the tuning chooses the ridge scale."""
+RIDGE_SEED: Final[int] = 737100
+"""Seed of the first ridge draw. The draws use 737100 to 737129, which differ from the tuning seeds
+(737000 to 737009) and from the G1 seeds (737900 upwards)."""
 G1_TOLERANCE: Final[float] = 0.03
 G1_COVERAGE: Final[tuple[float, float]] = (0.75, 0.85)
 G1B_MIN_SHARE: Final[float] = 0.95
