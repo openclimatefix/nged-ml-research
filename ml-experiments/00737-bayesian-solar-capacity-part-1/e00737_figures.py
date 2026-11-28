@@ -1,7 +1,8 @@
 """Figures of experiment 737, written under the data folder only (private, never published).
 
-The gallery shows synthetic quantities. The forward-model and fleet figures (6) are drawn before
-the first scored fit, the four posterior figures come from the tuning seeds, and the one real-record
+The gallery shows synthetic quantities. The forward-model figures are drawn before the first scored
+fit. The fleet and posterior figures read the tuned values and refuse to run without `tuned.json`
+and its digest. The four posterior figures come from the tuning seeds, and the one real-record
 figure holds the median capacity path over the six Primaries as a multiple of each Primary's own
 mean. No figure shows a metered series, a calendar date, a Primary's own path, or a capacity in
 megawatts of a real Primary. Every axis counts hours, days of a week, or quarters.
@@ -15,7 +16,7 @@ from typing import Any, Final
 import altair as alt
 import numpy as np
 import polars as pl
-from e00737_common import GROWTH_SD_GRID, N_QUARTERS, OUT, PRIMARIES, time_log
+from e00737_common import N_QUARTERS, OUT, PRIMARIES, time_log
 from e00737_fit import (
     PrimaryModel,
     build_model,
@@ -26,6 +27,7 @@ from e00737_fit import (
 )
 from e00737_forward import PRIOR_FLEET, FleetParams, fleet_unit_output
 from e00737_inputs import load_primary
+from e00737_phases import require_tuned
 from e00737_worlds import WorldSpec, build_world, draw_fleet
 from plotting.ocf_theme import BRAND_ORANGE, DATA_BLUE, DATA_GREEN, DATA_PURPLE, DATA_SKY
 
@@ -411,19 +413,15 @@ def make_figures(*, part: str) -> None:
     """Draw one part of the gallery.
 
     Args:
-        part: `forward`, `fleets`, `posterior`, or `real`.
+        part: `forward`, `fleets`, `posterior`, or `real`. The parts `fleets` and `posterior` stop
+            unless `tuned.json` holds the values chosen by the current code, with its digest.
     """
-    import json
-
-    tuned = OUT / "tuned.json"
-    record = json.loads(tuned.read_text()) if tuned.exists() else {}
-    growth_sd = record.get("growth_sd", GROWTH_SD_GRID[1])
-    ridge_scale = record.get("ridge_scale", 1.0)
     if part == "forward":
         forward_figures()
     elif part == "fleets":
-        fleet_figures(growth_sd=growth_sd)
+        fleet_figures(growth_sd=require_tuned().growth_sd)
     elif part == "posterior":
-        posterior_figures(growth_sd=growth_sd, ridge_scale=ridge_scale)
+        tuned = require_tuned()
+        posterior_figures(growth_sd=tuned.growth_sd, ridge_scale=tuned.ridge_scale)
     else:
         real_figure()

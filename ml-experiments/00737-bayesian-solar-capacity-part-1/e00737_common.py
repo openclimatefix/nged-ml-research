@@ -153,9 +153,9 @@ G1_DRAWS: Final[int] = 100
 G1_SEED: Final[int] = 737900
 RIDGE_DRAWS: Final[int] = 30
 """Synthetic draws on which the tuning chooses the ridge scale."""
-RIDGE_SEED: Final[int] = 737100
-"""Seed of the first ridge draw. The draws use 737100 to 737129, which differ from the tuning seeds
-(737000 to 737009) and from the G1 seeds (737900 upwards)."""
+RIDGE_SEED: Final[int] = 737200
+"""Seed of the first ridge draw. The draws use 737200 to 737229, which differ from every scored seed
+(737101 to 737103), the tuning seeds (737000 to 737009), and the G1 seeds (737900 upwards)."""
 G1_TOLERANCE: Final[float] = 0.03
 G1_COVERAGE: Final[tuple[float, float]] = (0.75, 0.85)
 G1B_MIN_SHARE: Final[float] = 0.95

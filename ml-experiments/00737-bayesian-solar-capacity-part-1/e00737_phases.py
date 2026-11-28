@@ -20,10 +20,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
-from e00737_common import EXIT_FAILED, OUT, Tuned, atomic_json
+from e00737_common import EXIT_FAILED, OUT, Tuned, atomic_json, sha256_of
 
 CODE_SHA: Final[Path] = OUT / "code.sha256"
 """Hash of the scoring code, written by `freeze-code`."""
+TUNED_SHA_NAME: Final[str] = "tuned.sha256"
+"""The sidecar that holds the SHA-256 of `tuned.json`, written by `tune-collect`."""
 MARKER_REVIEW: Final[str] = "review_stage1.ok"
 BUDGET_MARKER: Final[str] = "cpu_budget_extended.ok"
 """Written by the manager to allow a run past `STOP_CPU_HOURS`."""
@@ -135,12 +137,21 @@ def require_gates(*, required: tuple[str, ...] = GATES_REQUIRED) -> None:
 
 
 def require_tuned() -> Tuned:
-    """Stop unless `tuned.json` holds the values chosen by the current code.
+    """Stop unless `tuned.json` holds the values chosen by the current code, with its digest.
+
+    The digest in `tuned.sha256` must equal the SHA-256 of the file, so a hand edit of the chosen
+    values stops every stage that reads them.
 
     Returns:
         The chosen growth standard deviation and ridge scale.
     """
     record = read_record(name="tuned.json")
+    digest_file = OUT / TUNED_SHA_NAME
+    held = digest_file.read_text().split()[0] if digest_file.exists() else None
+    if held != sha256_of(path=OUT / "tuned.json"):
+        sys.exit(
+            f"refusing to run: tuned.json does not match {TUNED_SHA_NAME} (rerun tune-collect)"
+        )
     return Tuned(growth_sd=float(record["growth_sd"]), ridge_scale=float(record["ridge_scale"]))
 
 

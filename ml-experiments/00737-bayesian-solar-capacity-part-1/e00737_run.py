@@ -11,7 +11,7 @@
                                              deviation, at the chosen ridge scale, sharded by
                                              Primary
     e00737_run.py tune-collect                the growth standard deviation and the ridge scale
-                                             into tuned.json
+                                             into tuned.json, and its SHA-256 into tuned.sha256
     e00737_run.py g1-reference                one fit of the real record that G1 and G1b read
     e00737_run.py g1 --worker i --of n        the 100 + 100 synthetic fits of G1 and G1b, sharded
     e00737_run.py g1-collect                  G1 and G1b into gates.json
@@ -61,6 +61,7 @@ from e00737_common import (
     Tuned,
     atomic_json,
     atomic_npz,
+    sha256_of,
     time_log,
 )
 from e00737_fit import (
@@ -78,6 +79,7 @@ from e00737_phases import (
     GATES_BEFORE_TUNING,
     MARKER_REVIEW,
     STOP_CPU_HOURS,
+    TUNED_SHA_NAME,
     assert_blas_pinned,
     code_hash,
     read_record,
@@ -352,6 +354,8 @@ def ridge_reference() -> dict[str, np.ndarray]:
     """Fit arm A to the first Primary's real record at the unscaled ridge, once for each process.
 
     The synthetic series of the ridge draws take their baseline and noise scales from this fit.
+    Each worker process pays one cold fit for it (about 24 seconds), which the first-unit
+    projection does not count: at most 6 workers add about 0.04 CPU-hours.
 
     Returns:
         The baseline and scales, as `g1_reference` returns them.
@@ -557,10 +561,12 @@ def tune_ridge_collect() -> dict[str, Any]:
         The record written to `ridge.json`.
 
     Raises:
-        RuntimeError: When a draw file is missing.
+        RuntimeError: When a draw task has no done marker of the current code, a failure record
+            exists, or a draw file is missing.
     """
     from e00737_score import load_npz
 
+    require_finished(names=[f"tune_ridge_{d:03d}" for d in range(RIDGE_DRAWS)])
     folder = OUT / "tuning" / "ridge"
     files = [folder / f"draw_{d:03d}.npz" for d in range(RIDGE_DRAWS)]
     missing = [f.name for f in files if not f.exists()]
@@ -586,15 +592,32 @@ def tune_ridge_collect() -> dict[str, Any]:
 def tune_collect() -> dict[str, Any]:
     """Choose the growth standard deviation with the lowest median path error, at the ridge scale.
 
+    The stage also writes `tuned.sha256`, which holds the SHA-256 of `tuned.json`, and every stage
+    that reads the chosen values checks it.
+
     Returns:
         The record written to `tuned.json`, which holds the chosen ridge scale too.
 
     Raises:
-        RuntimeError: When the number of tuning worlds is not `EXPECTED_TUNING_WORLDS`.
+        RuntimeError: When a tuning task has no done marker of the current code, a failure record
+            exists, or the number of tuning worlds is not `EXPECTED_TUNING_WORLDS`.
     """
     from e00737_score import load_npz, path_error
 
     ridge = read_record(name="ridge.json")
+    require_finished(
+        names=[
+            name
+            for name, _ in tune_tasks(
+                primaries=list(PRIMARIES),
+                store=OUT,
+                part="growth",
+                ridge_scale=ridge["ridge_scale"],
+                worker=0,
+                of=1,
+            )
+        ]
+    )
     errors: list[list[float]] = [[] for _ in GROWTH_SD_GRID]
     for site in PRIMARIES:
         folder = OUT / "tuning" / site
@@ -623,6 +646,9 @@ def tune_collect() -> dict[str, Any]:
         "code_hash": code_hash(),
     }
     atomic_json(obj=record, path=OUT / "tuned.json")
+    (OUT / TUNED_SHA_NAME).write_text(
+        f"{sha256_of(path=OUT / 'tuned.json')}  tuned.json code_hash={code_hash()}\n"
+    )
     return record
 
 
@@ -891,7 +917,7 @@ def stage_g1_collect() -> None:
 
     path = OUT / "gates.json"
     out = read_record(name="gates.json")  # refuses when the record is missing or of other code
-    record = collect_g1()
+    record = collect_g1(tuned=require_tuned())
     out.update(record)
     atomic_json(obj=out, path=path)
     print(json.dumps(record, indent=1, default=float))

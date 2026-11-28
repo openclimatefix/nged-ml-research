@@ -552,11 +552,8 @@ def evaluate_bars(
     return out
 
 
-def convergence_table(*, extras: dict[str, dict]) -> dict[str, float]:
+def convergence_table() -> dict[str, float]:
     """Return the share of cold-start fits (arms A, F, Qt, O, R) that stopped on the tolerance.
-
-    Args:
-        extras: The per-Primary extras of `collect_metrics`.
 
     Returns:
         The share converged, and the number of fits, and the number of fits whose capacities all
@@ -578,16 +575,13 @@ def convergence_table(*, extras: dict[str, dict]) -> dict[str, float]:
     }
 
 
-def g5_record(*, extras: dict[str, dict]) -> dict[str, object]:
+def g5_record() -> dict[str, object]:
     """Gate G5: 99% of the cold fits converge, and no fit ends with every capacity at its bound.
-
-    Args:
-        extras: The per-Primary extras.
 
     Returns:
         The record with `passed`.
     """
-    table = convergence_table(extras=extras)
+    table = convergence_table()
     return {
         "passed": bool(
             table["share_converged"] >= G5_MIN_CONVERGED and table["n_all_at_bound"] == 0
@@ -611,9 +605,10 @@ def normal_cdf(*, x: float) -> float:
 def real_record_aggregates(*, extras: dict[str, dict], included: list[str]) -> dict[str, object]:
     """Return the aggregates of the real-record fits (arm A and its comparisons).
 
-    Every aggregate is a ratio, a share, or a count. The private tables keep every Primary's value,
-    and the figure's array (`real_path.npz`) holds each Primary's capacity as a multiple of its own
-    mean. The probability that capacity rises uses a normal approximation that treats the
+    Every aggregate is a ratio, a share, or a count. The per-Primary values and the figure's array
+    (`real_path.npz`, each Primary's capacity as a multiple of its own mean) cover only the
+    `included` Primaries, so the Primaries that gate G4 excluded have no value in either. The
+    probability that capacity rises uses a normal approximation that treats the
     quarters' posterior errors as independent, so it is approximate. Only the `included` Primaries
     enter.
 
@@ -720,7 +715,7 @@ def run_score() -> None:
     gates = json.loads((OUT / "gates.json").read_text())
     included = included_primaries(gates=gates)
     bars = evaluate_bars(metrics=metrics, extras=extras, included=included)
-    g5 = g5_record(extras=extras)
+    g5 = g5_record()
     gates_ok = all(gates[g]["passed"] is True for g in ("G1", "G1b", "G2", "G3", "G4")) and bool(
         g5["passed"]
     )

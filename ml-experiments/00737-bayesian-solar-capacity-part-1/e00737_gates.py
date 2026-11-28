@@ -33,6 +33,7 @@ from e00737_common import (
     RIDGE_STEP_GROWTH_SD,
     Tuned,
     atomic_json,
+    atomic_npz,
 )
 from e00737_fit import PrimaryModel, build_model, fit_arm, random_walk_prior
 from e00737_forward import (
@@ -50,6 +51,7 @@ from e00737_inputs import (
     load_primary,
     unit_term,
 )
+from e00737_phases import code_hash
 from e00737_worlds import (
     build_world,
     capacity_path,
@@ -945,21 +947,51 @@ def write_g1_reference(*, tuned: Tuned) -> None:
     """
     model = g1_model()
     ref = g1_reference(model=model, tuned=tuned)
-    path = OUT / "g1" / "reference.npz"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name("reference.tmp.npz")
-    np.savez_compressed(tmp, **ref)  # ty: ignore[invalid-argument-type]
-    tmp.rename(path)
+    atomic_npz(
+        arrays={
+            **ref,
+            "growth_sd": np.array(tuned.growth_sd),
+            "ridge_scale": np.array(tuned.ridge_scale),
+            "code_hash": np.array(code_hash()),
+        },
+        path=OUT / "g1" / "reference.npz",
+    )
 
 
-def read_g1_reference() -> dict[str, np.ndarray]:
-    """Read the reference fit that `write_g1_reference` wrote.
+def check_tuned_record(*, record: dict[str, Any], tuned: Tuned, what: str) -> None:
+    """Stop unless a stored G1 record was made with the current tuned values and code.
+
+    Args:
+        record: The stored values, holding `growth_sd`, `ridge_scale`, and `code_hash`.
+        tuned: The current tuned growth standard deviation and ridge scale.
+        what: What the record is, for the message.
+
+    Raises:
+        RuntimeError: When a value or the code hash differs.
+    """
+    held = (float(record["growth_sd"]), float(record["ridge_scale"]), str(record["code_hash"]))
+    if held != (tuned.growth_sd, tuned.ridge_scale, code_hash()):
+        msg = f"{what} was made with other tuned values or other code: {held} against {tuned}"
+        raise RuntimeError(msg)
+
+
+def read_g1_reference(*, tuned: Tuned) -> dict[str, np.ndarray]:
+    """Read the reference fit that `write_g1_reference` wrote, after checking what it holds.
+
+    Args:
+        tuned: The current tuned growth standard deviation and ridge scale.
 
     Returns:
         The baseline and scales.
     """
     with np.load(OUT / "g1" / "reference.npz") as f:
-        return {k: f[k] for k in f.files}
+        stored = {k: f[k] for k in f.files}
+    check_tuned_record(
+        record={k: stored[k].item() for k in ("growth_sd", "ridge_scale", "code_hash")},
+        tuned=tuned,
+        what="the G1 reference",
+    )
+    return {k: stored[k] for k in ("baseline", "sigma")}
 
 
 def run_g1_draw(*, tuned: Tuned, draw: int, heavy: bool) -> None:
@@ -971,19 +1003,33 @@ def run_g1_draw(*, tuned: Tuned, draw: int, heavy: bool) -> None:
         heavy: Whether this is a G1b draw.
     """
     record = g1_draw(
-        model=g1_model(), reference=read_g1_reference(), tuned=tuned, draw=draw, heavy=heavy
+        model=g1_model(),
+        reference=read_g1_reference(tuned=tuned),
+        tuned=tuned,
+        draw=draw,
+        heavy=heavy,
     )
+    record |= {
+        "growth_sd": tuned.growth_sd,
+        "ridge_scale": tuned.ridge_scale,
+        "code_hash": code_hash(),
+    }
     atomic_json(obj=record, path=OUT / "g1" / f"{'g1b' if heavy else 'g1'}_{draw:03d}.json")
 
 
-def collect_g1() -> dict[str, dict[str, Any]]:
+def collect_g1(*, tuned: Tuned) -> dict[str, dict[str, Any]]:
     """Read every draw's record and summarise G1 and G1b.
+
+    Args:
+        tuned: The current tuned growth standard deviation and ridge scale, which every draw's
+            record must hold.
 
     Returns:
         The records of `G1` and `G1b`.
 
     Raises:
         FileNotFoundError: When a draw's file is missing.
+        RuntimeError: When a draw was made with other tuned values or other code.
     """
     import json
 
@@ -995,5 +1041,8 @@ def collect_g1() -> dict[str, dict[str, Any]]:
         if missing:
             msg = f"{name}: {len(missing)} draw files are missing, such as {missing[0]}"
             raise FileNotFoundError(msg)
-        out[name] = g1_collect(draws=[json.loads(f.read_text()) for f in files], heavy=heavy)
+        draws = [json.loads(f.read_text()) for f in files]
+        for f, draw in zip(files, draws, strict=True):
+            check_tuned_record(record=draw, tuned=tuned, what=f"G1 draw {f.name}")
+        out[name] = g1_collect(draws=draws, heavy=heavy)
     return out

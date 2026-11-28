@@ -348,12 +348,19 @@ def test_worst_case_timing_scales_the_fit_times_to_30_iterations() -> None:
     assert run.worst_case_timing(timing=timing, iterations=30) == timing
 
 
-def test_ridge_draws_use_seeds_that_differ_from_the_tuning_and_g1_seeds() -> None:
+def test_ridge_draws_use_seeds_that_differ_from_every_other_seed() -> None:
     seeds = set(range(common.RIDGE_SEED, common.RIDGE_SEED + common.RIDGE_DRAWS))
-    assert (min(seeds), max(seeds)) == (737100, 737129)
-    assert seeds.isdisjoint(common.TUNING_SEEDS)
+    assert (min(seeds), max(seeds)) == (737200, 737229)
     g1_seeds = {common.G1_SEED + d + h for d in range(common.G1_DRAWS) for h in (0, 100_000)}
     assert seeds.isdisjoint(g1_seeds)
+    others: set[int] = set(g1_seeds)
+    for name in dir(common):
+        value = getattr(common, name)
+        if name.endswith(("_SEED", "_SEEDS")) and name not in ("RIDGE_SEED", "G1_SEED"):
+            others |= set(value) if isinstance(value, tuple) else {value}
+    assert {*common.TUNING_SEEDS, *common.MAIN_SEEDS, *common.MATCHED_SEEDS} <= others
+    assert common.SPECIAL_SEED in others
+    assert seeds.isdisjoint(others)
     assert 1.0 in common.RIDGE_SCALE_GRID
     assert common.RIDGE_SCALE_GRID[0] == max(common.RIDGE_SCALE_GRID)  # a tie goes to the first
 
@@ -375,11 +382,23 @@ def test_tuned_record_holds_both_values_and_every_fit_task_carries_them(scratch_
     path.write_text(
         json.dumps({"growth_sd": 0.6, "ridge_scale": 0.01, "code_hash": phases.code_hash()})
     )
+    with pytest.raises(SystemExit, match=r"tuned\.sha256"):
+        phases.require_tuned()
+    digest = scratch_out / phases.TUNED_SHA_NAME
+    digest.write_text(f"{common.sha256_of(path=path)}  tuned.json\n")
     tuned = phases.require_tuned()
     assert tuned == common.Tuned(growth_sd=0.6, ridge_scale=0.01)
+    path.write_text(
+        json.dumps({"growth_sd": 0.15, "ridge_scale": 0.01, "code_hash": phases.code_hash()})
+    )
+    with pytest.raises(SystemExit, match=r"tuned\.sha256"):
+        phases.require_tuned()
     path.write_text(json.dumps({"growth_sd": 0.6, "code_hash": "stale"}))
     with pytest.raises(SystemExit, match="different code"):
         phases.require_tuned()
+    path.write_text(
+        json.dumps({"growth_sd": 0.6, "ridge_scale": 0.01, "code_hash": phases.code_hash()})
+    )
     tasks = run.fit_tasks(primaries=[common.PRIMARIES[0]], store=scratch_out, tuned=tuned)
     assert tasks
     for name, kwargs in tasks:
@@ -393,6 +412,11 @@ def test_tune_collect_picks_the_ridge_scale_first_and_then_the_growth_sd(
     import e00737_run as run
 
     monkeypatch.setattr(run, "OUT", scratch_out)
+
+    def finish_ridge_tasks() -> None:
+        for d in range(common.RIDGE_DRAWS):
+            phases.run_task(name=f"tune_ridge_{d:03d}", fn=lambda: None)
+
     folder = scratch_out / "tuning" / "ridge"
     folder.mkdir(parents=True)
     rng = np.random.default_rng(0)
@@ -400,9 +424,12 @@ def test_tune_collect_picks_the_ridge_scale_first_and_then_the_growth_sd(
         # Scale 1 gives the largest error and the smallest scale the lowest, in every draw.
         errors = np.array([0.30, 0.10, 0.05]) + rng.uniform(0.0, 0.01, size=3)
         np.savez(folder / f"draw_{d:03d}.npz", error=errors)
+    with pytest.raises(RuntimeError, match="30 of 30"):
+        run.tune_ridge_collect()
+    finish_ridge_tasks()
     record = run.tune_ridge_collect()
     assert record["ridge_scale"] == 0.01
-    assert record["seeds"] == [737100, 737129]
+    assert record["seeds"] == [737200, 737229]
     truth = np.linspace(0.0, 4.0, common.N_QUARTERS)
     scored = np.ones(common.N_QUARTERS, dtype=bool)
     growth_error = [0.3, 0.2, 0.05]  # the largest growth sd is the best
@@ -414,11 +441,25 @@ def test_tune_collect_picks_the_ridge_scale_first_and_then_the_growth_sd(
             # An estimate of truth x (1 - e) has a path error of exactly e.
             cap = np.array([truth * (1 - e) for e in growth_error])
             np.savez(folder / f"growth_{spec.name}.npz", cap=cap, truth=truth)
+    with pytest.raises(RuntimeError, match="126 of 126"):
+        run.tune_collect()
+    for name, _ in run.tune_tasks(
+        primaries=list(common.PRIMARIES),
+        store=scratch_out,
+        part="growth",
+        ridge_scale=0.01,
+        worker=0,
+        of=1,
+    ):
+        phases.run_task(name=name, fn=lambda: None)
     tuned = run.tune_collect()
     assert tuned["ridge_scale"] == 0.01
     assert tuned["growth_sd"] == 0.60
     assert tuned["median_path_error"] == pytest.approx(growth_error)
     assert json.loads((scratch_out / "tuned.json").read_text())["ridge_scale"] == 0.01
+    digest = (scratch_out / phases.TUNED_SHA_NAME).read_text().split()[0]
+    assert digest == common.sha256_of(path=scratch_out / "tuned.json")
+    assert phases.require_tuned() == common.Tuned(growth_sd=0.60, ridge_scale=0.01)
 
 
 def test_ridge_tie_goes_to_the_larger_scale(
@@ -431,6 +472,7 @@ def test_ridge_tie_goes_to_the_larger_scale(
     folder.mkdir(parents=True)
     for d in range(common.RIDGE_DRAWS):
         np.savez(folder / f"draw_{d:03d}.npz", error=np.array([0.2, 0.1, 0.1]))
+        phases.run_task(name=f"tune_ridge_{d:03d}", fn=lambda: None)
     assert run.tune_ridge_collect()["ridge_scale"] == 0.1
 
 
@@ -460,3 +502,49 @@ def test_ridge_tasks_are_sharded_by_draw_and_growth_tasks_by_primary(scratch_out
     )
     assert len(growth) == 1 + 20
     assert all(kwargs["ridge_scale"] == 0.1 for _, kwargs in growth)
+
+
+def test_tuning_makes_468_fits_and_the_projection_counts_them() -> None:
+    import e00737_run as run
+
+    # 30 ridge draws at 3 ridge scales, then 120 tuning worlds and 6 real records at 3 growth sds.
+    fits = common.RIDGE_DRAWS * len(common.RIDGE_SCALE_GRID) + (
+        common.EXPECTED_TUNING_WORLDS + len(common.PRIMARIES)
+    ) * len(common.GROWTH_SD_GRID)
+    assert fits == 468
+    growth = run.tune_tasks(
+        primaries=list(common.PRIMARIES),
+        store=Path("x"),
+        part="growth",
+        ridge_scale=0.1,
+        worker=0,
+        of=1,
+    )
+    assert len(growth) == len(common.PRIMARIES) * (1 + 20) == 126
+    timing = {"load": 0.0, "control": 0.0, "world": 0.0, "fit_a": 3600.0}
+    hours = run.project_cpu_hours(timing=timing)
+    key = next(k for k in hours if k.startswith("tune"))
+    assert hours[key] == pytest.approx(468.0)
+
+
+def test_the_tuned_stages_refuse_when_ridge_json_is_missing_or_stale(scratch_out: Path) -> None:
+    with pytest.raises(SystemExit, match=r"ridge\.json"):
+        phases.require_ridge_scale()
+    with pytest.raises(SystemExit, match=r"ridge\.json"):
+        phases.read_record(name="ridge.json")
+    (scratch_out / "ridge.json").write_text(json.dumps({"ridge_scale": 0.1, "code_hash": "stale"}))
+    with pytest.raises(SystemExit, match="different code"):
+        phases.require_ridge_scale()
+    (scratch_out / "ridge.json").write_text(
+        json.dumps({"ridge_scale": 0.1, "code_hash": phases.code_hash()})
+    )
+    assert phases.require_ridge_scale() == 0.1
+
+
+def test_g1_records_must_hold_the_current_tuned_values_and_code() -> None:
+    tuned = common.Tuned(growth_sd=0.3, ridge_scale=0.1)
+    good = {"growth_sd": 0.3, "ridge_scale": 0.1, "code_hash": phases.code_hash()}
+    gates.check_tuned_record(record=good, tuned=tuned, what="a draw")
+    for bad in ({"growth_sd": 0.6}, {"ridge_scale": 0.01}, {"code_hash": "stale"}):
+        with pytest.raises(RuntimeError, match="other tuned values or other code"):
+            gates.check_tuned_record(record={**good, **bad}, tuned=tuned, what="a draw")
