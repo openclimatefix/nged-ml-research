@@ -8,7 +8,7 @@ title: >-
 theme: solar-disaggregation
 also_relevant_to:
   - lsc-detectors
-status: planned
+status: finished
 date: 2026-11-28
 kind: other
 size: >-
@@ -116,16 +116,410 @@ metric: >-
   injected capacities), and the coverage of the 80% interval on the injected increment, on
   injected fleets of 1 MW, 2.5 MW, and 5 MW AC capacity.
 code: ml-experiments/00737-bayesian-solar-capacity-part-1/
+verdict: not supported
+best_arm: >-
+  A, the Bayesian fit with a growth prior, with a median path error of 0.110 and a median recovered
+  share of 1.08 on the 162 main worlds, against 0.771 and 1.11 for the flat fit F and 0.110 and
+  1.07 for the independent-quarter fit Qt. The 80% interval of A covers 0.497 of the injected
+  increments. Arm O, which is given the injected mix, tilt, and ratio, has a path error of 0.002.
+headline: >-
+  The Bayesian fit followed a synthetic solar fleet added to the real power of six Primaries (median
+  path error 0.110, against 0.771 for one flat capacity), but its growth prior added nothing over
+  fitting each quarter on its own (median difference -0.001 or -0.002 at five Primaries, +0.010 at
+  D11), and it failed three of seven bars. Its 80% interval covered the injected increment 0.497 of
+  the time (bar 0.65 to 0.92), a cloud-following load moved the fitted increment by a median of 1.02
+  of the fleet (bar at most 0.35), and a 30-day load transfer moved the fitted capacity by a median
+  of 0.50 MW (bar at most 0.25 MW). The verdict is `not supported` (row 6 of the verdict mapping),
+  and every result is for a synthetic fleet.
+lessons: >-
+  The Student-t fit (a regression with a heavy-tailed noise density, so that a few large residuals
+  count for less) recovers the shape and the size of a synthetic fleet at six Primaries, and a fleet
+  whose orientation mix, tilt, and DC:AC ratio differ from the prior's is recovered as well as a
+  matching fleet (0.095 above it, bar B4), so the statistics of the point estimate work. Three bars
+  failed, and they show that the interval and the real-record answer cannot be trusted yet. B2: the
+  80% interval covers 0.497 of the injected increments, 1.00 on the 24 matched worlds, and 0.972 for
+  the oracle arm O, and the coverage falls from 0.74 at 1 MW to 0.46 at 2.5 MW and 0.29 at 5 MW
+  while the mean standard deviation stays at 0.06 MW. B6: a load that follows the cloud changes the
+  fitted increment (the capacity fitted to a world minus the capacity fitted to the same real record
+  alone) by 0.99 to 1.06 of the injected fleet. B7: a 30-day load transfer moves the fitted capacity
+  of its quarter by 0.10 to 1.01 MW. A real Primary's capacity path might therefore move by about a
+  fleet for reasons that are not solar. Separately, the growth prior does not help, which may be
+  because the data fix each quarter to about 0.06 MW without it. No explanation of the B2, B6, and
+  B7 failures was tested. The past-only fits (fits of the record cut at a quarter end, so that they
+  read only the past) returned no capacities at all, so the loss from cutting the record is
+  unmeasured.
+take_home_message: >-
+  This fit does not change any forecast, because it is a history-labelling step and not a
+  forecaster. It followed a synthetic solar fleet added to six substations' power (median path error
+  0.110, against 0.771 for one flat capacity), but its 80% interval covered the added fleet only
+  half the time (0.497, bar 0.65 to 0.92). A load that follows the cloud moved the fitted increment
+  by about a whole fleet (B6), and a 30-day load transfer moved the fitted capacity by 0.10 to 1.01
+  MW (B7). The growth prior added nothing over fitting each quarter separately. The capacity that
+  the fit reads on the real record (1.73 times as high in the last year as in the first, at four
+  substations) is therefore not evidence of solar growth, and the fit is not ready to supply the
+  solar term to the switching detector.
+advice:
+  - >-
+    Do not read a rise in this fit's capacity on a real Primary as solar growth: a cloud-following
+    load moved the fitted increment by 0.99 to 1.06 of the fleet (B6), and a 30-day transfer moved
+    the capacity by 0.10 to 1.01 MW (B7).
+  - >-
+    Do not quote this fit's 80% interval as an 80% interval: it covered 0.497 of the injected
+    increments (B2), against 1.00 on fleets that match the prior and 0.972 for the oracle arm O.
+  - >-
+    Test an interval on fleets whose mix, tilt, and DC:AC ratio differ from the fit's, as well as on
+    matching fleets, because the matching fleets covered every quarter of 24 worlds and the 162 main
+    worlds, whose fleets differ from the fit's, covered 0.497 (B2 and B4).
+  - >-
+    Do not spend effort on a random-walk growth prior for a quarterly capacity: independent quarters
+    (Qt) had the same path error as A to within 0.002 at 5 of 6 Primaries (C2).
+  - >-
+    Size a cloud-following test load by the share of the fleet's energy that it adds, not by its
+    share of the fleet's capacity, and test a smaller load: the load of 25% of the fleet's capacity
+    added 0.59 to 0.75 of the injected fleet's energy, yet the median fitted increment moved by 1.02
+    of the fleet, which is more than the load's energy, and the excess is unexplained (B6).
+  - >-
+    Run a fit that uses only past data on a small fixture before the bulk run, because all 24 such
+    fits returned NaN capacities (section "Fit using only past data").
+  - >-
+    Record for each fit whether the interval's variance fell back to a simpler formula, and report
+    the count by arm: 95 of 1,560 arm fits fell back, 61 of them at D11 (section "Fits that fell
+    back to the stock variance").
+production_status: not-for-production
+adopted_in: none
 ---
 
-**The fit labels history after the fact, and the page is a plan, so no number below is a fit
-result.** We ask whether a fit that knows the physics of solar panels can read, from a Primary
-substation's power meter alone, how many megawatts of unmetered solar panels sit behind the
-substation in each quarter of a year. A Primary is the kind of substation that steps voltage down
-towards customers. NGED (National Grid Electricity Distribution) meters the power at a Primary as
-demand minus the output of every solar panel connected below, and does not meter the panels. NGED
-meters six of the Primaries in signed megawatts, which means the power is negative when the
-substation exports power to the grid, and the six are the subject of the page.
+**The Bayesian fit followed a growing synthetic solar fleet, but its 80% interval was too narrow,
+and a cloud-following load and a 30-day load transfer each moved its answer by about a whole fleet,
+so it cannot yet be trusted to read real solar capacity.** We asked whether a fit that knows the
+physics of solar panels can read, from a Primary substation's power meter alone, how many megawatts
+of unmetered solar panels sit behind the substation in each quarter. A Primary is a substation that
+steps voltage down towards customers, and NGED (National Grid Electricity Distribution) meters six
+of them in signed megawatts (positive when the Primary imports power from the grid, negative when it
+exports power). We added the synthetic output of a fleet of known capacity, growing over the 18
+quarters from 2022 to mid-2026, to each Primary's real power, and compared the capacity the fit read
+with the capacity we had added. One Primary's real record with one fleet added is a world. The fit
+is a Bayesian regression (a regression that returns a range as well as a value) of the power on a
+calendar-and-temperature baseline and a solar term, with one capacity per quarter and a prior (an
+assumption stated before the data are read) that favours growth from one quarter to the next. The
+fit reads weather and power from after each half-hour it labels, so it can label a historical record
+and cannot estimate a live one. The verdict is `not supported` (row 6 of the verdict mapping). An
+arm is one fitting method compared in the experiment, and an arm fit is one arm fitted to one world
+or to one real record. The 80% interval uses the sandwich variance of Amendment 3 (a change to the
+plan, described below), and 95 of the 1,560 arm fits (6.1%) fell back to the stock variance (the
+simpler formula that the sandwich variance replaced).
+
+**The fit recovered the fleet's path, and the growth prior did not help.** The path error is the
+mean absolute gap between the fitted and the injected capacity over the 18 quarters, as a share of
+the mean injected capacity. On the 162 main worlds (the worlds whose fleet has an orientation mix,
+tilt, and DC:AC ratio that differ from the fit's), its median is 0.110 for the Bayesian fit (arm A),
+against 0.771 for a fit with one flat capacity (arm F). The increment is the capacity fitted to a
+world minus the capacity fitted to the same Primary's real record alone. The median recovered share
+(the sum of the fitted increments over the sum of the injected capacities, over the 18 quarters) is
+1.08. A fit that gives each quarter its own capacity with a flat prior (arm Qt) has the same median
+path error as arm A (0.110), so the growth prior adds nothing.
+
+**Arm A failed three of the seven robustness bars (B1 to B7), which the section "Bars" defines.**
+The 80% interval covered the injected increment 0.497 of the time (B2, bar 0.65 to 0.92). A load
+that follows the day's cloud moved the fitted increment by a median of 1.02 of the injected fleet
+(B6, bar at most 0.35). A 30-day load transfer moved the fitted capacity by a median of 0.50 MW (B7,
+bar at most 0.25 MW). Every result is for a synthetic fleet, and none supports a claim about the
+real capacity.
+
+**The 80% interval uses the sandwich variance of Amendment 3 in place of the stock variance.** The
+first run of gate G1 (a gate is a check that must pass before a verdict counts, and G1 fits a
+synthetic series with Gaussian noise) found that the stock posterior variance `(X' W X)^-1` of the
+Student-t fit (a regression with a heavy-tailed noise density) covered only 0.718 of the true
+capacities, against a bar of 0.75 to 0.85, because the Student-t noise scale is smaller than the
+Gaussian noise's standard deviation. Before any scored fit, [Amendment
+3](#amendment-3-to-the-plan-of-experiment-737-2026-11-28) replaced the stock variance by the
+sandwich variance (a variance that stays valid when the noise density is wrong), and G1 then covered
+0.806.
+
+**Of the 1,560 arm fits, 95 (6.1%) fell back to the stock variance.** When the observed information
+is not positive definite, the fit keeps the stock variance and records that it did. The section
+"Fits that fell back to the stock variance" gives the count by arm and the coverage of the two
+groups.
+
+**The power loader reads grid index `i` from store index `i + 1`.** The power store's index `i` is
+the half-hour that ends at the origin (the start of the grid, 2022-01-01) plus 30 minutes times `i`.
+[Amendment 1](#amendment-1-to-the-plan-of-experiment-737) gives the history of the correction, and
+the audit in it found that no earlier published result depends on the same off-by-one.
+
+**The timing gate G4 passes only in a relaxed form.** Gate G4 compares each Primary's timing with
+the timing of NGED's metered solar farms. A best shift is the delay, in half-hours, at which a
+series' daily pattern best matches the modelled solar curve. The registered gate required a best
+shift of 0 at each Primary and pooled. The relaxed gate passes when the pooled best shift lies
+within 0.5 half-hours of the farms' and at least 4 of the 6 Primaries lie within 0.75 half-hours of
+the metered-farm reference for each Primary. The Primaries D9 and D14 lie outside the bound, so both
+are excluded from the real-record results and from bar B5, and they stay in every synthetic-world
+result.
+
+## Verdict and what the result means for the history-detector pipeline
+
+**The verdict is `not supported`, which is row 6 of the verdict mapping.** Contrast C1 (the flat fit
+F minus A, on the path error) passes its sanity gate. Contrast C2 (the independent-quarter fit Qt
+minus A) is in state N (the sign test does not pass, and Qt does not beat A at all six Primaries). A
+beats Qt at only 1 of the 6 Primaries (D11, by +0.010), and the upper end of the world-resampled 95%
+interval of the pooled median, -0.0002, lies below the threshold of 0.05. The three failed bars do
+not change the row. They show that the interval of A is too narrow and that A's answer moves with a
+load that is not solar.
+
+**For stage 2 of the history-detector pipeline (the solar-capacity fit, described in [How the
+history detectors fit together](../detector-pipeline.md)), the fit tracks a growing synthetic fleet
+and also reads two kinds of change that are not solar as solar capacity.** The fit recovers about
+the right total for a synthetic fleet (a median recovered share of 1.03 to 1.25 at the six
+Primaries). A load that follows the cloud moved the fitted increment by 0.99 to 1.06 of the injected
+fleet. A 30-day transfer of load from a neighbouring substation moved the fitted capacity by 0.10 to
+1.01 MW.
+
+The switching offset model of stage 3 subtracts the solar estimate from the power before it looks
+for transfers, and the pipeline page lists a transfer absorbed by the solar fit as a risk. The
+transfer world of this experiment measured how far one 30-day transfer moves the fitted capacity at
+each Primary, and the move exceeded 0.25 MW at 5 of the 6. The section "Questions the result leaves
+open" lists what a later experiment could answer.
+
+## Gate results
+
+**All six gates passed, and G4 passed in the relaxed form.**
+
+- **G1, recovery with Gaussian noise.** On synthetic series of a baseline, the prior's own fleet, and
+  Gaussian noise, arm A recovered the capacity to within 1.1% of the mean capacity at most (bar 3%),
+  recovered 0.994 of the fleet, and covered 0.806 of the truth with its 80% interval (bar 0.75 to
+  0.85), over 100 draws.
+- **G1b, the heavy-tailed recovery.** With Student-t noise, the recovered share was 0.990 over 100
+  draws (bar at least 0.95), so the Student-t weights do not bias the capacity down.
+- **G2 and G3, the injection and the look-ahead.** The injected output equals the fleet formula and
+  is nonzero in at least 99% of the sunny half-hours at each Primary (the worst share was 0.995 to
+  0.997), and the injected output and the design matrix are identical when the power is shuffled.
+- **G4, the timing convention.** The pooled best shift of the Primaries is 0.25 half-hours later
+  than the farms' (bound 0.5), and 4 of the 6 Primaries lie within 0.75 half-hours of their farm
+  reference (D5, D10, D11, and D16).
+- **G5, convergence.** 99.9% of the 1,104 cold fits (fits that start from the initial weights, for
+  arms A, F, Qt, O, and R) stopped on the tolerance, and no fit ended with every capacity at its
+  bound.
+
+**The tuning chose a ridge scale of 0.1 and a growth standard deviation of 0.15 MW a quarter, and
+the growth value barely mattered.** The ridge scale multiplies the penalty that keeps the baseline
+coefficients small, and the growth standard deviation is the standard deviation of the prior's
+growth step from one quarter to the next. The lowest error was at a ridge scale of 0.1: the median
+largest capacity error on 30 synthetic series was 0.161 MW at ridge scale 1, 0.061 MW at 0.1, and
+0.067 MW at 0.01. The median path error on the 120 tuning worlds was 0.1126, 0.1142, and 0.1128 at
+growth standard deviations of 0.15, 0.30, and 0.60 MW a quarter.
+
+## Contrasts and arms
+
+**Arm A and arm Qt have the same path error, and both beat the flat fit F.** The table gives the
+median over the 162 main worlds for each arm.
+
+| Arm | What it is | Median path error | Median recovered share | Coverage of the 80% interval |
+|---|---|---|---|---|
+| A | The Bayesian fit with a growth prior (headline) | 0.110 | 1.076 | 0.497 |
+| F | A with one flat capacity over the 18 quarters | 0.771 | 1.105 | 0.061 |
+| Qt | A's likelihood, with an independent flat prior on each quarter | 0.110 | 1.074 | 0.550 |
+| Q | The bounded least-squares fit of `studies.pv_separation` on each quarter alone | 0.081 | 1.047 | none |
+| Ad | A on daily sums | 0.127 | 1.072 | 0.659 |
+| Af | A with the DC:AC ratio fitted | 0.195 | 0.823 | 0.188 |
+| O | A given the injected mix, tilt, and ratio | 0.002 | 1.001 | 0.972 |
+| R | The residual of experiment 734 (switching offset model), with a flat quarterly level | 0.111 | 1.102 | 0.493 |
+
+**C1 passes at 6 of 6 Primaries.** The median path error difference (F minus A) is +0.672 at D5,
++0.206 at D9, +0.675 at D10, +0.557 at D11, +0.664 at D14, and +0.686 at D16, with a world-resampled
+95% interval of +0.589 to +0.687 for the pooled median. D9's value lies below the predicted range of
++0.25 to +0.70, and D9 has 11 scored quarters.
+
+**C2 is state N: the difference (Qt minus A) is -0.001 or -0.002 at five Primaries and +0.010 at
+D11.** The differences are -0.001 at D5, D9, D10, and D16, -0.002 at D14, and +0.010 at D11, so A
+beats Qt at only 1 of the 6 Primaries. The world-resampled 95% interval of the pooled median is
+-0.00097 to -0.00018. By growth shape, the pooled median difference is +0.0005 on the ramp, +0.0004
+on the accelerating path, and -0.0053 on the step, where the prediction was +0.02 to +0.10 on the
+first two shapes and -0.08 to 0.00 on the step.
+
+**Arms O, Q, and R show where the error of A may come from.** Arm O, which is given the injected
+fleet's mix, tilt, and ratio, reads the fleet to a path error of 0.002 and a recovered share of
+1.001. This suggests that the error of arm A comes from the difference between the injected fleet's
+mix, tilt, and ratio and the fit's, and the explanation was not tested. Arm Q has a lower path error
+than A (0.081), cannot report a negative increment, and gives no interval. Arm R, which fits the
+residual of experiment 734 (switching offset model, a forecast that has not seen the injected
+fleet), has a path error close to A's (0.111).
+
+## Bars
+
+**B1, B3, B4, and B5 pass, and B2, B6, and B7 fail.** Each bar is evaluated on arm A. The table
+states each bar, the bar's limit, and the result.
+
+| Bar | What it tests | Limit | Result |
+|---|---|---|---|
+| B1 | Median recovered share per Primary on the 2.5 MW and 5 MW main worlds | 0.85 to 1.15 at 5 of 6 Primaries | Pass: 1.03 to 1.25 (D11 at 1.25 is outside) |
+| B2 | Pooled coverage of the 80% interval on the injected increment, 162 main worlds | 0.65 to 0.92 | **Fail: 0.497** |
+| B3 | Capacity fitted on a placebo sky (the sunshine record of another year, no fleet), as a share of the real fit's | At most 0.25 at 5 of 6 Primaries | Pass: 0.05 to 0.12 at 6 of 6 |
+| B4 | Median recovered share on worlds whose mix, tilt, and ratio differ from the prior's, against matched worlds | At most 0.10 below matched | Pass: 1.095 against 1.000 |
+| B5 | Median recovered share on worlds built half from a real metered farm's output, against the 2.5 MW ramp main worlds, at the 4 included Primaries | At most 0.10 below | Pass: 1.085 against 1.111 |
+| B6 | A load that follows the cloud, at 25% of the fleet's capacity: change in the recovered share, median over the 6 Primaries | At most 0.35 of the fleet | **Fail: 1.02 (0.99 to 1.06)** |
+| B7 | A flat 1.5 MW transfer for 30 days: largest change in the fitted capacity in the affected quarters, median over the 6 Primaries | At most 0.25 MW | **Fail: 0.50 MW (0.10 to 1.01)** |
+
+**Predictions P4 and P6 held, P2 and P3 held in part, and P1 and P5 failed.** P1 (the median
+recovered share per Primary, predicted at 0.75 to 1.00) failed, because the share is 1.03 to 1.25.
+P2 (the C1 range of +0.25 to +0.70, at 6 of 6 Primaries) held for the pooled median and at 6 of 6
+Primaries, and D9's +0.206 lies outside the range. P3 (the C2 range and the count) held in part: the
+pooled median difference of about -0.001 lies inside the predicted -0.02 to +0.06, and the step
+shape (-0.0053) lies inside -0.08 to 0.00, but C2 does not count at 6 of 6 Primaries, and the ramp
+and accelerating shapes (+0.0005 and +0.0004) lie below the predicted +0.02 to +0.10. P4 (the
+placebo ratio, predicted at 0.0 to 0.3) held. P5 (the confound sizes) failed: the cloud load raised
+the fitted increment by about 1.0 of the fleet and not by +10% to +30%, and the transfer moved the
+capacity by 0.50 MW at the median, and not by under 0.25 MW. P6 (the free-ratio arm Af does not beat
+A by more than 0.03) held: the median path error of Af (0.195) is 0.085 higher than A's (0.110), a
+difference of medians, and the median of the per-world differences is 0.129.
+
+## Why B2, B6, and B7 failed
+
+**No explanation below was tested, and each rests on the numbers named.** The code is frozen, no fit
+was rerun, and a later experiment would have to test them.
+
+- **B2: the interval may hold no allowance for the mismatch between the injected fleet and the fit's
+  forward model (the model that turns sky, temperature, and wind into panel output).** The coverage
+  is 1.00 on the 24 matched worlds (ramp fleets of 2.5 MW and 5 MW whose mix, tilt, and ratio equal
+  the prior's), 0.972 for arm O, and 0.497 on the 162 main worlds. On the main worlds, the coverage
+  falls with the fleet's size, at 0.74 for 1 MW, 0.46 for 2.5 MW, and 0.29 for 5 MW, while the mean
+  standard deviation of the capacity stays at 0.063 to 0.064 MW and the mean signed error (the
+  fitted increment minus the injected capacity, pooled over the scored quarters) grows (+0.040 MW,
+  +0.102 MW, and +0.208 MW). The fallback to the stock variance does not explain the failure: the
+  151 main worlds in which arm A used the sandwich variance cover 0.513, which is also below the
+  bar.
+- **B6: the cloud-following load may be large against the fleet's output.** The load is 25% of the
+  fleet's capacity on every daylight half-hour, on average, and the fleet's output averages well
+  under its capacity, so the load added 0.59 to 0.75 of the injected fleet's energy at the six
+  Primaries (the energy ratio of the stored cloud worlds). The prediction of +10% to +30% rested on
+  experiment 40's error-bar finding of about +20%. A fitted shift of 1.02 is larger than the load's
+  energy, and the page cannot say why. The coverage of arm A on the cloud worlds is 0.00.
+- **B7: the transfer's flat 1.5 MW over 30 days may leak into the quarter's capacity.** The fit has
+  a flat level per quarter that absorbs a change that is flat across the day, but a 30-day window
+  covers about a third of a quarter, so the level cannot absorb the transfer fully. This explanation
+  comes from reading the fit's flat quarterly level and was not tested. The largest move of the
+  capacity was 0.87 MW at D5, 0.68 at D9, 0.26 at D10, 1.01 at D11, 0.10 at D14, and 0.33 at D16.
+
+## Fits that fell back to the stock variance
+
+**The fallback to the stock variance concentrates at D11 and D9, and arm A's coverage is below the
+bar in both groups.** The fit files record, in element 8 of each arm's `_info` array, whether the
+sandwich variance was used (1) or the fit fell back to the stock variance (0). The table counts arm
+fits in the 264 files of `fits/` and `past/`, for arms A, F, Qt, Ad, Af, O, and R. An arm fit is one
+arm fitted to one world or to one real record. Arm A has 264 arm fits, one for each of the 264 fit
+jobs. Each of the other six arms has 216: one for each of the 162 main, 24 matched, 12 real-farm, 6
+cloud, and 6 transfer worlds, and for the 6 control fits (the real record with no fleet added). Arm
+Q is left out, because it reports no interval.
+
+| Arm | Arm fits | Fell back to the stock variance |
+|---|---|---|
+| A | 264 | 14 |
+| F | 216 | 20 |
+| Qt | 216 | 3 |
+| Ad | 216 | 36 |
+| Af | 216 | 0 |
+| O | 216 | 22 |
+| R | 216 | 0 |
+| All | 1,560 | 95 (6.1%) |
+
+**The 95 fallbacks are 61 at D11, 33 at D9, and 1 at D14, and none are at D5, D10, or D16.** By arm
+fit, 73 sit in main worlds, 9 in real-farm worlds, 6 in matched worlds, 4 in cloud worlds, 2 in
+control fits, and 1 in a transfer world. All 95 are in `fits/`, none in `past/`. The 24 past-only
+fits record the sandwich variance as used although their capacities are NaN (section "Fit using only
+past data"), so the share without them is 95 of 1,536 (6.2%). The cause of the loss of positive
+definiteness was not investigated.
+
+**Bar B2 fails for fits that used the sandwich variance and for fits that fell back.** The coverage
+of arm A on the main worlds is 0.513 on the 151 worlds that used the sandwich variance and 0.298 on
+the 11 worlds that fell back, all at D11. By Primary, the pooled coverage is 0.43 at D5, 0.68 at D9,
+0.56 at D10, 0.42 at D11, 0.46 at D14, and 0.51 at D16 (27 worlds each). The fallback does not lower
+the coverage of every arm: arm O covers 0.965 with the stock variance and 0.973 with the sandwich
+variance, and arm Ad covers 0.727 and 0.650.
+
+## Real-record fit
+
+**At the four Primaries that pass G4, the fitted capacity of the real record rises, and the result
+is descriptive only.** The four are D5, D10, D11, and D16, and the page publishes no per-Primary
+capacity in megawatts. The median over the four of the ratio of the last year's mean capacity to the
+first year's is 1.73 (the four values lie between 1.26 and 2.03). The capacity rises between the
+first and last year with posterior probability 0.9 or more at 4 of 4. The 80% interval is wider than
+half the median capacity in none of the scored quarters. The capacity of arm R is 0.067 of arm A's
+at the median (0.03 to 0.09). The capacity table of experiment 649 (capacity from stored probes)
+overlaps the fit's April-to-September capacity at 2 of the 4 Primaries. Because B6 and B7 failed,
+the rise cannot be read as solar growth, and the fit's interval is too narrow.
+
+**Every Primary has at least 11 scored quarters, and the counts of dropped half-hours are small
+except for D9's missing power.** A quarter is scored when at least 60% of its daylight half-hours
+are usable. D5, D10, D11, D14, and D16 have 18 scored quarters. D9 has 11, because its first 7
+quarters are unscored: the first six have no power (28,791 missing half-hours, about 6.6 quarters of
+4,380), and the seventh has only about a third of its daylight half-hours usable. The
+`substation_zero` rule and missing readings drop 202 half-hours at D5, 2 at D10, 2 at D11, 2 at D14,
+4 at D16, and 28,791 at D9. CAMS (the Copernicus Atmosphere Monitoring Service's satellite sunshine
+record) reliability under 0.9 drops 7,590 to 7,744 half-hours at each Primary.
+
+## Fit using only past data
+
+**All 24 past-only fits returned NaN capacities, so the loss from cutting the record is
+unmeasured.** A past-only fit reads the real record cut at a quarter end and sees nothing after the
+cut. The sample fits arm A to the real record of each Primary cut at 4 quarter ends (6 Primaries, 24
+fits). Every file has NaN in every capacity and in every standard deviation, an iteration count of
+30, and the not-converged flag, so the past-only gap reads NaN with 16 fits counted (4 Primaries).
+The code sets the power after the cut to NaN before the fit, and the cause of the NaN was not
+investigated. The G5 count of 1,104 fits does not include these 24 files.
+
+## Compute
+
+**The run took 5.85 CPU-hours at one thread, against 17.5 estimated and a stop at 26, and used no
+GPU time.** The sum of the job durations in `time_log.csv` is 0.01 for the gates, 2.15 for the
+tuning, 0.70 for G1 and G1b, 0.05 for the first unit (the first world, run before the bulk fits as a
+timing check), and 2.93 for the 264 fit jobs (the controls, worlds, placebos, and past-only fits).
+The estimate assumed 30 expectation-maximisation iterations and 24 seconds per fit. The cold fits of
+the first unit (fits that start from the initial weights) stopped after 6 to 8 iterations, and one
+fit of arm A took 5.4 seconds. The log covers the final run only. The archived earlier runs (before
+Amendment 3, and a failed run caused by a name clash) have no time log.
+
+## Checks
+
+- **Median minus mean forecast per site, and the error of the mean or median forecast beside each
+  quantile-score contrast.** Not applicable, because the fit scores no forecast, so there is no
+  forecast whose median and mean can differ.
+- **Audit triggers.** Trigger 1 (a control, known-answer test, or placebo fails) fired, because the
+  confound tests B6 and B7 failed. Trigger 2 (a result contradicts its own prediction, and no tested
+  explanation is recorded) fired, because the results contradict P1 and P5 and no explanation was
+  tested. No audit has run, which means that no separate agent has re-derived the headline contrasts
+  from the stored fits.
+- **Figures.** No figure is published. The data folder holds only the three figures of the forward
+  model (the model that turns sky, temperature, and wind into panel output) from the planned gallery
+  of 11, and the other eight were not drawn. The real-record figure would show real-record curves
+  and is therefore not published.
+- **Anonymisation.** The page names substations only. It gives no metered generator's name,
+  identifier, size, or date, and the real-farm worlds report shares over six farms with none
+  labelled.
+
+## Questions the result leaves open
+
+**The result leaves three questions that a later experiment could answer.** The first is whether the
+interval's failure comes from the mismatch between the injected fleet and the fit's forward model,
+as the matched worlds and arm O suggest. The second is whether the cloud-following load and the
+transfer worlds were set at sizes that the plan intended, and how much of the confound is the fit's
+and how much is the test's. The third is why all 24 past-only fits returned NaN, because the loss
+from using only past data is the number that a live estimate would need.
+
+## The plan as registered
+
+**The sections from here down to "Files" are the plan registered before the first scored fit, with
+tenses updated, and the amendments follow.** No registered arm, contrast, or bar threshold has
+changed. Amendment 1 relaxed gate G4 and took D9 and D14 out of bar B5, so the count of 12 real-farm
+worlds in the `decision_rule` field is stale: bar B5 now counts the 8 real-farm worlds at the 4
+included Primaries. The registered `hypothesis`, `prediction`, and `decision_rule` text is not
+edited.
+
+**The fit labels history after the fact, and cannot estimate a live record.** The experiment asks
+whether a fit that knows the physics of solar panels can read, from a Primary substation's power
+meter alone, how many megawatts of unmetered solar panels sit behind the substation in each quarter
+of a year. A Primary is the kind of substation that steps voltage down towards customers. NGED
+(National Grid Electricity Distribution) meters the power at a Primary as demand minus the output of
+every solar panel connected below, and does not meter the panels. NGED meters six of the Primaries
+in signed megawatts, which means the power is negative when the substation exports power to the
+grid, and the six are the subject of the page.
 
 **The fit is a Bayesian regression, and the test adds a fleet of known size to the real record.**
 The regression turns satellite sunshine (the Copernicus Atmosphere Monitoring Service, CAMS), air
@@ -138,25 +532,24 @@ Primaries, and asks how closely the fit recovers each quarter's capacity. The fi
 power from after each half-hour it labels, so it can label a historical record and cannot estimate
 a live one.
 
-**The only numbers from a run are those of the `gates` stage, and its timing gate G4 passes in a
-relaxed form.** G4 compares each Primary's timing with the timing of the metered solar farms, in
-half-hours. The relaxed gate passes when the pooled best shift of the Primaries lies within 0.5
-half-hours of the farms' pooled best shift, and at least 4 of the 6 Primaries lie within 0.75
-half-hours of their own farm reference. In the latest run, the pooled difference is +0.25
-half-hours, and 4 of the 6 Primaries pass (D5, D10, D11, and D16). D9 (+0.92) and D14 (+1.08) lie
-outside the bound, so both are excluded from the real-record results only: bar B5, the real-record
-aggregates, the real-record figure, and the past-only gap. The synthetic-world bars keep all six
-Primaries. The audit that preceded the gate found that the power store's index `i` is the
-half-hour that ends at the origin plus 30 minutes times `i`, and that the loader had read the power
-one half-hour late, so the loader now reads grid index `i` from store index `i + 1`. The audit
-found that no earlier published result depends on the same off-by-one. Experiments 653 (edge-state
-event table), 660 (injected load-transfer events), 672 to 692 (the graph model of load transfers
-and the event tables), and 734 (switching offset model) use index arithmetic only. Experiment 736
-places its additions at panel index equal to the bank's half-hour plus 1, and checks the placement
-with its gate G2. The padded store of experiment 685 (event table on the final test window)
-matches the store of experiment 327 exactly at end stamps. The [second decision of Amendment
-1](#second-decision-4-of-6-primaries-and-the-exclusion-of-the-others) gives the per-Primary
-numbers.
+**The timing gate G4 passes in a relaxed form.** G4 compares each Primary's timing with the timing
+of the metered solar farms, in half-hours. The relaxed gate passes when the pooled best shift of the
+Primaries lies within 0.5 half-hours of the farms' pooled best shift, and at least 4 of the 6
+Primaries lie within 0.75 half-hours of their own farm reference. In the final run of the gates
+stage, the pooled difference is +0.25 half-hours, and 4 of the 6 Primaries pass (D5, D10, D11, and
+D16). D9 (+0.92) and D14 (+1.08) lie outside the bound, so both are excluded from the real-record
+results only: bar B5, the real-record aggregates, the real-record figure, and the past-only gap. The
+synthetic-world bars keep all six Primaries. The audit that preceded the gate found that the power
+store's index `i` is the half-hour that ends at the origin plus 30 minutes times `i`, and that the
+loader had read the power one half-hour late, so the loader now reads grid index `i` from store
+index `i + 1`. The audit found that no earlier published result depends on the same off-by-one.
+Experiments 653 (edge-state event table), 660 (injected load-transfer events), 672 to 692 (the graph
+model of load transfers and the event tables), and 734 (switching offset model) use index arithmetic
+only. Experiment 736 places its additions at panel index equal to the bank's half-hour plus 1, and
+checks the placement with its gate G2. The padded store of experiment 685 (event table on the final
+test window) matches the store of experiment 327 exactly at end stamps. The [second decision of
+Amendment 1](#second-decision-4-of-6-primaries-and-the-exclusion-of-the-others) gives the
+per-Primary numbers.
 
 **The page belongs to the second of four detectors that read a Primary's history.** The detector
 for unmetered solar capacity is stage 2 of the pipeline in [How the history detectors fit
@@ -322,20 +715,21 @@ can check each one.
 
 ## The worlds and the arms
 
-**A world is the real record of one Primary with one synthetic fleet added, and the unit of
-evidence is the Primary.** The injected output is subtracted from the signed power, because
-generation lowers the reading. The fleet's capacity follows one of three growth shapes from zero in
-the first quarter to its final AC capacity: a ramp (linear), a step (zero for the first eight
-quarters, then the final capacity), and an accelerating path (quadratic). The three final
-capacities are 1 MW, 2.5 MW, and 5 MW. [Experiment
-649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md)'s probe reads 2.4 MW to
-3.9 MW of unmetered solar behind the six Primaries in April to September (whole-summer values), so
-the three sizes span from well under that fleet to above it. At the two Primaries with the lowest
-midday readings, D5 and D10, the midday reading is about 1 MW to 1.5 MW, so a 5 MW fleet is
-several times the reading, and the page says so. A fleet smaller than 1 MW sits below the noise of
-a quarter at the smallest Primary and is not planned. The injected fleet's orientation mix, tilt
-(15 to 40 degrees from horizontal), and DC:AC ratio (1.0 to 1.5) are drawn per world from a seed,
-so the fleet differs from the prior in the way a real fleet will.
+**A world is the real record of one Primary with one synthetic fleet added, and the unit of evidence
+is the Primary.** The injected output is subtracted from the signed power, because generation lowers
+the reading. The fleet's capacity follows one of three growth shapes from zero in the first quarter
+to its final AC capacity: a ramp (linear), a step (zero for the first eight quarters, then the final
+capacity), and an accelerating path (quadratic). The three final capacities are 1 MW, 2.5 MW, and 5
+MW. [Experiment 649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md)'s probe
+reads 2.4 MW to 3.9 MW of unmetered solar across the six Primaries in April to September
+(whole-summer values, the range over the six as that experiment published it, and not a per-Primary
+figure of this fit), so the three sizes span from well under that fleet to above it. At the two
+Primaries with the lowest midday power readings, D5 and D10, the midday reading is about 1 MW to 1.5
+MW, so a 5 MW fleet is several times the reading, and the page says so. A power reading is not a
+capacity estimate. A fleet smaller than 1 MW sits below the noise of a quarter at the smallest
+Primary and is not planned. The injected fleet's orientation mix, tilt (15 to 40 degrees from
+horizontal), and DC:AC ratio (1.0 to 1.5) are drawn per world from a seed, so the fleet differs from
+the prior in the way a real fleet will.
 
 **The scored seeds differ from the tuning seeds.** The tuning worlds use seeds 737000 to 737009.
 The main worlds use seeds 737101, 737102, and 737103, the matched worlds use 737101 and 737102,
@@ -527,14 +921,14 @@ year's; the share of Primaries whose capacity rises between the first and the la
 posterior probability 0.9 or more; the capacity fitted on the placebo sky as a share of the real
 fit's (bar B3); the capacity of arm R as a share of A's; the number of the six Primaries whose
 April-to-September mean capacity has an 80% interval that overlaps the season-year table of
-[experiment 649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md) (capacity
-from stored probes), as a count k of 6; and the share of quarters whose 80% interval is wider than
-half the median capacity. One figure shows the median over the six Primaries of the capacity path
-as a multiple of each Primary's own mean, with the range over the six. **No per-Primary capacity
-in megawatts, and no Primary's own path, appears on the page.** The six Primaries are substations,
-so the rule on metered generators does not cover them, but the page follows the convention of
-experiments 716 and 729 and gives estimates of unmetered solar anonymised. The private tables hold
-every number.
+[experiment 649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md) (capacity from
+stored probes), as a count k of 6; and the share of quarters whose 80% interval is wider than half
+the median capacity. The plan called for one figure of the median over the six Primaries of the
+capacity path as a multiple of each Primary's own mean, with the range over the six, and the page
+does not publish it. **No per-Primary capacity estimate of this fit in megawatts, and no Primary's
+own path, appears on the page.** The six Primaries are substations, so the rule on metered
+generators does not cover them, but the page follows the convention of experiments 716 and 729 and
+gives estimates of unmetered solar anonymised. The private tables hold every number.
 
 ## Gates
 
@@ -607,7 +1001,7 @@ real-data aggregate figure (1) comes after the real-record fits.
 
 **The smoke check on the data files** asserts G2 on every world file before a fit reads it, that
 each of the 210 injected worlds and the 12 uninjected fits is present, and that no injected series
-is all zero. The write-up repeats the gallery with the results added.
+is all zero. Only the three forward-model figures were drawn, and none is published.
 
 ## Stages and compute
 
@@ -637,8 +1031,9 @@ absorbs.
 | 3 | Real-record fits (6 Primaries, 195 seconds each, 0.3), the past-only sample (24 fits of A, 0.2), matching to experiment 649, scores, and figures (0.2) | 0.7 |
 | Total | | 17.5 |
 
-**The total is 17.5 CPU-hours, which stays under the 26 CPU-hour stop.** The stages run in the order
-of the table: the tuning, then G1 and G1b, then the first unit, then the bulk fits.
+**The total is 17.5 CPU-hours, which stays under the 26 CPU-hour stop, and the run measured 5.85
+CPU-hours (section "Compute").** The stages run in the order of the table: the tuning, then G1 and
+G1b, then the first unit, then the bulk fits.
 
 **Peak memory is about 1 GB per worker, and the scope cap is 2.5 GB per worker.** The design
 matrix of 78,816 rows by 423 columns in 64-bit floats is 267 MB, and the weighted copy and the Gram
@@ -672,10 +1067,11 @@ the next stage exists before it starts the stage, and `e00737_run.py` is the run
 ## Standing practices, advice, and privacy
 
 - **Followed:** cleaned data (the dropped half-hours are counted per Primary); a per-phase time log;
-  a synthetic world gallery and a smoke check; the stored forecast of experiment 327 read only for
-  arm R; the real-environment smoke test; no stage past its review gate; the hash of every edited
-  reviewed script recorded; a placebo beside every contrast; the tuning of two values only, on
-  separate seeds, with the caveat that the tuning and scored worlds share the real history.
+  a smoke check, and a synthetic world gallery of which only three of the 11 figures were drawn; the
+  stored forecast of experiment 327 read only for arm R; the real-environment smoke test; no stage
+  past its review gate; the hash of every edited reviewed script recorded; a placebo beside every
+  contrast; the tuning of two values only, on separate seeds, with the caveat that the tuning and
+  scored worlds share the real history.
 - **Not applicable:** the D15 and D18 cut (neither is among the six); monthly refits and model
   saving (the fit has no stored coefficients to save); training-loss plots (the fit is a
   closed-form solve with an expectation-maximisation loop of at most 30 iterations); tail coverage
@@ -787,8 +1183,9 @@ page reports the count of scored quarters per Primary, and the dropped half-hour
 - The injected fleets are drawn by the experiment's own code from the seed of each world: the
   growth shape and the final capacity, the orientation mix (a Dirichlet draw around the fleet mix,
   or the prior's mix for the matched worlds), the tilt, and the DC:AC ratio.
-- Compute: CPU only, about 17.5 CPU-hours at one thread (30 iterations assumed for each cold fit,
-  10 for each warm fit of Af), a stop at 26, and 0 GPU-process-hours.
+- Compute: CPU only, about 17.5 CPU-hours at one thread estimated (30 iterations assumed for each
+  cold fit, 10 for each warm fit of Af), a stop at 26, 5.85 CPU-hours measured, and 0
+  GPU-process-hours.
 
 ### Measurement
 
@@ -843,14 +1240,14 @@ structure that no fit captures, and the synthetic series have neither.
 
 **The G4 timing gate is relaxed, and two Primaries are excluded from the real-record results.** The
 gate passes when the pooled difference from the metered farms lies within 0.5 half-hours and at
-least 4 of the 6 Primaries lie within 0.75 half-hours of their farm reference. In the latest run,
-the pooled best shift is 0.75 half-hours against 0.5 for the farms (a difference of +0.25), and 4 of
-the 6 Primaries lie within the bound. D9 (+0.92 half-hours) and D14 (+1.08) lie outside it, so bar
-B5, the real-record aggregates, the real-record figure, and the past-only gap are computed on four
-Primaries. The synthetic-world bars B1 to B4, B6, and B7, the contrasts C1 and C2, and the placebo
-ratio of B3 keep all six. A Primary's power is net load, so the fleet's west lean and the demand's
-response to the sun can explain a remaining delay of up to 1 half-hour without a timing error, and
-the gate cannot show that none remains.
+least 4 of the 6 Primaries lie within 0.75 half-hours of their farm reference. In the final run of
+the gates stage, the pooled best shift is 0.75 half-hours against 0.5 for the farms (a difference of
++0.25), and 4 of the 6 Primaries lie within the bound. D9 (+0.92 half-hours) and D14 (+1.08) lie
+outside it, so bar B5, the real-record aggregates, the real-record figure, and the past-only gap are
+computed on four Primaries. The synthetic-world bars B1 to B4, B6, and B7, the contrasts C1 and C2,
+and the placebo ratio of B3 keep all six. A Primary's power is net load, so the fleet's west lean
+and the demand's response to the sun can explain a remaining delay of up to 1 half-hour without a
+timing error, and the gate cannot show that none remains.
 
 **The loader read the power one half-hour late, and no earlier published result shares the
 off-by-one.** The power store's index `i` is the half-hour that ends at the origin plus 30 minutes
@@ -862,7 +1259,7 @@ stamps.
 
 ## Files
 
-- `ml-experiments/00737-bayesian-solar-capacity-part-1/` (to be written): `e00737_forward.py` builds
+- `ml-experiments/00737-bayesian-solar-capacity-part-1/`: `e00737_forward.py` builds
   the solar term from `studies.pv_physics`, adds the Faiman derate, and builds the temperature
   means from `temperature_2m`; `e00737_inputs.py` loads the power, CAMS, and ERA5, cuts every
   loader at 2026-07-01, and builds the baseline with `studies.pv_separation.baseline_design` and
@@ -888,8 +1285,12 @@ stamps.
   (the reference table);
   `data/ml-experiments/00179-metered-solar-farm-exploration/cleaned_solar_farms.parquet` (the
   half-real-farm worlds).
-- Written: `data/ml-experiments/00737-bayesian-solar-capacity-part-1/` (never committed): world
-  files, fit and posterior tables, score tables, the time log, and the review markers.
+- Written: `data/ml-experiments/00737-bayesian-solar-capacity-part-1/` (never committed): `worlds/`
+  (the injected series per Primary), `fits/` and `past/` (one `.npz` per fit, holding `<arm>_cap`,
+  `<arm>_sd`, and `<arm>_info`, whose element 8 says whether the sandwich variance was used),
+  `g1/`, `tuning/`, `unit/`, `gates.json`, `ridge.json`, `tuned.json`, `scores/` (`scores.json`,
+  `world_metrics.parquet`, and `real_path.npz`), `report_output.txt` (the printed report that this
+  page quotes), `time_log.csv`, `smoke.json`, and the review markers (`done/`).
 
 ## Amendment 1 to the plan of experiment 737 (2026-11-28)
 
@@ -1020,7 +1421,7 @@ replaces the requirement that every Primary lie within the bound. No bound chang
 per-Primary bound stays at 0.75 half-hours and the pooled bound at 0.5. The reason is that a
 Primary's power is net load, and two Primaries sit more than 0.75 half-hours later than the farms,
 which the fleet's west lean and the demand's response to the sun can explain without a timing
-error. The decision applies before any scored fit and before any fit of any stage. The latest run
+error. The decision applies before any scored fit and before any fit of any stage. The final run
 of the `gates` stage gives these numbers, in half-hours:
 
 | Primary | Best shift | Difference from the farm reference | Within 0.75 |
