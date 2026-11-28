@@ -6,7 +6,8 @@
 `parse_args()` at import, so it cannot be imported; this copy takes a model function instead of
 building the model, and has no import-time effect. Changes from the original: the model function
 returns the quantiles and a dict of diagnostics (the level head's age and depth), the frame carries
-the injected `actual`, and the lead days are an argument.
+the injected `actual`, the lead days are an argument, and every row whose valid time is on or
+after 2026-07-01 (`common.HOLDOUT_START_US`) is dropped, as in experiment 713's own pass.
 
 `assert_713_code` compares experiment 713's code hash with the hash that the stored `M1` fits carry.
 """
@@ -75,6 +76,11 @@ def assert_713_code() -> str:
     actual = arms.code_hash()
     assert_hash(actual=actual)
     return actual
+
+
+def before_holdout(*, valid_us: np.ndarray | pl.Expr) -> np.ndarray | pl.Expr:
+    """Return the mask of valid times that lie before 2026-07-01 (the rows a forecast may keep)."""
+    return valid_us < common.HOLDOUT_START_US
 
 
 def forecast_pass(
@@ -176,6 +182,8 @@ def forecast_pass(
     utc = pl.Datetime("us", "UTC")
     frame = (
         pl.concat(frames)
+        # no forecast of the data from 2026-07-01 on, as in experiment 713's own forecast pass
+        .filter(before_holdout(valid_us=pl.col("valid_us")))
         .with_columns(
             power_fcst_init_time=pl.col("origin_us")
             .cast(pl.Datetime("us"))

@@ -5,11 +5,15 @@ Three checks must pass:
 
 1. An oracle that adds the true shift to `M1`'s median returns a follow share of at least 0.95
    through the scorer, at a mid-day onset as well as at midnight.
-2. LP adds at least 0.75 of the depth of a shift that is in force and far from its end, to the median
-   at lead days 1 and 2 (zero-based), beyond `M1`'s median, on the rows where A1 sees the shift
-   (A1's age is above zero). The share over all far rows is recorded beside it as a diagnostic,
-   because A1 cannot see a shift older than its 14-day history and LP adds nothing there.
-3. The depth head's median depth divided by the true depth is at least 0.7 on shifts of 3 to 10 days.
+2. LP adds at least 0.75 of the depth that `M1` leaves unfollowed, of a shift that is in force and
+   far from its end, to the median at lead days 1 and 2 (zero-based), beyond `M1`'s median, on the
+   rows where A1 sees the shift (A1's age is above zero). `M1` already follows a share f of the
+   shift on its own (its median on the injected panel minus its median on the real panel, over the
+   true depth, on the same rows), so a perfect head adds 1 - f. The bar is 0.75 (1 - f). The share
+   over all far rows is recorded as a diagnostic, because A1 cannot see a shift older than its
+   14-day history.
+3. The depth head's median depth divided by the true depth is at least 0.7 (1 - f) on shifts of 3 to
+   10 days, where A1 sees the shift.
 
 A first failure sets the remedy flag (cap 120, patience 15 for every head fit) and the 4 screen LP
 fits run again once. A second failure exits with code 5 and nothing else may run. No worker waives it.
@@ -108,6 +112,26 @@ def depth_ratio_table(
     return out
 
 
+def follow_bars(*, m1_follow: float) -> dict[str, float]:
+    """Return the bars of checks 2 and 3 for `M1`'s own follow share, with the derivation.
+
+    A perfect head adds the depth that `M1` leaves unfollowed, `1 - f`. The bars keep the plan's
+    fractions of that remaining depth: 0.75 for the follow share and 0.7 for the depth ratio.
+
+    Args:
+        m1_follow: `M1`'s own follow share f on the gate's rows.
+
+    Returns:
+        `remaining` (1 - f, floored at 0.2), `lp_follow_bar`, and `depth_ratio_bar`.
+    """
+    remaining = float(np.clip(1.0 - m1_follow, 0.2, 1.0))
+    return {
+        "remaining": remaining,
+        "lp_follow_bar": LP_FOLLOW_MIN * remaining,
+        "depth_ratio_bar": DEPTH_RATIO_MIN * remaining,
+    }
+
+
 def evaluate(
     *,
     oracle: dict[str, float],
@@ -115,28 +139,50 @@ def evaluate(
     depth_ratio: float,
     lp_follow_all_far: float | None = None,
     diagnostics: dict[str, object] | None = None,
+    m1_follow: float = 0.0,
 ) -> dict:
     """Return the gate record from the three readings.
 
     Args:
         oracle: The oracle follow share by onset (`midday` and `midnight`).
-        lp_follow: LP's pooled follow share at lead days 1 and 2 on far-stratum rows where A1 sees
-            the shift.
-        depth_ratio: The median depth ratio on shifts of 3 to 10 days.
+        lp_follow: LP's pooled increment over `M1`'s median, as a share of the true depth, at lead
+            days 1 and 2 on far-stratum rows where A1 sees the shift.
+        depth_ratio: The median depth ratio (head depth over the full true depth) on shifts of 3 to
+            10 days.
         lp_follow_all_far: The same share over all far-stratum rows (a diagnostic, not a check).
         diagnostics: Other readings to record, such as the share of far rows that A1 sees.
+        m1_follow: `M1`'s own follow share on the same rows, which sets the bars.
 
     Returns:
-        The record, with `passed` true only when all three checks hold.
+        The record, with `passed` true only when all three checks hold, and the derivation of the
+        bars.
     """
+    bars = follow_bars(m1_follow=m1_follow)
     checks = {
         "oracle": {"values": oracle, "passed": all(v >= ORACLE_MIN for v in oracle.values())},
-        "lp_follow": {"value": lp_follow, "passed": bool(lp_follow >= LP_FOLLOW_MIN)},
-        "depth_ratio": {"value": depth_ratio, "passed": bool(depth_ratio >= DEPTH_RATIO_MIN)},
+        "lp_follow": {
+            "value": lp_follow,
+            "bar": bars["lp_follow_bar"],
+            "passed": bool(lp_follow >= bars["lp_follow_bar"]),
+        },
+        "depth_ratio": {
+            "value": depth_ratio,
+            "bar": bars["depth_ratio_bar"],
+            "passed": bool(depth_ratio >= bars["depth_ratio_bar"]),
+        },
     }
+    derivation = (
+        f"M1 follows {m1_follow:.3f} of the injected depth on these rows, so a perfect head adds "
+        f"{bars['remaining']:.3f}. The bars keep the plan's fractions of that: "
+        f"{LP_FOLLOW_MIN} x {bars['remaining']:.3f} = {bars['lp_follow_bar']:.3f} for LP's "
+        f"increment, and {DEPTH_RATIO_MIN} x {bars['remaining']:.3f} = "
+        f"{bars['depth_ratio_bar']:.3f} for the depth ratio."
+    )
     return {
         "checks": checks,
         "passed": all(c["passed"] for c in checks.values()),
+        "m1_follow": m1_follow,
+        "derivation": derivation,
         "diagnostics": {"lp_follow_all_far_rows": lp_follow_all_far, **(diagnostics or {})},
     }
 
@@ -162,7 +208,8 @@ def age_per_row(*, frame: pl.DataFrame, diag: pl.DataFrame) -> np.ndarray:
         how="left",
         maintain_order="left",
     )
-    return found["age"].fill_null(0.0).to_numpy().astype(float)
+    assert found["age"].null_count() == 0, "a forecast row has no diagnostics row"
+    return found["age"].to_numpy().astype(float)
 
 
 def panel_readings(
@@ -185,25 +232,30 @@ def panel_readings(
         ids: The `time_series_id` of each Primary in `primary` order.
 
     Returns:
-        `num` and `den` of the follow share over all far rows at lead days 1 and 2, `num_seen` and
-        `den_seen` over those rows that A1 sees, the row counts, and the depth ratios of the
-        3-to-10-day band (a list of at most one value).
+        `num` and `den` of LP's increment over `M1` as a share of the true depth, over all far rows
+        at lead days 1 and 2; `num_seen` and `den_seen` over those rows that A1 sees; `m1_num` and
+        `m1_num_seen`, the same sums for `M1`'s own follow (its median on the injected panel minus
+        its median on the real panel); the row counts; and the depth ratios by band (a dict of
+        lists) with the pooled 3-to-10-day ratio (a list of at most one value).
     """
     assert m1.height == lp.height == real.height, "the panels differ in length"
     prim = score.primary_of(time_series_id=m1["time_series_id"].to_list(), ids=ids)
     origin, valid, lead = score.row_indices(frame=m1)
+    score.assert_before_holdout(valid_idx=valid)
+    onset_a, end_a, clipped_a = score.shift_arrays(shifts=shifts)
     masks = score.row_masks(
         prim=prim,
         origin_idx=origin,
         valid_idx=valid,
         lead_day=lead,
-        onset=np.array([s.onset_idx for s in shifts]),
-        end=np.array([s.end_idx for s in shifts]),
-        clipped=np.array([s.clipped for s in shifts]),
+        onset=onset_a,
+        end=end_a,
+        clipped=clipped_a,
     )
     sel = masks["far"] & np.isin(lead, (1, 2))
     delta = np.nan_to_num(m1["actual"].to_numpy() - real["actual"].to_numpy())
     step = lp["q50"].to_numpy() - m1["q50"].to_numpy()
+    m1_step = m1["q50"].to_numpy() - real["q50"].to_numpy()
     seen_row = (
         age_per_row(frame=lp, diag=diag) > 0 if diag is not None else np.zeros(m1.height, bool)
     )
@@ -213,9 +265,12 @@ def panel_readings(
         "den": float((delta[sel] ** 2).sum()),
         "num_seen": float((step[sel_seen] * delta[sel_seen]).sum()),
         "den_seen": float((delta[sel_seen] ** 2).sum()),
+        "m1_num": float((m1_step[sel] * delta[sel]).sum()),
+        "m1_num_seen": float((m1_step[sel_seen] * delta[sel_seen]).sum()),
         "rows": int(sel.sum()),
         "rows_seen": int(sel_seen.sum()),
         "depth_ratio": [],
+        "depth_bands": {},
     }
     if diag is not None and diag.height:
         d = diag.filter(pl.col("lead_day") == 1)
@@ -224,7 +279,7 @@ def panel_readings(
             d["origin_us"].to_numpy() - common.GRID_START_US
         ) // common.STEP_US + common.NATIVE_OFFSET_STEPS
         onset = np.array([s.onset_idx for s in shifts])[dprim]
-        end = np.array([s.end_idx for s in shifts])[dprim]
+        end = end_a[dprim]
         age = (c_idx - onset) / 48.0
         true = np.array([s.sign * s.depth for s in shifts])[dprim]
         in_force = (c_idx >= onset) & (c_idx < end)
@@ -236,6 +291,7 @@ def panel_readings(
         )
         if not np.isnan(tab["3-10"]):
             out["depth_ratio"] = [tab["3-10"]]
+        out["depth_bands"] = {k: [v] for k, v in tab.items() if k != "3-10" and not np.isnan(v)}
     return out
 
 
@@ -260,6 +316,30 @@ def write_gate(*, record: dict, remedy_done: bool, code_hash: str, out: Path | N
     if decision == "remedy":
         (root / REMEDY_FLAG).write_text("cap 120, patience 15\n")
     return decision
+
+
+def remedy_complete(*, out: Path | None = None, folder: Path | None = None) -> bool:
+    """Return whether every remedy fit and prediction task has finished.
+
+    The gate treats a failure as the second one only when this holds. A flag without the finished
+    refits means that `gate-remedy` has not run, or crashed, so the gate asks for it again.
+
+    Args:
+        out: The output folder (`OUT` by default).
+        folder: The code folder whose hash a done marker holds.
+
+    Returns:
+        True when the flag exists and the 16 fit tasks and 4 prediction tasks of the remedy are done.
+    """
+    root = out if out is not None else common.OUT
+    if not remedy_active(out=root):
+        return False
+    import e00738_phases as phases
+
+    names = [
+        f"fit_{arm}_{m}_s0_remedy" for m in common.SCREEN_FOLDS for arm in common.HEAD_ARMS
+    ] + [f"predict_{m}_s0_remedy" for m in common.SCREEN_FOLDS]
+    return all(phases.is_done(name=n, out=root, folder=folder) for n in names)
 
 
 def remedy_active(*, out: Path | None = None) -> bool:

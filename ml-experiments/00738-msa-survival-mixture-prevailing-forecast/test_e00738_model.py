@@ -139,8 +139,49 @@ def test_features_have_the_planned_width() -> None:
     net = make_net(mode="LP")
     inp = make_inputs()
     h0, base, spread, _ = net.base_forward(inp)
-    assert net.features_of(inp=inp, h0=h0, base=base, spread=spread).shape == (4, model.N_FEATURES)
+    assert net.features_of(inp=inp, h0=h0, base=base, spread=spread).shape == (
+        4,
+        model.N_FEATURES_LP,
+    )
     assert model.N_FEATURES == 108
+    assert model.N_FEATURES_LP == 44
+    ld = make_net(mode="LD")
+    h0, base, spread, _ = ld.base_forward(inp)
+    assert ld.features_of(inp=inp, h0=h0, base=base, spread=spread).shape == (4, model.N_FEATURES)
+
+
+def test_lp_level_term_is_identical_at_every_lead() -> None:
+    """LP is full persistence: one history gives one level term at every lead and weather."""
+    net = make_net(mode="LP")
+    torch.manual_seed(1)
+    torch.nn.init.normal_(net.level_head[-1].weight, std=0.5)
+    inp = make_inputs(batch=1)
+    depths = []
+    shifts = []
+    for lead in range(mdl.N_LEAD_DAYS):
+        other = make_inputs(batch=1, seed=100 + lead)
+        mixed = mdl.MsaInputs(
+            primary=inp.primary,
+            lead_day=torch.tensor([lead]),
+            top_weather=other.top_weather,
+            top_spread=other.top_spread,
+            top_datetime=other.top_datetime,
+            hist_weather=inp.hist_weather,
+            hist_datetime=inp.hist_datetime,
+            hist_power=inp.hist_power,
+            hist_visible=inp.hist_visible,
+            row_exists=inp.row_exists,
+            day_type_top=inp.day_type_top,
+            day_type_hist=inp.day_type_hist,
+        )
+        out = net.level_forward(mixed)
+        depths.append(out.depth)
+        base = net.base_forward(mixed)[3]
+        shifts.append((out.out[..., 3:6] - base[..., 3:6])[0, :, 0])
+    assert float(depths[0].detach().abs().max()) > 0.0, "the test needs a non-zero depth"
+    for d, sh in zip(depths, shifts, strict=True):
+        assert torch.equal(d, depths[0])
+        assert torch.allclose(sh, depths[0].expand_as(sh), atol=1e-6)
 
 
 def test_torch_hazard_ratio_matches_numpy() -> None:

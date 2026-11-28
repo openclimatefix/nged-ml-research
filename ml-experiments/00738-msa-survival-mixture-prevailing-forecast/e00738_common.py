@@ -170,6 +170,14 @@ N_HISTORY: Final[int] = 14
 MIN_AGE_DAYS: Final[int] = 2
 """The newest history row is 2 days old at the contract origin."""
 A1_Z: Final[float] = 2.0
+"""A1's default detection threshold in noise units. Phase 0 may replace it by the tuned value."""
+A1_Z_GRID: Final[tuple[float, ...]] = tuple(2.0 + 0.25 * i for i in range(41))
+"""The thresholds that the one pre-registered remedy tries, 2.0 to 12.0 noise units."""
+A1_MISS_MAX_3_10: Final[float] = 0.6
+"""The largest share of shifts of 3 to 10 days that A1 may miss at the tuned threshold."""
+A1_THRESHOLD_FILE: Final[str] = "a1/threshold.json"
+HOLDOUT_START_US: Final[int] = 1_782_864_000_000_000
+"""2026-07-01 00:00 UTC in microseconds. No valid time on or after it is forecast or scored."""
 A1_MIN_REFERENCE_ROWS: Final[int] = 3
 MAD_TO_SD: Final[float] = 1.4826
 

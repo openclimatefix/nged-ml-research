@@ -50,8 +50,11 @@ def window_end_idx() -> int:
     return int(c650.WINDOW_START_IDX)
 
 
-def fold_curve(*, month: str, seed: int, cutoff_idx: int, is_mw: np.ndarray) -> surv.Curve:
-    """Fit the survival curve to the drawn durations of the fold's training worlds.
+def fold_durations(*, month: str, seed: int, cutoff_idx: int, is_mw: np.ndarray) -> np.ndarray:
+    """Return the drawn (unclipped) durations of every shift in the fold's training worlds.
+
+    The shifts lie in the training window only (the grid start to the fold's cutoff), so no
+    duration comes from a scoring month.
 
     Args:
         month: The fold month.
@@ -60,7 +63,7 @@ def fold_curve(*, month: str, seed: int, cutoff_idx: int, is_mw: np.ndarray) -> 
         is_mw: Per Primary, whether it reports signed megawatts.
 
     Returns:
-        The best of the four families, fitted to every shift's drawn (unclipped) duration.
+        The durations in days.
     """
     durations: list[float] = []
     for pass_no in range(N_DURATION_PASSES):
@@ -78,7 +81,24 @@ def fold_curve(*, month: str, seed: int, cutoff_idx: int, is_mw: np.ndarray) -> 
                     is_mw=is_mw,
                 )
             )
-    return surv.fit_curve(durations_days=np.array(durations))
+    return np.array(durations)
+
+
+def fold_curve(*, month: str, seed: int, cutoff_idx: int, is_mw: np.ndarray) -> surv.EmpiricalCurve:
+    """Return the empirical survival function of the fold's training worlds' drawn durations.
+
+    `LD` and `LM` use this curve. A fitted Weibull (`fold_weibull`) is for the report only.
+    """
+    return surv.EmpiricalCurve.of(
+        durations_days=fold_durations(month=month, seed=seed, cutoff_idx=cutoff_idx, is_mw=is_mw)
+    )
+
+
+def fold_weibull(*, month: str, seed: int, cutoff_idx: int, is_mw: np.ndarray) -> surv.Curve:
+    """Return the best of the four fitted families, for the report only (no arm reads it)."""
+    return surv.fit_curve(
+        durations_days=fold_durations(month=month, seed=seed, cutoff_idx=cutoff_idx, is_mw=is_mw)
+    )
 
 
 def load_fold_data(*, month: str, phase: str, seed: int, device: str) -> Any:
@@ -150,6 +170,7 @@ def head_model(  # noqa: ANN201 - `LevelNet` needs torch, imported lazily
     target_std: np.ndarray,
     noise: float,
     curve: surv.SurvivalFunction | None,
+    a1_z: float,
     device: str,
 ):
     """Return a `LevelNet` with the stored stage 3 `M1` base loaded and frozen.
@@ -160,7 +181,8 @@ def head_model(  # noqa: ANN201 - `LevelNet` needs torch, imported lazily
         seed: The seed.
         target_std: Each Primary's standard deviation of power over capacity.
         noise: A1's noise unit.
-        curve: The fitted survival curve (`LD` and `LM`).
+        curve: The empirical survival curve (`LD` and `LM`).
+        a1_z: A1's detection threshold.
         device: The device.
 
     Returns:
@@ -170,7 +192,9 @@ def head_model(  # noqa: ANN201 - `LevelNet` needs torch, imported lazily
     import torch  # ty: ignore[unresolved-import]
 
     torch.manual_seed(head_init_seed(seed=seed))
-    net = lmdl.LevelNet(mode=arm, target_std=target_std, noise=noise, curve=curve).to(device)
+    net = lmdl.LevelNet(mode=arm, target_std=target_std, noise=noise, curve=curve, a1_z=a1_z).to(
+        device
+    )
     net.load_base(state=m1_state(month=month, seed=seed, stage=3, device=device))
     net.freeze_base()
     return net
@@ -181,6 +205,7 @@ def save_state_atomic(*, state: dict, path: Path) -> None:
     import torch  # ty: ignore[unresolved-import]
 
     path.parent.mkdir(parents=True, exist_ok=True)
+    phases.write_recipe(path=path, modules=phases.FIT_MODULES)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     torch.save(state, tmp)
     tmp.rename(path)
@@ -206,6 +231,7 @@ def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = Fals
     torch.set_num_threads(1)
     paths = common.fit_paths(arm=arm, month=month, seed=seed)
     if paths["state"].exists() and paths["log"].exists():
+        phases.require_recipe(path=paths["state"], modules=phases.FIT_MODULES)
         return
     started = time.time()
     data = load_fold_data(month=month, phase="train", seed=seed, device=device)
@@ -239,6 +265,7 @@ def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = Fals
     else:
         z = (data.clean - data.target_mean[:, None]) / data.target_std[:, None]
         noise = surv.noise_unit_from_panel(z=z, cutoff_idx=data.cutoff_idx)
+        a1_z = surv.a1_threshold()
         curve = (
             fold_curve(month=month, seed=seed, cutoff_idx=data.cutoff_idx, is_mw=is_mw)
             if arm in {"LD", "LM"}
@@ -251,6 +278,7 @@ def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = Fals
             target_std=data.target_std,
             noise=noise,
             curve=curve,
+            a1_z=a1_z,
             device=device,
         )
         head_log = train738.fit_head_arm(
@@ -260,16 +288,21 @@ def fit_job(*, arm: str, month: str, seed: int, device: str, remedy: bool = Fals
         log["passes"] = head_log.passes
         log["cap_hit"] = head_log.cap_hit
         log["noise"] = noise
-        log["curve"] = (
-            None if curve is None else {"family": curve.family, "params": list(curve.params)}
-        )
-        log["curve_error"] = None if curve is None else surv.curve_error(curve=curve)
+        log["a1_z"] = a1_z
+        if curve is not None:
+            weibull = fold_weibull(month=month, seed=seed, cutoff_idx=data.cutoff_idx, is_mw=is_mw)
+            log["curve"] = {"family": "empirical", "n_durations": len(curve.durations)}
+            log["curve_error"] = surv.curve_error(curve=curve)
+            log["weibull"] = {
+                "family": weibull.family,
+                "params": list(weibull.params),
+                "curve_error": surv.curve_error(curve=weibull),
+            }
         state = {
             "mode": arm,
             "noise": noise,
-            "curve": None
-            if curve is None
-            else {"family": curve.family, "params": list(curve.params), "nll": curve.nll},
+            "a1_z": a1_z,
+            "curve": None if curve is None else surv.curve_record(curve=curve),
             "level_head": net.level_head.state_dict(),
         }
     log["seconds"] = round(time.time() - started, 1)
@@ -306,6 +339,7 @@ def load_for_prediction(*, arm: str, month: str, seed: int, data: Any, device: s
             net.load_state_dict(m1_state(month=month, seed=seed, stage=3, device=device))
         else:
             path = common.fit_paths(arm=arm, month=month, seed=seed)["state"]
+            phases.require_recipe(path=path, modules=phases.FIT_MODULES)
             net.load_state_dict(torch.load(path, map_location=device))
         net.eval()
 
@@ -313,13 +347,12 @@ def load_for_prediction(*, arm: str, month: str, seed: int, data: Any, device: s
             return mdl.standardised_quantiles(out=net(inp_).out), {}  # ty: ignore[invalid-argument-type]
 
         return net, plain
-    saved = torch.load(
-        common.fit_paths(arm=arm, month=month, seed=seed)["state"], map_location=device
-    )
+    state_path = common.fit_paths(arm=arm, month=month, seed=seed)["state"]
+    phases.require_recipe(path=state_path, modules=phases.FIT_MODULES)
+    saved = torch.load(state_path, map_location=device)
     curve = None
     if saved["curve"] is not None:
-        c = saved["curve"]
-        curve = surv.Curve(family=c["family"], params=tuple(c["params"]), nll=float(c["nll"]))
+        curve = surv.curve_from_record(record=saved["curve"])
     head = head_model(
         arm=arm,
         month=month,
@@ -327,6 +360,7 @@ def load_for_prediction(*, arm: str, month: str, seed: int, data: Any, device: s
         target_std=data.target_std,
         noise=float(saved["noise"]),
         curve=curve,
+        a1_z=float(saved["a1_z"]),
         device=device,
     )
     head.level_head.load_state_dict(saved["level_head"])

@@ -233,14 +233,15 @@ def test_stage_gate_with_non_monotone_ids_passes_on_the_seen_rows_only(
     for month in common.SCREEN_FOLDS:
         for arm, frame in (("M1", m1), ("LP", lp)):
             path = pred.panel_path(arm=arm, month=month, seed=0, name="pass00")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            frame.write_parquet(path)
-        pred.panel_path(arm="M1", month=month, seed=0, name="real").write_bytes(b"")
-        real.write_parquet(pred.panel_path(arm="M1", month=month, seed=0, name="real"))
-        diag.write_parquet(
-            pred.panel_path(arm="LP", month=month, seed=0, name="pass00").with_name(
+            pred.write_parquet_atomic(frame=frame, path=path)
+        pred.write_parquet_atomic(
+            frame=real, path=pred.panel_path(arm="M1", month=month, seed=0, name="real")
+        )
+        pred.write_parquet_atomic(
+            frame=diag,
+            path=pred.panel_path(arm="LP", month=month, seed=0, name="pass00").with_name(
                 "pass00_diag.parquet"
-            )
+            ),
         )
     monkeypatch.setattr(pred, "panel_names", lambda: ["pass00"])
     monkeypatch.setattr(run, "screen_shifts", lambda *, month: {"pass00": shifts})

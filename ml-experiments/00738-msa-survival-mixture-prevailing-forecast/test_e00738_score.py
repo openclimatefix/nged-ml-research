@@ -175,9 +175,9 @@ def test_contrast_readings_have_the_sign_of_the_difference() -> None:
 
 
 def test_choose_s_star_prefers_the_simpler_arm_within_the_margin() -> None:
-    assert score.choose_s_star(in_force_scaled={"LD": 5.0, "LM": 4.95, "LR": 4.9}) == "LD"
-    assert score.choose_s_star(in_force_scaled={"LD": 5.0, "LM": 4.7, "LR": 4.9}) == "LM"
-    assert score.choose_s_star(in_force_scaled={"LD": 5.0, "LM": 4.9, "LR": 4.2}) == "LR"
+    assert score.choose_s_star(in_force={"LD": 5.0, "LM": 4.95, "LR": 4.9}) == "LD"
+    assert score.choose_s_star(in_force={"LD": 5.0, "LM": 4.7, "LR": 4.9}) == "LM"
+    assert score.choose_s_star(in_force={"LD": 5.0, "LM": 4.9, "LR": 4.2}) == "LR"
 
 
 def test_world_of_panel_names() -> None:
@@ -209,8 +209,8 @@ def test_every_state_of_the_verdict_table_maps_to_exactly_one_row() -> None:
         assert row == rows[0], "the first matching row decides"
         assert 1 <= row <= 8
         counts[name] = counts.get(name, 0) + 1
-    assert n == 2**13
-    assert sum(counts.values()) == 2**13
+    assert n == 2**14
+    assert sum(counts.values()) == 2**14
     assert set(counts) == {
         "invalid", "refuted", "not supported", "inconclusive", "supported", "partly supported",
         "small gain",
@@ -230,9 +230,14 @@ def test_verdict_rows_in_priority_order() -> None:
     assert score.verdict(state=_state(n1_gain=True, n1_seeds=False))[1] == "inconclusive"
     full = _state(
         n1_gain=True, n1_at_threshold=True, n1_seeds=True, n3_gain=True, n3_at_threshold=True,
-        n3_seeds=True, c2_gain=True, c2_seeds=True, held_out_agrees=True,
+        n3_seeds=True, c3_below_zero=True, c2_gain=True, c2_seeds=True, held_out_agrees=True,
     )  # fmt: skip
     assert score.verdict(state=full) == (5, "supported")
+    # N3 passes only with an in-force C3 interval below zero: without it the verdict is row 6
+    no_c3 = _state(
+        **{**{k: getattr(full, k) for k in full.__dataclass_fields__}, "c3_below_zero": False}
+    )
+    assert score.verdict(state=no_c3) == (6, "partly supported")
     partly = _state(n1_gain=True, n1_at_threshold=True, n1_seeds=True)
     assert score.verdict(state=partly) == (6, "partly supported")
     assert score.label_of(state=partly) == "partly supported (duration-dependent)"

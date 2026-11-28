@@ -8,7 +8,8 @@ curve, which are fitted on the training window.
 
 Arms (`mode`):
 
-- `LP`: the level term is added to the three mixture means at every lead (full persistence).
+- `LP`: the level term is added to the three mixture means at every lead (full persistence). Its
+  depth reads only the history rows and the Primary, so the level term is the same at every lead.
 - `LD`: the level term times the survival ratio p(a, h) is added to the three means (a decay).
 - `LM`: a mixture of six components: the base three with weight 1 - p, and a shifted copy with
   weight p, with p from the fixed fitted curve.
@@ -34,6 +35,9 @@ from torch import nn  # ty: ignore[unresolved-import]
 N_FEATURES: Final[int] = mdl.WIDTH + 2 + mdl.N_LEAD_DAYS + 2 * mdl.N_HISTORY
 """Pooled target summary (64), read-out mean and spread (2), one-hot lead day (14), 14 row means,
 and 14 presence flags."""
+N_FEATURES_LP: Final[int] = 2 * mdl.N_HISTORY + mdl.N_PRIMARIES
+"""`LP` reads only the history rows (14 row means, 14 presence flags) and the Primary's one-hot, so
+its depth cannot change with the lead day or with the target row's weather."""
 P_EPS: Final[float] = 1e-6
 UNSEEN_LOGIT: Final[float] = -30.0
 """The shifted branch's log weight where A1 sees no shift, so that the arm equals `M1` there."""
@@ -95,6 +99,7 @@ class LevelNet(mdl.MsaNet):
         target_std: np.ndarray,
         noise: float,
         curve: surv.SurvivalFunction | None,
+        a1_z: float = common.A1_Z,
     ) -> None:
         """Build the head.
 
@@ -102,13 +107,15 @@ class LevelNet(mdl.MsaNet):
             mode: `LP`, `LD`, `LM`, or `LR`.
             target_std: The standard deviation of each Primary's power over capacity (16,).
             noise: The noise unit of A1, from the fold's training window.
-            curve: The fitted survival curve (needed by `LD` and `LM`).
+            curve: The empirical survival curve of the training worlds (needed by `LD` and `LM`).
+            a1_z: A1's detection threshold in noise units, as Phase 0 tuned it.
         """
         super().__init__()
         assert mode in common.HEAD_ARMS, mode
         assert mode not in {"LD", "LM"} or curve is not None, "LD and LM need the fitted curve"
         self.mode = mode
         self.noise = float(noise)
+        self.a1_z = float(a1_z)
         self.curve = curve
         self.register_buffer(
             "depth_limit",
@@ -118,7 +125,7 @@ class LevelNet(mdl.MsaNet):
         )
         n_out = 1 + (common.N_HAZARDS if mode == "LR" else 0)
         self.level_head = nn.Sequential(
-            nn.Linear(N_FEATURES, common.HIDDEN),
+            nn.Linear(N_FEATURES_LP if mode == "LP" else N_FEATURES, common.HIDDEN),
             nn.ReLU(),
             nn.Linear(common.HIDDEN, common.HIDDEN),
             nn.ReLU(),
@@ -169,19 +176,22 @@ class LevelNet(mdl.MsaNet):
         """Return A1's age in days (B,), 0 where no shift is seen. It reads history rows only."""
         power = inp.hist_power.detach().cpu().numpy()
         visible = inp.hist_visible.detach().cpu().numpy()
-        age = surv.age_rule_a1(hist_power=power, visible=visible, noise=self.noise)
+        age = surv.age_rule_a1(hist_power=power, visible=visible, noise=self.noise, z=self.a1_z)
         return torch.from_numpy(age.astype(np.float32)).to(inp.hist_power.device)
 
     def features_of(
         self, *, inp: mdl.MsaInputs, h0: torch.Tensor, base: torch.Tensor, spread: torch.Tensor
     ) -> torch.Tensor:
-        """Return the head's input (B, 108) from the frozen trunk's summary and the history rows."""
+        """Return the head's input: (B, 108), or (B, 44) for `LP` (history only)."""
         n = inp.hist_visible.sum(dim=-1)
         present = n > 0
         total = torch.where(inp.hist_visible, inp.hist_power, torch.zeros_like(inp.hist_power)).sum(
             -1
         )
         row_mean = torch.where(present, total / n.clamp_min(1), torch.zeros_like(total))
+        if self.mode == "LP":
+            primary = nn.functional.one_hot(inp.primary, mdl.N_PRIMARIES).to(h0.dtype)
+            return torch.cat([row_mean, present.to(h0.dtype), primary], dim=-1)
         lead = nn.functional.one_hot(inp.lead_day, mdl.N_LEAD_DAYS).to(h0.dtype)
         return torch.cat(
             [

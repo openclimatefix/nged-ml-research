@@ -73,6 +73,11 @@ class Shift:
     family: str
 
     @property
+    def drawn_end_idx(self) -> int:
+        """The first half-hour after the shift as the generator drew it, before any clipping."""
+        return self.onset_idx + round(self.drawn_days * PER_DAY)
+
+    @property
     def clipped(self) -> bool:
         """Whether the window cut the shift short of its drawn duration."""
         return self.end_idx - self.onset_idx < round(self.drawn_days * PER_DAY)
@@ -442,9 +447,10 @@ def strata(
     - `event_free`: none of the above, so the shift has not started by the valid time or ended more
       than 7 days before the origin.
 
-    A shift clipped at the window edge has an end that is not a real end, so an in-force row of such
-    a shift is `in_force_clipped`, and is left out of far, middle, and near. A clipped shift never
-    reaches `ended` strata, because its end is the window's.
+    A shift clipped at the window edge has an end that is not a real end, so its in-force rows are
+    `in_force_clipped`, left out of far, middle, and near. The scoring code does not use that
+    stratum: it passes the drawn end and `clipped` false, because every scored valid time is before
+    the window's end and the drawn end is then exact.
 
     Args:
         origin_idx: Grid index of the 12:00 UTC contract origin of each row.

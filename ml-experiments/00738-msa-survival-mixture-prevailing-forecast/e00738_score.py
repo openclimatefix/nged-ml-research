@@ -131,6 +131,27 @@ def follow_share(*, median_arm: np.ndarray, median_ref: np.ndarray, delta: np.nd
 # ---------------------------------------------------------------------------------------------
 # Row labels
 # ---------------------------------------------------------------------------------------------
+def shift_arrays(*, shifts: list) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return each Primary's onset, drawn end, and a clipped flag that is always false.
+
+    The strata are built from the drawn end and the drawn shift, not from the end that the window
+    clipped. Every scored valid time lies before the holdout, which is the window's end, so the
+    drawn end is exact for every scored row, and no in-force row is dropped on what a later month
+    holds.
+
+    Args:
+        shifts: The 16 shifts, indexed by the site table's `primary`.
+
+    Returns:
+        The onset indices, the drawn end indices, and an all-false array.
+    """
+    return (
+        np.array([s.onset_idx for s in shifts]),
+        np.array([s.drawn_end_idx for s in shifts]),
+        np.zeros(len(shifts), dtype=bool),
+    )
+
+
 def row_masks(
     *,
     prim: np.ndarray,
@@ -347,6 +368,8 @@ class VerdictState:
         n3_gain: N3 is a gain.
         n3_at_threshold: N3's point estimate is at or below -0.03.
         n3_seeds: Each seed has the sign of N3's point estimate.
+        c3_below_zero: The upper limit of the 98.33% t interval of C3 (in-force rows, unscaled CRPS,
+            against W0) is below 0. N3 passes only with this and `n3_gain` and `n3_at_threshold`.
         c2_gain: C2 is a gain.
         c2_seeds: Each seed has the sign of C2's point estimate.
         held_out_agrees: The point estimates of C2 and C3 on the held-out world have the sign of the training family's.
@@ -362,6 +385,7 @@ class VerdictState:
     n3_gain: bool
     n3_at_threshold: bool
     n3_seeds: bool
+    c3_below_zero: bool
     c2_gain: bool
     c2_seeds: bool
     held_out_agrees: bool
@@ -373,6 +397,7 @@ def _row_5(s: VerdictState) -> bool:
         and s.n1_at_threshold
         and s.n3_gain
         and s.n3_at_threshold
+        and s.c3_below_zero
         and s.c2_gain
         and not s.v1_fails
         and s.n1_seeds
@@ -388,7 +413,9 @@ def _row_6(s: VerdictState) -> bool:
         and s.n1_at_threshold
         and not s.v1_fails
         and s.n1_seeds
-        and not (s.n3_gain and s.n3_at_threshold and s.c2_gain and s.held_out_agrees)
+        and not (
+            s.n3_gain and s.n3_at_threshold and s.c3_below_zero and s.c2_gain and s.held_out_agrees
+        )
     )
 
 
@@ -438,7 +465,7 @@ def verdict(*, state: VerdictState) -> tuple[int, str]:
 
 
 def all_states() -> Iterable[VerdictState]:
-    """Yield every combination of the 13 boolean inputs (8,192 states)."""
+    """Yield every combination of the 14 boolean inputs (16,384 states)."""
     names = list(VerdictState.__dataclass_fields__)
     for combo in itertools.product([False, True], repeat=len(names)):
         yield VerdictState(**dict(zip(names, combo, strict=True)))
@@ -608,21 +635,22 @@ def net_reading(
     return Reading(float(monthly.mean()), t_lo, t_hi, b_lo, b_hi, seeds)
 
 
-def choose_s_star(
-    *, in_force_scaled: Mapping[str, float], margin: float = common.TIE_MARGIN
-) -> str:
-    """Return S*: the arm of LD, LM, LR with the lowest in-force scaled CRPS, preferring the simpler arm within `margin`.
+def choose_s_star(*, in_force: Mapping[str, float], margin: float = common.TIE_MARGIN) -> str:
+    """Return S*: the arm of LD, LM, LR with the lowest in-force unscaled CRPS, preferring the simpler arm within `margin`.
+
+    The scaled CRPS stays a report-only reading, because the scale factor is fitted on the same
+    rows and can hide a loss in the unscaled score.
 
     Args:
-        in_force_scaled: The screen's in-force scaled CRPS of LD, LM, and LR.
+        in_force: The screen's in-force unscaled CRPS of LD, LM, and LR.
         margin: An arm within this of the best loses to a simpler arm (order LD, LM, LR).
 
     Returns:
         The arm's name.
     """
-    best = min(in_force_scaled.values())
+    best = min(in_force.values())
     for arm in common.SURVIVAL_ARMS:
-        if arm in in_force_scaled and in_force_scaled[arm] <= best + margin:
+        if arm in in_force and in_force[arm] <= best + margin:
             return arm
     msg = "no survival arm scored"
     raise ValueError(msg)
@@ -678,6 +706,18 @@ def primary_of(*, time_series_id: np.ndarray | list, ids: np.ndarray) -> np.ndar
     return np.array([pos[int(t)] for t in time_series_id], dtype=np.int64)
 
 
+def assert_before_holdout(*, valid_idx: np.ndarray) -> None:
+    """Stop when a scored row has a valid time on or after 2026-07-01 (the holdout).
+
+    Args:
+        valid_idx: The grid index of each row's valid time.
+    """
+    limit = (common.HOLDOUT_START_US - common.GRID_START_US) // common.STEP_US
+    assert valid_idx.size == 0 or int(valid_idx.max()) < limit, (
+        "a scored row has a valid time on or after 2026-07-01"
+    )
+
+
 def score_fold_seed(
     *,
     month: str,
@@ -730,20 +770,21 @@ def score_fold_seed(
             ok = np.isfinite(y)
             prim = primary_of(time_series_id=f["time_series_id"].to_list(), ids=ids)
             origin, valid, lead = row_indices(frame=f)
+            assert_before_holdout(valid_idx=valid)
             if wld == "real":
                 masks = {"all": np.ones(len(y), bool)}
                 if arm == common.ARM_M1:
                     real_actual = y
             else:
-                sh = shifts_of[name]
+                onset, end, clipped = shift_arrays(shifts=shifts_of[name])
                 masks = row_masks(
                     prim=prim,
                     origin_idx=origin,
                     valid_idx=valid,
                     lead_day=lead,
-                    onset=np.array([s.onset_idx for s in sh]),
-                    end=np.array([s.end_idx for s in sh]),
-                    clipped=np.array([s.clipped for s in sh]),
+                    onset=onset,
+                    end=end,
+                    clipped=clipped,
                 )
             masks = {k: m & ok for k, m in masks.items()}
             pin = pinball_points(y=np.where(ok, y, 0.0), q=q)

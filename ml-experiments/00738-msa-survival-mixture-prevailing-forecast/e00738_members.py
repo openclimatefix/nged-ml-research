@@ -336,6 +336,18 @@ def tolerance_study(*, n_cases: int = 400, seed: int = 1) -> dict[str, dict[str,
     }
 
 
+def complete_blocks(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Keep the rows of the (Primary, origin, lead day) blocks that hold all 48 half-hours.
+
+    The valid-time filter cuts the blocks of the last fold at 2026-07-01, so a block there can hold
+    fewer than 48 rows. A partial block cannot be reshaped into a day, so the check leaves it out.
+    """
+    keys = ["time_series_id", "power_fcst_init_time", "lead_day"]
+    return (
+        frame.with_columns(_n=pl.len().over(keys)).filter(pl.col("_n") == STEPS_PER_ROW).drop("_n")
+    )
+
+
 def check_frames(
     *,
     arm: pl.DataFrame,
@@ -368,6 +380,7 @@ def check_frames(
         so it measures the paths and not the difference between two formulas.
     """
     qcols = [f"q{n}" for n in ("01", "05", "10", "25", "40", "50", "60", "75", "90", "95", "99")]
+    arm, base = complete_blocks(frame=arm), complete_blocks(frame=base)
     assert arm.height == base.height
     assert arm.height % STEPS_PER_ROW == 0
     n = arm.height // STEPS_PER_ROW

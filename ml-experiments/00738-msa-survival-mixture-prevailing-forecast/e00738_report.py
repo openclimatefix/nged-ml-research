@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TypedDict
+from typing import Final, TypedDict
 
 import e00738_common as common
 import e00738_score as score
@@ -184,10 +184,17 @@ def net(
     return score.net_reading(c=c, v=v, q=q, level=level, n_resamples=n_resamples)
 
 
-def screen_in_force_scaled(
-    *, tables: Tables, months: tuple[str, ...], labels: list[str]
+def screen_in_force(
+    *, tables: Tables, months: tuple[str, ...], labels: list[str], metric: str = "crps"
 ) -> dict[str, float]:
-    """Return the in-force scaled CRPS of LD, LM, and LR on the screen folds at seed 0 (interim)."""
+    """Return the in-force CRPS of LD, LM, and LR on the screen folds at seed 0 (interim).
+
+    Args:
+        tables: The sums of each (month, seed).
+        months: The screen folds.
+        labels: The 16 Primaries' labels.
+        metric: `crps` (unscaled, which chooses S*) or `crps_scaled` (report only).
+    """
     prims = score.primary_indices(group="all14", labels=labels)
     out = {}
     for arm in common.SURVIVAL_ARMS:
@@ -199,11 +206,76 @@ def screen_in_force_scaled(
             arm_b=None,
             wld="train_family",
             slc="in_force",
-            metric="crps_scaled",
+            metric=metric,
             prims=prims,
         )
         out[arm] = float((s[0] / n).mean())
     return out
+
+
+SCENARIOS: Final[dict[str, tuple[str, ...]]] = {
+    "all": ("all",),
+    "outside_events_and_7_days_after": ("event_free",),
+    "inside_events": ("in_force",),
+    "7_days_after_an_end": ("ended_24h", "ended_1_7"),
+}
+"""The four scenarios of the injected-world table and the slices of the sums that make each."""
+
+
+def scenario_tables(
+    *,
+    tables: Tables,
+    months: tuple[str, ...],
+    seeds: tuple[int, ...],
+    labels: list[str],
+    drop_ld: bool,
+) -> dict[str, dict[str, float | None]]:
+    """Return each arm's mean CRPS (points of capacity) in the four scenarios, on the training-family worlds.
+
+    The mean pools every (fold, seed) cell in which the arm has forecasts, and the 14 Primaries of
+    the main group. There is no climatology row, because no climatology forecast exists for an
+    injected world.
+    """
+    prims = score.primary_indices(group="all14", labels=labels)
+    out: dict[str, dict[str, float | None]] = {}
+    for arm in common.ALL_ARMS:
+        cells = arm_cells(arm=arm, months=months, seeds=seeds, drop_ld=drop_ld)
+        row: dict[str, float | None] = {}
+        for name, slices in SCENARIOS.items():
+            num = sum(
+                tables[c][arm]["train_family"][sl]["crps"][prims].sum()
+                for c in cells
+                for sl in slices
+            )
+            den = sum(
+                tables[c][arm]["train_family"][sl]["n"][prims].sum() for c in cells for sl in slices
+            )
+            row[name] = float(num / den) if den > 0 else None
+        out[arm] = row
+    return out
+
+
+def phase0_readings(*, out: Path | None = None) -> dict[str, object]:
+    """Return what Phase 0 and the gate wrote that the page reports beside the readings.
+
+    These are the survival curve's error against the generator's at each checkpoint, A1's table
+    (false alarms, miss rate and signed age bias by true age band), and the gate's depth ratios by
+    age band. A missing file reads as None.
+    """
+    root = out if out is not None else common.OUT
+    found: dict[str, object] = {"curves": {}, "a1": {}, "gate_depth_ratio_by_band": None}
+    for path in sorted((root / "curves").glob("*.json")):
+        found["curves"][path.stem] = json.loads(path.read_text())  # ty: ignore[invalid-assignment]
+    for path in sorted((root / "a1").glob("20*.json")):
+        found["a1"][path.stem] = json.loads(path.read_text())  # ty: ignore[invalid-assignment]
+    for name in ("gate_passed.json", "gate_last_run.json"):
+        gate_path = root / name
+        if gate_path.exists():
+            found["gate_depth_ratio_by_band"] = (
+                json.loads(gate_path.read_text()).get("diagnostics", {}).get("depth_ratio_by_band")
+            )
+            break
+    return found
 
 
 def compute_report(
@@ -281,6 +353,7 @@ def compute_report(
         n3_gain=n3.gain,
         n3_at_threshold=n3.point <= common.N3_THRESHOLD,
         n3_seeds=n3.seeds_agree,
+        c3_below_zero=c3.t_upper < 0.0,
         c2_gain=c2.gain,
         c2_seeds=c2.seeds_agree,
         held_out_agrees=bool(held_agrees),
@@ -365,6 +438,29 @@ def compute_report(
                 slc="in_force",
             )
         )
+    # B6: LM and LR can gain over LP by spreading the forecast, not by timing the end. Report C2 split
+    # into the median's error and the 90% interval's coverage (the target is 0.90) on in-force rows.
+    report["report_only"]["spread_check"] = {
+        sel: {
+            "C2_crps": reading_dict(
+                r=contrast(**kw, a=sel, b="LP", wld="train_family", slc="in_force")
+            ),
+            "C2_nmae_of_median": reading_dict(
+                r=contrast(**kw, a=sel, b="LP", wld="train_family", slc="in_force", metric="nmae")
+            ),
+            "C2_cover90": reading_dict(
+                r=contrast(
+                    **kw, a=sel, b="LP", wld="train_family", slc="in_force", metric="cover90"
+                )
+            ),
+        }
+        for sel in ("LD", "LM", "LR")
+        if not (drop_ld and sel == "LD")
+    }
+    report["scenario_tables"] = scenario_tables(
+        tables=tables, months=months, seeds=seeds, labels=labels, drop_ld=drop_ld
+    )
+    report["phase0"] = phase0_readings()
     report["by_group"] = {
         g: {
             k: reading_dict(
@@ -524,6 +620,27 @@ def render(*, report: dict) -> str:
         f"share of event-free rows whose history holds an ended shift: {report['event_free_with_ended_history_share']:.3f}"
     )
     lines.append("leave-one-Primary-out sign flips: " + str(report["trigger_flips"]["sign_flips"]))
+    lines.append("mean CRPS (points of capacity) by scenario, training-family worlds:")
+    for arm, row in report["scenario_tables"].items():
+        lines.append(
+            f"  {arm}: " + ", ".join(f"{k} {v:.3f}" for k, v in row.items() if v is not None)
+        )
+    for sel, d in report["report_only"]["spread_check"].items():
+        lines.append(
+            f"{sel} minus LP, in force: CRPS {d['C2_crps']['point']:+.3f}, "
+            f"NMAE of the median {d['C2_nmae_of_median']['point']:+.3f}, "
+            f"q05 to q95 coverage {d['C2_cover90']['point']:+.3f}"
+        )
+    p0 = report["phase0"]
+    for month, c in p0["curves"].items():  # ty: ignore[unresolved-attribute]
+        lines.append(f"curve error {month}: worst {c.get('worst')}, ok {c.get('error_ok')}")
+    for month, a in p0["a1"].items():  # ty: ignore[unresolved-attribute]
+        lines.append(
+            f"A1 {month}: tuned z {a.get('tuned_z')}, false alarms on real rows "
+            f"{a.get('false_alarm_real_all_rows')}, miss rate 3 to 10 days "
+            f"{a.get('miss_rate_true_age_3_to_10_days')}, signed age bias {a.get('age_bias_days')}"
+        )
+    lines.append(f"gate depth ratio by age band: {p0['gate_depth_ratio_by_band']}")
     return "\n".join(lines)
 
 

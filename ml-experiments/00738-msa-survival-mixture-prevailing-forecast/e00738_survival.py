@@ -8,7 +8,9 @@ daily hazards of the learned arm LR. Nothing here imports torch.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final, Protocol
 
 import e00738_common as common
@@ -52,6 +54,44 @@ class Curve:
     def sf(self, t: np.ndarray) -> np.ndarray:
         """Return P(duration > t), with t in days."""
         return FAMILIES[self.family].sf(np.asarray(t, dtype=float), *self.params)
+
+
+@dataclass(frozen=True)
+class EmpiricalCurve:
+    """The empirical survival function of drawn durations: a step function, no parametric family.
+
+    Attributes:
+        durations: The drawn durations in days, sorted ascending. They come from the training
+            worlds' generator, never from the real record.
+    """
+
+    durations: tuple[float, ...]
+
+    @staticmethod
+    def of(*, durations_days: np.ndarray) -> EmpiricalCurve:
+        """Return the curve of a set of durations."""
+        d = np.sort(np.asarray(durations_days, dtype=float))
+        assert d.size > 0
+        return EmpiricalCurve(durations=tuple(float(v) for v in d))
+
+    def sf(self, t: np.ndarray) -> np.ndarray:
+        """Return the share of durations above `t` (days)."""
+        d = np.asarray(self.durations)
+        return 1.0 - np.searchsorted(d, np.asarray(t, dtype=float), side="right") / d.size
+
+
+def curve_record(*, curve: Curve | EmpiricalCurve) -> dict:
+    """Return a curve as plain data for a state file or a log."""
+    if isinstance(curve, EmpiricalCurve):
+        return {"family": "empirical", "durations": list(curve.durations)}
+    return {"family": curve.family, "params": list(curve.params), "nll": curve.nll}
+
+
+def curve_from_record(*, record: dict) -> Curve | EmpiricalCurve:
+    """Return the curve that `curve_record` described."""
+    if record["family"] == "empirical":
+        return EmpiricalCurve(durations=tuple(float(v) for v in record["durations"]))
+    return Curve(family=record["family"], params=tuple(record["params"]), nll=float(record["nll"]))
 
 
 @dataclass(frozen=True)
@@ -225,18 +265,21 @@ def row_summaries(*, hist_power: np.ndarray, visible: np.ndarray) -> tuple[np.nd
     return np.where(present, total / np.maximum(n, 1), 0.0), present
 
 
-def age_rule_a1(*, hist_power: np.ndarray, visible: np.ndarray, noise: float) -> np.ndarray:
+def age_rule_a1(
+    *, hist_power: np.ndarray, visible: np.ndarray, noise: float, z: float | None = None
+) -> np.ndarray:
     """Return the age in days of the shift that A1 sees, 0 where it sees none.
 
     The reference level is the mean of the oldest 7 history rows. A1 counts the newest consecutive
     rows (ages 2, 3, ...) whose mean differs from the reference by more than 2 noise units. The age
     is the count plus 2. A row with no visible half-hour ends the count, and fewer than 3 reference
-    rows with data means that no shift is seen.
+    rows with data means that no shift is seen. The threshold is `z` noise units, `A1_Z` by default.
 
     Args:
         hist_power: Standardised history power, shape (B, 14, 48), newest row first.
         visible: Visibility of each half-hour, same shape.
         noise: The noise unit from `noise_unit`.
+        z: The detection threshold in noise units.
 
     Returns:
         A float array (B,) of ages, 0.0 where no shift is seen.
@@ -247,11 +290,71 @@ def age_rule_a1(*, hist_power: np.ndarray, visible: np.ndarray, noise: float) ->
     reference = np.where(present[:, ref_rows], means[:, ref_rows], 0.0).sum(axis=1) / np.maximum(
         n_ref, 1
     )
-    differs = present & (np.abs(means - reference[:, None]) > common.A1_Z * noise)
+    differs = present & (
+        np.abs(means - reference[:, None]) > (common.A1_Z if z is None else z) * noise
+    )
     # the count of the newest consecutive rows that differ: the cumulative product stops at a gap
     run = np.cumprod(differs, axis=1).sum(axis=1)
     run = np.where(n_ref >= common.A1_MIN_REFERENCE_ROWS, run, 0)
     return np.where(run > 0, run + common.MIN_AGE_DAYS, 0).astype(np.float64)
+
+
+def tune_a1_z(
+    *,
+    hist_power: np.ndarray,
+    visible: np.ndarray,
+    noise: float,
+    target: float = common.A1_FALSE_ALARM_MAX,
+    grid: tuple[float, ...] = common.A1_Z_GRID,
+) -> tuple[float | None, float]:
+    """Return the smallest threshold whose false-alarm share on the given rows is at most `target`.
+
+    The rows are real rows of the training period, which hold no shift that the caller knows of, so
+    every age above zero counts as a false alarm (logged events cover about 2.5% of the rows, so
+    the share is slightly overstated).
+
+    Args:
+        hist_power: Standardised history power (B, 14, 48).
+        visible: Visibility of each half-hour.
+        noise: The noise unit.
+        target: The false-alarm bar.
+        grid: The thresholds to try, in ascending order.
+
+    Returns:
+        The threshold (None when no threshold on the grid meets the bar) and its false-alarm share
+        (the share at the largest threshold when none does).
+    """
+    share = float("nan")
+    for z in grid:
+        share = float(
+            (age_rule_a1(hist_power=hist_power, visible=visible, noise=noise, z=z) > 0).mean()
+        )
+        if share <= target:
+            return z, share
+    return None, share
+
+
+def a1_threshold(*, out: Path | None = None) -> float:
+    """Return A1's detection threshold: the value Phase 0 wrote, else the default `A1_Z`.
+
+    Args:
+        out: The output folder (`OUT` by default).
+
+    Returns:
+        The threshold in noise units.
+
+    Raises:
+        RuntimeError: When Phase 0 wrote no threshold and the output folder is not a scratch folder.
+    """
+    root = out if out is not None else common.OUT
+    for path in (root / common.A1_THRESHOLD_FILE, common.REAL_OUT / common.A1_THRESHOLD_FILE):
+        if path.exists():
+            return float(json.loads(path.read_text())["z"])
+    path = root / common.A1_THRESHOLD_FILE
+    if not common.is_scratch(out=out):
+        msg = f"{path} is missing: Phase 0 has not written A1's threshold"
+        raise RuntimeError(msg)
+    return common.A1_Z
 
 
 def noise_unit_from_panel(*, z: np.ndarray, cutoff_idx: int) -> float:

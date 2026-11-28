@@ -184,8 +184,7 @@ def test_fit_predict_and_score_run_end_to_end_on_a_tiny_fold(dry: FakeData, tmp_
     import e00738_survival as surv
 
     saved = torch.load(common.fit_paths(arm="LM", month=MONTH, seed=0)["state"])
-    c = saved["curve"]
-    curve = surv.Curve(family=c["family"], params=tuple(c["params"]), nll=float(c["nll"]))
+    curve = surv.curve_from_record(record=saved["curve"])
     path = pred.panel_path(arm="LM", month=MONTH, seed=0, name="pass00")
     got = members.check_frames(
         arm=pl.read_parquet(path),
@@ -218,8 +217,8 @@ def test_phase_zero_tasks_run_on_the_tiny_fold(dry: FakeData) -> None:
 def test_the_level_head_starts_from_different_weights_for_different_seeds(dry: FakeData) -> None:
     def first_layer(seed: int) -> torch.Tensor:
         net = fit.head_model(
-            arm="LR", month=MONTH, seed=seed, target_std=dry.target_std, noise=0.05, curve=None,
-            device="cpu",
+            arm="LR", month=MONTH, seed=seed, target_std=dry.target_std, noise=0.05,
+            curve=None, a1_z=2.0, device="cpu",
         )  # fmt: skip
         return net.level_head[0].weight.detach().clone()
 
@@ -342,4 +341,6 @@ def test_the_noise_unit_and_the_curve_read_nothing_after_the_cutoff(
     is_mw = np.array([True] * 8 + [False] * 8)
     one = fit.fold_curve(month=MONTH, seed=0, cutoff_idx=dry.cutoff_idx, is_mw=is_mw)
     two = fit.fold_curve(month=MONTH, seed=0, cutoff_idx=dry.cutoff_idx, is_mw=is_mw)
-    assert (one.family, one.params) == (two.family, two.params)
+    assert one.durations == two.durations
+    # the durations come from the training window only: every drawn start lies before the cutoff
+    assert len(one.durations) > 0

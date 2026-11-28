@@ -16,6 +16,7 @@ from typing import Final
 
 import e00738_common as common
 import e00738_panel as panel
+import e00738_phases as phases
 import e00738_world as world
 import numpy as np
 import polars as pl
@@ -31,11 +32,39 @@ def panel_path(*, arm: str, month: str, seed: int, name: str, out: Path | None =
 
 
 def write_parquet_atomic(*, frame: pl.DataFrame, path: Path) -> None:
-    """Write a parquet file under a temporary name and rename it."""
+    """Write a parquet file under a temporary name and rename it, after its recipe file.
+
+    The recipe file holds the hash of the fitting and forecast modules, so a later stage refuses a
+    forecast that other code wrote.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    phases.write_recipe(path=path, modules=phases.FORECAST_MODULES)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     frame.write_parquet(tmp)
     tmp.rename(path)
+
+
+def diag_path(*, path: Path, name: str) -> Path:
+    """Return the diagnostics file that goes with the forecast file of a panel."""
+    return path.with_name(f"{name}_diag.parquet")
+
+
+def panel_done(*, arm: str, month: str, seed: int, name: str) -> bool:
+    """Return whether a panel's forecast (and, for a level arm, its diagnostics) is complete.
+
+    A file written by other code stops the run: it is neither reused nor overwritten.
+
+    Raises:
+        RuntimeError: When a file exists with another recipe hash.
+    """
+    path = panel_path(arm=arm, month=month, seed=seed, name=name)
+    needs_diag = arm not in {common.ARM_M1, common.ARM_W0}
+    files = [path, *([diag_path(path=path, name=name)] if needs_diag else [])]
+    if not all(f.exists() for f in files):
+        return False
+    for f in files:
+        phases.require_recipe(path=f, modules=phases.FORECAST_MODULES)
+    return True
 
 
 def reproduce_stored_m1(*, frame: pl.DataFrame, month: str, seed: int) -> dict[str, float]:
@@ -138,7 +167,7 @@ def run_job(
         a
         for a in arms
         if not all(
-            panel_path(arm=a, month=month, seed=seed, name=n).exists()
+            panel_done(arm=a, month=month, seed=seed, name=n)
             for n in panel_names()
             if only is None or n in only
         )
@@ -153,6 +182,9 @@ def run_job(
     native = data.test_origin_idx
     assert native is not None
     month_start = data.cutoff_idx
+    assert month_start == month_idx_650(month=month), (
+        "the fold's cutoff is not the first day of the month"
+    )
     window_end = fit.window_end_idx()
     clean = data.clean
     real_days = world.load_real_durations_days()
@@ -174,7 +206,7 @@ def run_job(
         )
         for name, own in panels.items():
             path = panel_path(arm=arm, month=month, seed=seed, name=name)
-            if path.exists():
+            if panel_done(arm=arm, month=month, seed=seed, name=name):
                 continue
             src = data.source.with_power_in(
                 power_in=torch.from_numpy(
@@ -207,9 +239,10 @@ def run_job(
                 common.atomic_json(
                     obj=rep, path=common.OUT / "checks" / f"reproduce_m1_{month}_s{seed}.json"
                 )
-            write_parquet_atomic(frame=frame, path=path)
+            # the diagnostics first, the forecast last: a forecast file implies its diagnostics
             if diag.height:
-                write_parquet_atomic(frame=diag, path=path.with_name(f"{name}_diag.parquet"))
+                write_parquet_atomic(frame=diag, path=diag_path(path=path, name=name))
+            write_parquet_atomic(frame=frame, path=path)
         del model
         if device.startswith("cuda"):
             torch.cuda.empty_cache()

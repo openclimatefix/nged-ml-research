@@ -84,6 +84,100 @@ def code_hash(*, folder: Path | None = None) -> str:
     return h.hexdigest()
 
 
+FIT_MODULES: Final[tuple[str, ...]] = (
+    "common",
+    "survival",
+    "world",
+    "model",
+    "train",
+    "fit",
+    "panel",
+)
+"""The modules whose code decides what a fitted state holds."""
+FORECAST_MODULES: Final[tuple[str, ...]] = (*FIT_MODULES, "predict")
+"""The modules whose code decides what a forecast file holds."""
+RECIPE_SUFFIX: Final[str] = ".recipe"
+WAIT_PREFIX: Final[str] = "wait_"
+"""A ledger task that starts with this prefix is a wait, which the stop line does not count."""
+
+
+def recipe_hash(*, modules: tuple[str, ...], folder: Path | None = None) -> str:
+    """Return the SHA-256 over the names and bytes of the named `e00738_<name>.py` modules.
+
+    Args:
+        modules: The module names without the `e00738_` prefix.
+        folder: The folder of the modules (this file's folder by default).
+
+    Returns:
+        The hex digest.
+    """
+    here = folder if folder is not None else Path(__file__).parent
+    h = hashlib.sha256()
+    for name in modules:
+        f = here / f"e00738_{name}.py"
+        h.update(f.name.encode() + b"\0" + f.read_bytes() + b"\0")
+    return h.hexdigest()
+
+
+def recipe_path(*, path: Path) -> Path:
+    """Return the sidecar file that holds the recipe hash of a state or forecast file."""
+    return path.with_name(path.name + RECIPE_SUFFIX)
+
+
+def write_recipe(*, path: Path, modules: tuple[str, ...], folder: Path | None = None) -> None:
+    """Write the recipe hash of a file's sidecar, atomically.
+
+    Callers write the sidecar before the file, so a file that exists always has a sidecar.
+    """
+    side = recipe_path(path=path)
+    side.parent.mkdir(parents=True, exist_ok=True)
+    tmp = side.with_name(f".{side.name}.{os.getpid()}.tmp")
+    tmp.write_text(recipe_hash(modules=modules, folder=folder) + "\n")
+    tmp.rename(side)
+
+
+def recipe_matches(*, path: Path, modules: tuple[str, ...], folder: Path | None = None) -> bool:
+    """Return whether the sidecar of a file holds the current recipe hash of the modules."""
+    side = recipe_path(path=path)
+    return side.exists() and side.read_text().strip() == recipe_hash(modules=modules, folder=folder)
+
+
+def require_recipe(*, path: Path, modules: tuple[str, ...], folder: Path | None = None) -> None:
+    """Raise unless the file's recipe hash is the current one.
+
+    Raises:
+        RuntimeError: When the sidecar is missing or holds another hash.
+    """
+    if not recipe_matches(path=path, modules=modules, folder=folder):
+        msg = (
+            f"refusing to use {path}: it was written by other fitting code than the current "
+            "code (or has no recipe file). Delete it and its dependants, and rerun."
+        )
+        raise RuntimeError(msg)
+
+
+def require_all_recipes(*, out: Path | None = None, folder: Path | None = None) -> int:
+    """Check every state file and forecast file under the output folder, and return how many.
+
+    Args:
+        out: The output folder (`OUT` by default).
+        folder: The code folder (this file's folder by default).
+
+    Raises:
+        RuntimeError: When any file has no recipe file or another recipe hash.
+    """
+    root = out if out is not None else common.OUT
+    n = 0
+    for pattern, modules in (
+        ("networks/*/*.pt", FIT_MODULES),
+        ("predictions/*/*/*.parquet", FORECAST_MODULES),
+    ):
+        for path in sorted(root.glob(pattern)):
+            require_recipe(path=path, modules=modules, folder=folder)
+            n += 1
+    return n
+
+
 def marker_hash(*, marker: str, out: Path | None = None) -> str | None:
     """Return the code hash that a marker file holds, or None when it does not exist.
 
@@ -179,8 +273,10 @@ def spent_hours(*, device: str, log: Path | None = None, stage: str | None = Non
         stage: Count only this phase when given.
 
     Returns:
-        Hours between each line's start and end, summed. A crashed attempt and a wait under
-        contention each have a line, so both count.
+        Hours between each line's start and end, summed. A crashed attempt has a line, so it
+        counts. A wait for another session's GPU process (a task named `wait_...`) does not
+        count, because the stop line limits the hours this experiment works, and `waited_hours`
+        reports the waits.
     """
     path = log if log is not None else common.OUT / "time_log.csv"
     if not path.exists():
@@ -188,7 +284,26 @@ def spent_hours(*, device: str, log: Path | None = None, stage: str | None = Non
     total = 0.0
     for line in path.read_text().splitlines():
         parts = line.split(",")
-        if len(parts) == 5 and parts[2] == device and (stage is None or parts[0] == stage):
+        if (
+            len(parts) == 5
+            and parts[2] == device
+            and (stage is None or parts[0] == stage)
+            and not parts[1].startswith(WAIT_PREFIX)
+        ):
+            a, b = (timegm(time.strptime(v, "%Y-%m-%dT%H:%M:%S")) for v in parts[3:5])
+            total += (b - a) / 3600.0
+    return total
+
+
+def waited_hours(*, device: str = "gpu", log: Path | None = None) -> float:
+    """Return the hours the ledger records as waiting for another session's process."""
+    path = log if log is not None else common.OUT / "time_log.csv"
+    if not path.exists():
+        return 0.0
+    total = 0.0
+    for line in path.read_text().splitlines():
+        parts = line.split(",")
+        if len(parts) == 5 and parts[2] == device and parts[1].startswith(WAIT_PREFIX):
             a, b = (timegm(time.strptime(v, "%Y-%m-%dT%H:%M:%S")) for v in parts[3:5])
             total += (b - a) / 3600.0
     return total
@@ -253,7 +368,7 @@ def require_gpu_free(*, busy: Callable[[], bool] | None = None) -> None:
     """Exit with code 75 when another session's process is on the GPU, before any job starts.
 
     A launcher calls this once. Between the jobs of one chain the chain waits instead
-    (`wait_for_gpu`), and the wait counts as GPU time.
+    (`wait_for_gpu`), which prints each wait and writes it to the ledger apart from the work.
 
     Args:
         busy: Whether the GPU is busy (`gpu_busy` by default; replaced in tests).
@@ -271,7 +386,9 @@ def wait_for_gpu(
     sleep: Callable[[float], None] = time.sleep,
     max_waits: int | None = None,
 ) -> int:
-    """Wait while another session uses the GPU, and write each wait to the ledger as GPU time.
+    """Wait while another session uses the GPU, and write each wait to the ledger as a wait.
+
+    The stop line does not count a wait, and each wait is printed.
 
     Args:
         stage: The phase for the ledger.
@@ -288,8 +405,13 @@ def wait_for_gpu(
         if max_waits is not None and n >= max_waits:
             return -1
         start = time.time()
+        print(
+            f"waiting for the GPU before {task}: another session's process is on it "
+            f"(wait {n + 1}, {common.GPU_BACKOFF_SECONDS} s)",
+            flush=True,
+        )
         sleep(common.GPU_BACKOFF_SECONDS)
-        common.time_log(stage=stage, task=f"wait_{task}", start=start, device="gpu")
+        common.time_log(stage=stage, task=f"{WAIT_PREFIX}{task}", start=start, device="gpu")
         n += 1
     return n
 
