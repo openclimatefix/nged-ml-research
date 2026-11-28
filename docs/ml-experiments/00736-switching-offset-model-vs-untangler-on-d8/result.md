@@ -21,7 +21,7 @@ size: >-
   handicap are fixed below. (3) Callers: this folder's scripts, which import the folders of
   experiments 653, 660, 732, and 734 read-only; nothing imports them. (4) Serving path and
   degradation rule: not touched. (5) Contracts: not touched. CPU only, no GPU time, about 2.4
-  CPU-hours, with a stop at 5 CPU-hours, on 1 core. Reviews: plan, code, numbers, and prose.
+  CPU-hours, with a stop at 8 CPU-hours, on 1 core. Reviews: plan, code, numbers, and prose.
 hypothesis: >-
   On the load transfers that experiment 732 injected into D8's own pre-engine days, the offset model
   H-nbr of experiment 734 finds a larger share of the transfers that last 1 day to 4 days and move
@@ -70,8 +70,11 @@ decision_rule: >-
   end of the wider of the two intervals is below +0.15. `inconclusive`: C1 does not count, and that
   upper end is +0.15 or more; also any result whose counted cell holds fewer than 20 transfers
   after the drops for gaps, and any result for which more than 2 of the 6 months hold no
-  discordant transfer (the month-resampled interval then fails). The porting threshold is +0.15,
-  which is a gain of at least 4 of the 21 transfers (4/21 = 0.19; 3/21 = 0.14 falls short). The
+  discordant transfer (the month-resampled interval then fails). The tests for fewer than 20
+  transfers and for more than 2 empty months come before the sign test, so a result that passes
+  the sign test with discordant transfers in only 3 of the 6 months is `inconclusive`. The porting
+  threshold is +0.15, which is a gain of at least 4 of the 21 transfers (4/21 = 0.19; 3/21 = 0.14
+  falls short). The
   threshold is above zero because the offset model needs a continuous record of 6-hour residual
   means, a panel of the 15 Primaries for its shared term, a demand forecast that uses no lagged
   power, and priors tuned on synthetic worlds, and each world takes about 15 CPU-minutes to decode
@@ -162,8 +165,8 @@ log-uniform from 1 to 96 hours, so the long cell of experiment 665 (more than 7 
 the question is about the part of experiment 665's medium cell (transfers of more than 1 day and up
 to 7 days) that lasts 4 days or less. The table counts the 104 transfers of 4 step noise units or
 more (13.67 points, 1.42 MW), which is the size band where experiment 732's recalibrated recall is
-reported. Of the 288 transfers, 287 have a start edge on a scored half-hour, and all 288 have an
-end edge on one; the counts below are start edges.
+reported. All 288 transfers have a start edge on a scored half-hour, and all 288 have an end edge on
+one; the counts below are start edges.
 
 | Duration | Injected transfers of at least 4 step noise units | With a mirror at D3, D5, or D14 |
 |---|---|---|
@@ -237,7 +240,7 @@ the oldest of the 6 months to the newest. Placing a merged call at its first hal
 largest step probability gives the same 12. The head's size output is signed (its sign agrees
 with the injected sign at 0.95 of the injected edges, and the head's output is positive when D8
 gains load), so the sign rule can be applied to both detectors. The files read had these SHA-256
-digests:
+digests, and G1 checks all six prediction files and the truth cache against them:
 
 - `predictions/U-noBSP_unet_s0/test_transfer.npz` of experiment 732:
   `5d001cbd78ccbb524aa5797d8ddb3a1afe154b4f9544fe028ba0ec908a820669`
@@ -245,6 +248,15 @@ digests:
   `e967ca20a284223627d51e9d1ddf31b05ee20b16cdd68b4b5c92137765002795`
 - `predictions/U-noBSP_unet_s2/test_transfer.npz`:
   `db376858834aa8299162cea197e087e246608d8a1975f77446129bdd1fb22d25`
+- `predictions/Ustar_unet_s0/test_transfer.npz`, the reference arm U*:
+  `022aa08770290805381fdf6015866c05096a408ee6b0fabed47e348d75f8a378`
+- `predictions/Ustar_unet_s1/test_transfer.npz`:
+  `b4dd121238a475263cd78f4bc6859a2a6773d6c90528ac5a1ff00bb8f24c202a`
+- `predictions/Ustar_unet_s2/test_transfer.npz`:
+  `9a7b9856b6dab568fa7c2d3ff95317ba8697dad4dbf4d25c8b16281a0c0673bc`
+- experiment 734's `params.json`, the tuned values of the offset model (pinned in
+  `e00736_common.py`, and checked against the `params.sha256` that experiment 734 stored beside it):
+  `d7b3c57cb43c21fcb9569b66cadc5d4b50eacf1ad98395fc67a94cef37896120`
 - the recalibration report's `frozen_thresholds.json` (written 16:36:17 UTC on 2026-11-27, before the
   report's `stage_b_test.py` first read the test overlay at 16:36:55):
   `49e81b90bc600dd27097efea831fbb209c5747a72d2419264d7758686325cc95`
@@ -275,9 +287,17 @@ hours of the injected end. The offset model needs an event whose end lies within
 injected end. With about 0.155 calls a day, a chance match to a given start is about 0.04.
 
 **Both detectors are restricted to D8 and to scored base days for the false-call count.** The day
-count for V1 is the same for both detectors: 245 scored base days times 8 draws for the head, and
-the same 245 base days times 8 draws in the 6 months for the offset model's D8 events. Real D8
-events in the base days count as false calls for both detectors.
+count for V1 is the same for both detectors: 185 base days per draw times 8 draws, which is 1,480
+draw-days in the 6 months that lie inside experiment 653's record, for the head's calls and for the
+offset model's D8 events alike. Real D8 events in the base days count as false calls for both
+detectors. The false-call count compares each call with the injected edges of all 288 transfers,
+including the transfers that the drops for gaps remove from the share found.
+
+**Veto V1 excuses a call near an injected edge of any size, and both detectors are treated
+alike.** A call within 6 hours of an injected edge of the right sign is not false, even when that
+transfer moves only 0.3 MW, which neither detector can see. Both detectors gain the same excuse, so
+each detector's false-call rate is lower than its rate on unexcused calls, and V1 tests the ratio
+of the two rates.
 
 ## Predictions, gates, and the placebo
 
@@ -296,40 +316,49 @@ counts.**
   `apply_additions`, and the head's reading gets experiment 732's refold with the reactive floor,
   which moves the reading by about the transfer times x/r rather than the transfer itself. G2
   checks each of the two against its own rule, and checks that every mirrored partner moves by minus
-  the jitter factor times the transfer. G2 also asserts the +1 index of the half-hour offset above.
+  the jitter factor times the transfer. In the transfers-only worlds, G2 also checks that D8 has no
+  addition outside the injected half-hours. G2 also asserts the +1 index of the half-hour offset above.
 - **G3, the decode reproduces.** The decode of the 15-Primary panel with no addition gives
   experiment 734's stored un-injected H-nbr event table
-  (`uninjected/H-nbr_events.parquet`, 131 events at 12 Primaries, 28 of them at D8), exactly,
-  compared over every Primary in the table.
+  (`uninjected/H-nbr_events.parquet`, 131 events at 12 Primaries, 28 of them at D8), exactly
+  on the primary, start, and end of every event, and to a relative tolerance of 1e-6 on `amp_mw`
+  and `confidence`, with an equal grade, compared over every Primary in the table. The decode also
+  stops when the compiled Viterbi kernel of experiment 734 was not the one used.
 - **G4, the overlays reproduce.** The regenerated test overlays reproduce experiment 732's digest
   `4c57546a9278dc0d0a6e3b2803d880b3205ae441dea7725681ab168000c30c6f` and its 384 transfers and 768
   edge rows over the 8 months.
 
 **A placebo moves every injected start 7 days later, onto time where no transfer was injected, and
 scores each detector's calls against the moved starts.** The placebo gives the share of starts that
-each detector matches by chance, and P4 predicts it. Starts whose moved time lands inside another
-transfer, off a scored half-hour, across a month end, or in a gap are dropped from the placebo,
-and the page reports how many starts remain.
+each detector matches by chance, and P4 predicts it. Starts whose moved time lands inside a
+transfer, within 6 hours of any real start or end edge of the segment (the edges of transfers that
+the drops for gaps remove count too), off a scored half-hour, across a month end, or in a gap are
+dropped from the placebo, and the page reports how many starts remain. The one-to-one match of the
+placebo still draws on the moved starts of every scored transfer, dropped starts included, so a
+dropped start can still take a call away from a kept start of the same sign.
 
 ## Synthetic world gallery
 
 **The gallery shows only synthetic quantities.** D8's readings in MW are private, and no figure
-shows a metered series, a date, or a real residual. The plan has 13 figures before the first
-decode, which is 1 histogram figure, 6 injected additions, and 6 detector rows.
+shows a metered series, a date, or a real residual. The plan has 19 figures before the first
+decode, which is 1 histogram figure, 9 injected additions, and 9 detector rows.
 
 - **The injected transfers.** Histograms of the 288 durations and sizes, with the 24-hour and
   4-step-noise-unit lines, and the counts of the table above (1 figure).
-- **Six injected additions in MW, one per duration and shape cell.** Constant, demand-shaped, and
-  solar-shaped additions at about 6 hours, 30 hours, and 90 hours, each drawn alone with its mirror
-  at the partner, on an axis of hours from the start with no date (6 figures).
-- **Six detector rows.** For the same six transfers, the head's step probability and the
+- **Nine injected additions in MW, one per duration and shape cell.** Constant, demand-shaped, and
+  solar-shaped additions (3 shapes) at about 6 hours, 30 hours, and 90 hours (3 durations), each
+  drawn alone with its mirror at the partner, on an axis of hours from the start with no date (9
+  figures).
+- **Nine detector rows.** For the same nine transfers, the head's step probability and the
   offset model's posterior of the switched power, in noise units, each against the injected truth.
-  The decoded offset is shown on an axis shifted to zero, so no D8 level is visible (6 figures).
+  The decoded offset is shown on an axis shifted to zero, so no D8 level is visible (9 figures).
 
 The smoke check on the data files asserts that the injected addition is nonzero in every
 half-hour of every transfer (the failure that silenced one earlier run's solar output in 37.5% of
 its test rows, in experiment 729), that every read partner carries a nonzero mirror, and that all
-288 transfers are present in the 8 worlds. The write-up repeats the gallery with the results
+288 transfers are present in the 8 worlds, and that in every segment with an engine or solar
+array the array is nonzero at the half-hours where it is written into D8's addition (the check
+reports a segment's index and never a value). The write-up repeats the gallery with the results
 added.
 
 ## Look-ahead
@@ -353,8 +382,10 @@ real time.
 wall-minutes for an uninjected full-record decode of one arm. The plan's 15 CPU-minutes per world
 with H-own and H-nbr is an estimate from those figures and from about 12 CPU-minutes for each world's
 H arms, and is not a measurement. If one decode of one arm takes 27.6 minutes, the 16 decodes cost
-about 7.4 CPU-hours, which passes the stop. The first world's measured time replaces the estimate,
-and the plan asks the manager before passing the 5 CPU-hour stop.
+about 7.4 CPU-hours (16 decodes of 27.6 minutes), which is the worst case. The manager set the
+stop at 8 CPU-hours, so the worst case stays below it. The first world's measured time replaces
+the estimate, and the plan asks the manager before passing the 8 CPU-hour stop. The runner also
+stops when the finished decode tasks project more than 8 CPU-hours.
 
 | Stage | Work | Expected CPU-hours |
 |---|---|---|
@@ -377,13 +408,23 @@ with a time log.
    did not write the code reviews the code (leakage, the match rule, the +1 index, the sign
    convention, and a match with the recipe the code copies). A second fresh Sonnet agent reviews
    the fixed code if the first review flags many problems.
-2. A real-environment smoke test runs one world, on validation rows only, on a scratch folder
-   (`.claude/scratch/`), with nothing written to the experiment's data folder. The test reads the
-   real input files, takes each detector's call table through the scoring code, and never reads the
-   test months.
-3. The runs happen inside `systemd-run --user --scope` with a memory cap of 4 GB and 1 thread for
+2. After the code review, a person or the manager runs `review-mark`, which writes the hash of the
+   reviewed code (the scripts, `run.sh`, and `run_workers.sh`) into `review_stage1.ok`. Every stage
+   from `world` onward refuses to start unless the marker holds the current code hash, and
+   `freeze-code` refuses unless the code hash equals the marker's content. Stage 0 needs no marker.
+   A done marker of a decode task holds the code hash too, and a re-run ignores a marker of other
+   code.
+3. A real-environment smoke test runs stage 0 and one world's decode into a scratch folder
+   (`.claude/scratch/`) that `E00736_OUT` names, with nothing written to the experiment's data
+   folder (the runner refuses `E00736_OUT` unless `E00736_SCRATCH=1` is set or the path has a
+   `scratch` component, prints the output folder at the start of every stage, and stores it in
+   `scores.json`). The smoke test has no validation mode, because this design has test rows only,
+   and none of its numbers is used to tune anything: every parameter is frozen before it runs.
+   The test reads the real input files and takes the world's call tables through the scoring
+   code.
+4. The runs happen inside `systemd-run --user --scope` with a memory cap of 4 GB and 1 thread for
    each numerical library, after the ML experiment manager approves the workstation run.
-4. A Sonnet agent checks the write-up against the printed report, and a second Sonnet agent runs the
+5. A Sonnet agent checks the write-up against the printed report, and a second Sonnet agent runs the
    prose review.
 
 ## Standing practices, advice, and scenarios
