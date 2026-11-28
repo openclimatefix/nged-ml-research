@@ -67,9 +67,10 @@ recipes="11 87 377 378 381 391 397 400 402 404 407 410 418 422 425 428 435 437 4
 folders_of() {  # print the recipe experiment folders under one root, in plan order
     for n in $recipes; do
         for d in "$1"/${n}-* "$1"/0${n}-* "$1"/00${n}-* "$1"/000${n}-*; do
-            [ -d "$d" ] && printf '%s:' "$d"
+            if [ -d "$d" ]; then printf '%s:' "$d"; fi
         done
     done
+    return 0  # the last test fails when the last recipe folder is absent, and set -e must not see it
 }
 paths=""
 if [ -n "${E00738_713_DIR:-}" ]; then
