@@ -143,8 +143,7 @@ def daily_hazards(*, curve: SurvivalFunction, n_days: int = common.N_HAZARDS) ->
     """Return the `n_days` daily hazards that reproduce `curve` at whole days.
 
     Hazard `d` is `-log(S(d + 1) / S(d))`, so the product of daily survival terms equals `S` at
-    every
-    whole day up to `n_days`.
+    every whole day up to `n_days`.
 
     Args:
         curve: The survival function.

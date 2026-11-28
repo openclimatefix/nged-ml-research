@@ -433,7 +433,8 @@ def strata(
     - `far`: in force at the origin (`onset <= origin < end`) and `R > 10`;
     - `middle`: in force and `1 < R <= 10`;
     - `near`: in force and `0 < R <= 1`;
-    - `ended_24h`: `0 < S <= 1`;
+    - `ended_24h`: `0 <= S <= 1` (an origin at the very half-hour of the end counts as ended, so the
+      in-force and ended intervals leave no gap);
     - `ended_1_7`: `1 < S <= 7` (a context stratum);
     - `onset_ahead`: the shift starts after the origin and no later than the valid time (context);
     - `event_free`: none of the above, so the shift has not started by the valid time or ended more
@@ -466,7 +467,7 @@ def strata(
             in_force & (remaining > FAR_DAYS),
             in_force & (remaining > MIDDLE_DAYS),
             in_force,
-            ended & (since > 0) & (since <= 1.0),
+            ended & (since <= 1.0),
             ended & (since > 1.0) & (since <= POST_END_DAYS),
             ahead,
         ],
@@ -514,8 +515,7 @@ def simulate_stratum_shares(
 
     Returns:
         The share of rows in each stratum (and `in_force_clipped`), plus the share of in-force
-        origins
-        older than 15 days under `older_than_15`.
+        origins older than 15 days under `older_than_15`.
     """
     is_mw = np.array([True] * 8 + [False] * 8)
     labels: list[np.ndarray] = []
