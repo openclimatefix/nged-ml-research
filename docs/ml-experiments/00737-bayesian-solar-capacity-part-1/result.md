@@ -243,8 +243,9 @@ groups.
 
 **The power loader reads grid index `i` from store index `i + 1`.** The power store's index `i` is
 the half-hour that ends at the origin (the start of the grid, 2022-01-01) plus 30 minutes times `i`.
-[Amendment 1](#amendment-1-to-the-plan-of-experiment-737-2026-11-28) gives the history of the correction, and
-the audit in it found that no earlier published result depends on the same off-by-one.
+[Amendment 1](#amendment-1-to-the-plan-of-experiment-737-2026-11-28) gives the history of the
+correction, and the audit in it found that no earlier published result depends on the same
+off-by-one.
 
 **The timing gate G4 passes only in a relaxed form.** Gate G4 compares each Primary's timing with
 the timing of NGED's metered solar farms. A best shift is the delay, in half-hours, at which a
@@ -970,8 +971,9 @@ gives estimates of unmetered solar anonymised. The private tables hold every num
   requires that the real nights carry no CAMS irradiance, and the test calls the real loader on a
   small fixture shaped like the real file (the second lesson of experiment 729).
   [Amendment 1](#amendment-1-to-the-plan-of-experiment-737-2026-11-28) replaces the
-  summer-minus-winter comparison with a same-month comparison of sunny and dull days, scans the shift in steps of 0.25 half-hour, and
-  requires the Primaries to match the metered farms' best shift within stated bounds.
+  summer-minus-winter comparison with a same-month comparison of sunny and dull days, scans the
+  shift in steps of 0.25 half-hour, and requires the Primaries to match the metered farms' best
+  shift within stated bounds.
 - **G5, convergence.** The expectation-maximisation fit converges in 30 iterations or fewer in 99%
   of the fits, and no fit ends with every quarter's capacity at its bound.
 
