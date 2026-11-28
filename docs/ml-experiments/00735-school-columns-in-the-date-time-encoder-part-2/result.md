@@ -113,8 +113,11 @@ to the encoder's input, which widens its first layer from 29 to 37 inputs:
   stamp minus 15 minutes, so they differ from the encoder's existing `bank_holiday` and
   `day_of_week_local` columns, which use the stamp itself (part 1 documents the difference).
 - **The 8 columns are not standardised.** They are 0 or 1, or `c` (0.003 to 0.87) times 0 or 1, so
-  they stay on one scale in every stage. The wider first layer starts from the standard
-  initialisation in stage 1, because stage 1 trains the encoder from scratch.
+  they stay on one scale in every stage. Stage 1 trains the encoder from scratch with paired
+  initialisation: R1 draws the 29 original first-layer input columns from the seed, the new arms
+  copy those weights, and draw the 8 new columns' weights from a generator seeded 735 (uniform
+  within plus or minus 1 over the square root of 37), so the arms of one seed differ only in the
+  new columns.
 - **The 8 columns enter at every place the encoder is called.** The step-5 neural network passes
   two inputs through the date-time encoder: the row itself, and the day lag and week lag, whose
   weather and date-time columns are read at each lag's own valid time (`e00574_model._expected`,
@@ -196,9 +199,11 @@ SKE-CP) removes the coast signal and leaves the school calendar real.
   column reads a weather product or any value after the forecast origin. The published 2026-27
   term dates are known in advance of every refit that reads them. A test checks that the columns
   of a row depend only on its valid time and its Primary.
-- **Replay gate:** the stored control must reproduce part 1's R0 forecasts in the gate month
-  (2026-03, seeds 0 to 2) to a median absolute difference of at most 1e-4 points of capacity
-  before any new arm runs.
+- **Replay gate:** part 1's R0 replay, run through part 1's pipeline in the gate month (2026-03,
+  seeds 0 to 2), must reproduce experiment 677's stored forecasts with a maximum quantile
+  difference of at most 5e-4 of capacity (part 1's rule) before any new arm runs. The gate does
+  not exercise part 2's runner, so the first check of the part 2 code on real files is the
+  smoke test, and R1 minus R0 (P5) is the descriptive check afterwards.
 - **Calendar check (data-validation):** the parsed calendar has ordered terms, no overlap, and
   holiday gaps of 16 to 19 days at Christmas and Easter and 43 to 51 days in summer. The check ran
   on 2026-11-28 and its output goes in the write-up.
