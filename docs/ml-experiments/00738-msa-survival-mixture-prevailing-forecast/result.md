@@ -601,7 +601,10 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
 
 - `e00738_common.py` holds every constant (arms, folds, thresholds, stop lines) as a named `Final`.
   `e00738_phases.py` holds the review markers, the hour ledgers, and the done markers.
-  `e00738_run.py` is the one entry point, started by `run.sh` and `run_workers.sh`.
+  `e00738_run.py` is the one entry point. `run.sh` starts a stage inside a memory-capped
+  `systemd-run` scope, and `run_workers.sh` starts the workers of a CPU stage inside that scope.
+  `run.sh` takes `E00738_713_DIR`, the frozen checkout of experiment 713 that goes first on
+  `PYTHONPATH`, because the stored fits carry the code hash of that checkout.
 - `e00738_world.py` draws the training worlds and the scoring worlds from experiment 650's
   generator, adds the shift to the inputs and the target, and assigns the strata.
 - `e00738_survival.py` fits the four candidate curves to the drawn durations, returns p(a, h), and
@@ -612,11 +615,19 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
   histories. `e00738_panel.py` copies the panel-swap code of experiment 726 (the original runs
   `argparse` at import) with a provenance note, and asserts experiment 713's code hash.
 - `e00738_predict.py` predicts the worlds and the real record, for the stored `M1` states and the new
-  arms, and writes forecasts with `experiment_store.write_predictions`.
+  arms, and writes one parquet file per arm, fold, seed, and panel under `predictions/`, with a second
+  file of diagnostics (age, depth share, survival ratio) beside it. It does not use
+  `experiment_store.write_predictions`, because the gate and the member-path check read the
+  diagnostics files.
 - `e00738_score.py`, `e00738_report.py`, and `e00738_members.py` compute every contrast, interval,
   gate, scenario, check, and the member-path check, and print every number of the page.
 - `e00738_gate.py` runs the known-answer gate. `e00738_figures.py` and `e00738_gallery.py` draw the
   figures and the gallery.
+- The tests are `test_e00738_world.py`, `test_e00738_survival.py`, `test_e00738_score.py`,
+  `test_e00738_panel.py`, `test_e00738_run.py`, and `test_e00738_model.py`. The last needs `torch`
+  and skips without it. They cover every pure function, the visibility limit of the level features,
+  the keyword names of `run_task`, every state of the verdict table, the guards, and the existence
+  of every attribute that the scripts take from an imported module.
 - Read from experiment 713 (`ml-experiments/00713-msa-axial-attention-demand-network-part-1/`): the
   network, inputs, batch, train, and score modules, and the stored stage 1 and stage 3 states and
   forecasts of `M1`, under
