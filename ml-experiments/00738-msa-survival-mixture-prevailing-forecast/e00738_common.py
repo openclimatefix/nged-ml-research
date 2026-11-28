@@ -132,7 +132,11 @@ A1_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("11-15", 11.0, 16.0),
     ("over 15", 16.0, 1e9),
 )
+N_TRAIN_LEADS: Final[int] = 14
+"""The lead days (zero-based 0 to 13) that the head fits train on."""
 A1_FALSE_ALARM_MAX: Final[float] = 0.05
+A1_FOLD_FALSE_ALARM_MAX: Final[float] = 0.10
+"""The largest false-alarm share of any one fold at the tuned threshold."""
 A1_BIAS_MAX_DAYS: Final[float] = 1.0
 """The largest mean signed error of A1's age against the true age (days) that needs no remark. A
 larger bias is recorded in the gate file and stated beside every reading that rests on the age."""
@@ -208,7 +212,14 @@ EXIT_GPU_BUSY: Final[int] = 75
 """Exit code of a launcher that finds the GPU busy (no job started)."""
 EXIT_REMEDY: Final[int] = 6
 """Exit code of the gate's first failure: the remedy flag is set and `gate-remedy` runs next."""
+EXIT_BAD_CALL: Final[int] = 64
+"""Exit code of a refused call, such as several workers on a GPU stage."""
+EXIT_REMEDY_CRASH: Final[int] = 7
+"""Exit code of a crash inside `gate-remedy` (a stale recipe, a missing forecast). A second gate
+failure is code 5."""
 GPU_BACKOFF_SECONDS: Final[int] = 300
+MAX_GPU_WAIT_SECONDS: Final[int] = 7200
+"""One chain waits at most 2 hours in all for another session's GPU process, then exits with 75."""
 MEMORY_MAX_GB: Final[int] = 16
 
 

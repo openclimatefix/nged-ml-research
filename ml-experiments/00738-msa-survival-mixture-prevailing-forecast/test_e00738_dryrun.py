@@ -34,6 +34,7 @@ import e00713_train as tr  # ty: ignore[unresolved-import]
 import e00738_common as common
 import e00738_fit as fit
 import e00738_panel as panel
+import e00738_phases as phases
 import e00738_predict as pred
 import e00738_score as score
 import e00738_world as world
@@ -195,6 +196,24 @@ def test_fit_predict_and_score_run_end_to_end_on_a_tiny_fold(dry: FakeData, tmp_
     )
     assert got["rows"] > 0
     assert all(np.isfinite(v) for v in got.values())
+
+    # the smoke-test check reads the predicted panels back against the shifts
+    import e00738_worldcheck as wc
+
+    real = pl.read_parquet(pred.panel_path(arm="M1", month=MONTH, seed=0, name="real"))
+    for arm in common.ALL_ARMS:
+        frame = pl.read_parquet(pred.panel_path(arm=arm, month=MONTH, seed=0, name="pass00"))
+        seen = wc.check_injected_panel(frame=frame, real=real, shifts=shifts["pass00"], ids=ids)
+        assert seen["max_abs_outside"] == 0.0
+
+    # every stored artefact carries its recipe, and fit and prediction refuse a stale one
+    assert phases.require_all_recipes() > 0
+    lp_state = common.fit_paths(arm="LP", month=MONTH, seed=0)["state"]
+    phases.recipe_path(path=lp_state).write_text("0" * 64 + "\n")
+    with pytest.raises(RuntimeError, match="recipe"):
+        fit.fit_job(arm="LP", month=MONTH, seed=0, device="cpu")
+    with pytest.raises(RuntimeError, match="recipe"):
+        fit.load_for_prediction(arm="LP", month=MONTH, seed=0, data=dry, device="cpu")
 
 
 def test_phase_zero_tasks_run_on_the_tiny_fold(dry: FakeData) -> None:

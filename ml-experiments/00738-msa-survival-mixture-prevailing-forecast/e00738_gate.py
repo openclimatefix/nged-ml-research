@@ -15,6 +15,9 @@ Three checks must pass:
 3. The depth head's median depth divided by the true depth is at least 0.7 (1 - f) on shifts of 3 to
    10 days, where A1 sees the shift.
 
+Both bars are also multiplied by the mean survival ratio that a correct lead-free head carries over
+the 14 training leads (`survival_discount`), because LP's one depth per history cannot exceed that.
+
 A first failure sets the remedy flag (cap 120, patience 15 for every head fit) and the 4 screen LP
 fits run again once. A second failure exits with code 5 and nothing else may run. No worker waives it.
 """
@@ -26,6 +29,7 @@ from typing import Final
 
 import e00738_common as common
 import e00738_score as score
+import e00738_survival as surv
 import e00738_world as world
 import numpy as np
 import polars as pl
@@ -112,23 +116,61 @@ def depth_ratio_table(
     return out
 
 
-def follow_bars(*, m1_follow: float) -> dict[str, float]:
+CHECK2_AGES: Final[tuple[float, float]] = (2.0, 16.0)
+"""The ages in days at which A1 sees a shift, for the discount of check 2."""
+CHECK3_AGES: Final[tuple[float, float]] = (3.0, 10.0)
+"""The ages in days of the shifts of check 3."""
+
+
+def survival_discount(
+    *, curve: surv.SurvivalFunction, ages: tuple[float, float], n_leads: int = common.N_TRAIN_LEADS
+) -> float:
+    """Return the mean survival ratio that a correct lead-free head's depth carries.
+
+    LP's depth is one number per history, so under the training likelihood its best value is the
+    remaining depth times the survival ratio p(a, h) averaged over the leads of the training fits
+    (the `n_leads` lead days, each of 48 half-hours). The mean is also taken over the whole days of
+    the age range.
+
+    Args:
+        curve: The empirical survival curve of the training worlds.
+        ages: The first and last age in days (whole days between them are averaged).
+        n_leads: The number of training lead days (14).
+
+    Returns:
+        The mean ratio, between 0 and 1.
+    """
+    h = np.arange(n_leads * 48) / 48.0
+    days = np.arange(int(ages[0]), int(ages[1]) + 1, dtype=float)
+    a, hh = np.meshgrid(days, h, indexing="ij")
+    return float(surv.ratio(curve=curve, age_days=a, lead_days=hh).mean())
+
+
+def follow_bars(
+    *, m1_follow: float, discount_follow: float = 1.0, discount_depth: float = 1.0
+) -> dict[str, float]:
     """Return the bars of checks 2 and 3 for `M1`'s own follow share, with the derivation.
 
-    A perfect head adds the depth that `M1` leaves unfollowed, `1 - f`. The bars keep the plan's
-    fractions of that remaining depth: 0.75 for the follow share and 0.7 for the depth ratio.
+    A perfect head adds the depth that `M1` leaves unfollowed, `1 - f`. A correct lead-free head adds
+    that depth times the mean survival ratio over the training leads, so the bars keep the plan's
+    fractions (0.75 for the follow share and 0.7 for the depth ratio) of that discounted depth.
 
     Args:
         m1_follow: `M1`'s own follow share f on the gate's rows.
+        discount_follow: The mean survival ratio for the ages of check 2.
+        discount_depth: The mean survival ratio for the ages of check 3.
 
     Returns:
-        `remaining` (1 - f, floored at 0.2), `lp_follow_bar`, and `depth_ratio_bar`.
+        `remaining` (1 - f, floored at 0.2), the two discounts, `lp_follow_bar`, and
+        `depth_ratio_bar`.
     """
     remaining = float(np.clip(1.0 - m1_follow, 0.2, 1.0))
     return {
         "remaining": remaining,
-        "lp_follow_bar": LP_FOLLOW_MIN * remaining,
-        "depth_ratio_bar": DEPTH_RATIO_MIN * remaining,
+        "discount_follow": discount_follow,
+        "discount_depth": discount_depth,
+        "lp_follow_bar": LP_FOLLOW_MIN * remaining * discount_follow,
+        "depth_ratio_bar": DEPTH_RATIO_MIN * remaining * discount_depth,
     }
 
 
@@ -140,6 +182,8 @@ def evaluate(
     lp_follow_all_far: float | None = None,
     diagnostics: dict[str, object] | None = None,
     m1_follow: float = 0.0,
+    discount_follow: float = 1.0,
+    discount_depth: float = 1.0,
 ) -> dict:
     """Return the gate record from the three readings.
 
@@ -152,12 +196,16 @@ def evaluate(
         lp_follow_all_far: The same share over all far-stratum rows (a diagnostic, not a check).
         diagnostics: Other readings to record, such as the share of far rows that A1 sees.
         m1_follow: `M1`'s own follow share on the same rows, which sets the bars.
+        discount_follow: The expected survival discount of a correct lead-free head for check 2.
+        discount_depth: The same for check 3.
 
     Returns:
         The record, with `passed` true only when all three checks hold, and the derivation of the
         bars.
     """
-    bars = follow_bars(m1_follow=m1_follow)
+    bars = follow_bars(
+        m1_follow=m1_follow, discount_follow=discount_follow, discount_depth=discount_depth
+    )
     checks = {
         "oracle": {"values": oracle, "passed": all(v >= ORACLE_MIN for v in oracle.values())},
         "lp_follow": {
@@ -173,15 +221,19 @@ def evaluate(
     }
     derivation = (
         f"M1 follows {m1_follow:.3f} of the injected depth on these rows, so a perfect head adds "
-        f"{bars['remaining']:.3f}. The bars keep the plan's fractions of that: "
-        f"{LP_FOLLOW_MIN} x {bars['remaining']:.3f} = {bars['lp_follow_bar']:.3f} for LP's "
-        f"increment, and {DEPTH_RATIO_MIN} x {bars['remaining']:.3f} = "
-        f"{bars['depth_ratio_bar']:.3f} for the depth ratio."
+        f"{bars['remaining']:.3f}. A lead-free head trained over 14 lead days carries the mean "
+        f"survival ratio, {discount_follow:.3f} for the ages of check 2 and {discount_depth:.3f} for "
+        f"those of check 3. The bars keep the plan's fractions of the discounted depth: "
+        f"{LP_FOLLOW_MIN} x {bars['remaining']:.3f} x {discount_follow:.3f} = "
+        f"{bars['lp_follow_bar']:.3f} for LP's increment, and {DEPTH_RATIO_MIN} x "
+        f"{bars['remaining']:.3f} x {discount_depth:.3f} = {bars['depth_ratio_bar']:.3f} for the "
+        "depth ratio."
     )
     return {
         "checks": checks,
         "passed": all(c["passed"] for c in checks.values()),
         "m1_follow": m1_follow,
+        "discounts": {"check2": discount_follow, "check3": discount_depth},
         "derivation": derivation,
         "diagnostics": {"lp_follow_all_far_rows": lp_follow_all_far, **(diagnostics or {})},
     }

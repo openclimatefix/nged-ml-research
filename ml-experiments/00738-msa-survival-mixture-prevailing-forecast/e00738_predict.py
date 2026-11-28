@@ -31,14 +31,15 @@ def panel_path(*, arm: str, month: str, seed: int, name: str, out: Path | None =
     return root / "predictions" / arm / f"{month}_s{seed}" / f"{name}.parquet"
 
 
-def write_parquet_atomic(*, frame: pl.DataFrame, path: Path) -> None:
+def write_parquet_atomic(*, frame: pl.DataFrame, path: Path, link: str | None = None) -> None:
     """Write a parquet file under a temporary name and rename it, after its recipe file.
 
-    The recipe file holds the hash of the fitting and forecast modules, so a later stage refuses a
+    The recipe file holds the hash of the fitting and forecast modules, and the digest of the state
+    that the forecast came from (`link`), so a later stage refuses a
     forecast that other code wrote.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    phases.write_recipe(path=path, modules=phases.FORECAST_MODULES)
+    phases.write_recipe(path=path, modules=phases.FORECAST_MODULES, link=link)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     frame.write_parquet(tmp)
     tmp.rename(path)
@@ -64,6 +65,9 @@ def panel_done(*, arm: str, month: str, seed: int, name: str) -> bool:
         return False
     for f in files:
         phases.require_recipe(path=f, modules=phases.FORECAST_MODULES)
+        if phases.recipe_link(path=f) != phases.state_digest(arm=arm, stem=f"{month}_s{seed}"):
+            msg = f"refusing to use {f}: it was made from another state of {arm}"
+            raise RuntimeError(msg)
     return True
 
 
@@ -204,6 +208,7 @@ def run_job(
         model, model_fn = fit.load_for_prediction(
             arm=arm, month=month, seed=seed, data=data, device=device
         )
+        link = phases.state_digest(arm=arm, stem=f"{month}_s{seed}")
         for name, own in panels.items():
             path = panel_path(arm=arm, month=month, seed=seed, name=name)
             if panel_done(arm=arm, month=month, seed=seed, name=name):
@@ -241,8 +246,8 @@ def run_job(
                 )
             # the diagnostics first, the forecast last: a forecast file implies its diagnostics
             if diag.height:
-                write_parquet_atomic(frame=diag, path=diag_path(path=path, name=name))
-            write_parquet_atomic(frame=frame, path=path)
+                write_parquet_atomic(frame=diag, path=diag_path(path=path, name=name), link=link)
+            write_parquet_atomic(frame=frame, path=path, link=link)
         del model
         if device.startswith("cuda"):
             torch.cuda.empty_cache()

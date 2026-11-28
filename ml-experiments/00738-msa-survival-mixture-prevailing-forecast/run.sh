@@ -13,7 +13,9 @@
 #         runs on one cpu of SLOT_CPUS when the list has one cpu per worker, and otherwise the
 #         workers share the whole list. A GPU stage runs with one worker and `--device cuda`.
 #         Exit codes: 3 a failed CPU stage, 5 a failed GPU chain or the gate's second failure, 6
-#         the gate's first failure (run `gate-remedy`), 64 a bad call, 75 the GPU is busy.
+#         the gate's first failure (run `gate-remedy`), 7 a crash inside `gate-remedy` (rerun it),
+#         64 a bad call (such as several workers on a GPU stage), 75 the GPU is busy (also after a
+#         chain has waited 2 hours in all).
 #
 # Rules it sets:
 #   - one scope at a time: `systemd-run --user --scope`, `MemoryMax=$SLOT_MEM`, `MemorySwapMax=0`,

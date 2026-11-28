@@ -95,7 +95,9 @@ def check_worlds(*, months: tuple[str, ...], out: Path | None = None) -> dict:
 
     Returns:
         A dict with `shares` (pooled over the training-family panels of every fold), `dropped_rows`
-        (the rows the valid-time filter drops, by fold), `latest_shift_end_idx`, and `holdout_idx`.
+        (the rows the valid-time filter drops, by fold), `latest_shift_end_idx` (the end as written
+        to the file, which must not pass the holdout), `latest_drawn_end_idx` (reported only), and
+        `holdout_idx`. Rows at or after the holdout are left out of the shares.
     """
     import e00650_common as c650  # ty: ignore[unresolved-import]
     import e00738_score as score
@@ -104,6 +106,7 @@ def check_worlds(*, months: tuple[str, ...], out: Path | None = None) -> dict:
     labels: list[np.ndarray] = []
     dropped: dict[str, int] = {}
     latest = 0
+    latest_drawn = 0
     for month in months:
         table = pl.read_parquet(worlds_path(month=month, out=out))
         start = int(c650.month_start_idx(month=month))
@@ -111,6 +114,7 @@ def check_worlds(*, months: tuple[str, ...], out: Path | None = None) -> dict:
         valid_us = common.GRID_START_US + v * common.STEP_US
         # a row's 48 target half-hours all sit after its valid-day start, so the last one is +47
         last_us = valid_us + (LEADS_PER_ORIGIN - 1) * common.STEP_US
+        scored = v < holdout_idx  # a row at or after the holdout is never scored
         dropped[month] = int((~panel.before_holdout(valid_us=last_us)).sum())
         latest = max(latest, int(table["end_idx"].max()))  # ty: ignore[invalid-argument-type]
         for name in table["panel"].unique().to_list():
@@ -119,13 +123,19 @@ def check_worlds(*, months: tuple[str, ...], out: Path | None = None) -> dict:
             sub = table.filter(pl.col("panel") == name).sort("primary")
             assert sub.height == 16, (month, name, sub.height)
             onset = sub["onset_idx"].to_numpy()
-            drawn_end = onset + np.round(sub["drawn_days"].to_numpy() * world.PER_DAY).astype(int)
-            n = o.size
+            drawn_end = np.array(
+                [
+                    world.drawn_end_of(onset_idx=int(a), drawn_days=float(d))
+                    for a, d in zip(onset, sub["drawn_days"].to_numpy(), strict=True)
+                ]
+            )
+            latest_drawn = max(latest_drawn, int(drawn_end.max()))
+            n = int(scored.sum())
             # one shift per Primary: every Primary is scored at every row
             labels.extend(
                 world.strata(
-                    origin_idx=o,
-                    valid_idx=v,
+                    origin_idx=o[scored],
+                    valid_idx=v[scored],
                     onset_idx=np.full(n, onset[p]),
                     end_idx=np.full(n, drawn_end[p]),
                     clipped=np.zeros(n, dtype=bool),
@@ -138,6 +148,7 @@ def check_worlds(*, months: tuple[str, ...], out: Path | None = None) -> dict:
         "shares": shares,
         "dropped_rows": dropped,
         "latest_shift_end_idx": latest,
+        "latest_drawn_end_idx": latest_drawn,
         "holdout_idx": int(holdout_idx),
     }
 
@@ -158,3 +169,65 @@ def verdict(*, found: dict) -> dict[str, Any]:
         if (n > 0) != (month == LAST_HOLDOUT_FOLD):
             faults.append(f"the valid-time filter drops {n} rows of fold {month}")
     return {"off": bad, "faults": faults}
+
+
+MIN_NONZERO_INSIDE: float = 0.9
+"""At least this share of the finite rows inside a shift must differ from the real record's actual
+(the MVA floor and a proportional shape at zero power can leave a few rows unchanged)."""
+
+
+def check_injected_panel(
+    *, frame: pl.DataFrame, real: pl.DataFrame, shifts: list, ids: np.ndarray
+) -> dict[str, Any]:
+    """Check a predicted panel's actuals against the shifts that the world files record.
+
+    The injected power (the panel's actual minus the real record's actual) must be exactly zero at
+    every valid time outside a shift, and nonzero at nearly every valid time inside one. No valid
+    time may be on or after 2026-07-01.
+
+    Args:
+        frame: A forecast frame of an injected panel.
+        real: The forecast frame of the real record (the same keys, with the unshifted actuals).
+        shifts: The panel's 16 shifts, indexed by the site table's `primary`.
+        ids: The `time_series_id` of each Primary.
+
+    Returns:
+        The row counts per stratum, the share of nonzero rows inside shifts, and the largest
+        absolute
+        injected power outside shifts.
+
+    Raises:
+        AssertionError: When the injection is missing, shifted, or present outside the shift.
+    """
+    import e00738_score as score
+
+    assert frame.height == real.height, "the injected and real panels differ in length"
+    prim = score.primary_of(time_series_id=frame["time_series_id"].to_list(), ids=ids)
+    origin, valid, lead = score.row_indices(frame=frame)
+    score.assert_before_holdout(valid_idx=valid)
+    onset, end, clipped = score.shift_arrays(shifts=shifts)
+    masks = score.row_masks(
+        prim=prim,
+        origin_idx=origin,
+        valid_idx=valid,
+        lead_day=lead,
+        onset=onset,
+        end=end,
+        clipped=clipped,
+    )
+    delta = frame["actual"].to_numpy().astype(float) - real["actual"].to_numpy().astype(float)
+    finite = np.isfinite(delta)
+    inside = (valid >= onset[prim]) & (valid < end[prim]) & finite
+    outside = ((valid < onset[prim]) | (valid >= end[prim])) & finite
+    nonzero = float((np.abs(delta[inside]) > 0).mean()) if inside.any() else float("nan")
+    leak = float(np.abs(delta[outside]).max()) if outside.any() else 0.0
+    assert inside.any(), "no scored row lies inside a shift: the injection cannot be checked"
+    assert nonzero >= MIN_NONZERO_INSIDE, (
+        f"only {nonzero:.2f} of the rows inside shifts are shifted"
+    )
+    assert leak == 0.0, f"the injected power is {leak} outside the shifts"
+    return {
+        "rows_by_stratum": {k: int(m.sum()) for k, m in masks.items()},
+        "share_nonzero_inside": nonzero,
+        "max_abs_outside": leak,
+    }

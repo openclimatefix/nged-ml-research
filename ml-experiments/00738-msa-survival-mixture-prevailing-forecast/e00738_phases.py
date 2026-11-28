@@ -124,22 +124,66 @@ def recipe_path(*, path: Path) -> Path:
     return path.with_name(path.name + RECIPE_SUFFIX)
 
 
-def write_recipe(*, path: Path, modules: tuple[str, ...], folder: Path | None = None) -> None:
-    """Write the recipe hash of a file's sidecar, atomically.
+def file_digest(*, path: Path) -> str:
+    """Return the SHA-256 of a file's bytes, or `none` when the file does not exist."""
+    if not path.exists():
+        return "none"
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def state_digest(*, arm: str, stem: str, out: Path | None = None) -> str:
+    """Return the digest of the state that an arm's forecasts of one fold and seed come from.
+
+    Args:
+        arm: The arm.
+        stem: `<month>_s<seed>`.
+        out: The output folder (`OUT` by default).
+
+    Returns:
+        The digest of the stored stage 3 state of `M1` (experiment 713's, read only), or of the
+        fitted
+        state of any other arm.
+    """
+    if arm == common.ARM_M1:
+        return file_digest(path=common.ROOT_713 / "work" / "models" / "M1" / f"{stem}_stage3.pt")
+    root = out if out is not None else common.OUT
+    return file_digest(path=root / "networks" / arm / f"{stem}.pt")
+
+
+def write_recipe(
+    *,
+    path: Path,
+    modules: tuple[str, ...],
+    folder: Path | None = None,
+    link: str | None = None,
+) -> None:
+    """Write a file's sidecar atomically: the recipe hash, then the digest of its source state.
 
     Callers write the sidecar before the file, so a file that exists always has a sidecar.
     """
     side = recipe_path(path=path)
     side.parent.mkdir(parents=True, exist_ok=True)
     tmp = side.with_name(f".{side.name}.{os.getpid()}.tmp")
-    tmp.write_text(recipe_hash(modules=modules, folder=folder) + "\n")
+    tmp.write_text(recipe_hash(modules=modules, folder=folder) + "\n" + (link or "") + "\n")
     tmp.rename(side)
+
+
+def recipe_link(*, path: Path) -> str:
+    """Return the state digest that a sidecar records (`none` when it records no state)."""
+    side = recipe_path(path=path)
+    lines = side.read_text().splitlines() if side.exists() else []
+    return lines[1] if len(lines) > 1 and lines[1] else "none"
 
 
 def recipe_matches(*, path: Path, modules: tuple[str, ...], folder: Path | None = None) -> bool:
     """Return whether the sidecar of a file holds the current recipe hash of the modules."""
     side = recipe_path(path=path)
-    return side.exists() and side.read_text().strip() == recipe_hash(modules=modules, folder=folder)
+    lines = side.read_text().splitlines() if side.exists() else []
+    return bool(lines) and lines[0].strip() == recipe_hash(modules=modules, folder=folder)
 
 
 def require_recipe(*, path: Path, modules: tuple[str, ...], folder: Path | None = None) -> None:
@@ -159,12 +203,16 @@ def require_recipe(*, path: Path, modules: tuple[str, ...], folder: Path | None 
 def require_all_recipes(*, out: Path | None = None, folder: Path | None = None) -> int:
     """Check every state file and forecast file under the output folder, and return how many.
 
+    A forecast also records the digest of the state it was made from, and the check compares it with
+    the digest of the state that exists now.
+
     Args:
         out: The output folder (`OUT` by default).
         folder: The code folder (this file's folder by default).
 
     Raises:
-        RuntimeError: When any file has no recipe file or another recipe hash.
+        RuntimeError: When any file has no recipe file or another recipe hash, or a forecast came
+            from another state.
     """
     root = out if out is not None else common.OUT
     n = 0
@@ -174,6 +222,14 @@ def require_all_recipes(*, out: Path | None = None, folder: Path | None = None) 
     ):
         for path in sorted(root.glob(pattern)):
             require_recipe(path=path, modules=modules, folder=folder)
+            if pattern.startswith("predictions"):
+                want = state_digest(arm=path.parent.parent.name, stem=path.parent.name, out=root)
+                if recipe_link(path=path) != want:
+                    msg = (
+                        f"refusing to use {path}: it was made from another state of "
+                        f"{path.parent.parent.name} than the one now in {root / 'networks'}"
+                    )
+                    raise RuntimeError(msg)
             n += 1
     return n
 
@@ -385,6 +441,7 @@ def wait_for_gpu(
     busy: Callable[[], bool] = gpu_busy,
     sleep: Callable[[float], None] = time.sleep,
     max_waits: int | None = None,
+    max_seconds: float | None = None,
 ) -> int:
     """Wait while another session uses the GPU, and write each wait to the ledger as a wait.
 
@@ -396,6 +453,7 @@ def wait_for_gpu(
         busy: Whether the GPU is busy.
         sleep: The sleep function (replaced in tests).
         max_waits: Give up after this many back-offs (None to wait for ever).
+        max_seconds: Exit with code 75 when the waits of this call reach this many seconds.
 
     Returns:
         The number of back-offs, or -1 if it gave up.
@@ -404,6 +462,9 @@ def wait_for_gpu(
     while busy():
         if max_waits is not None and n >= max_waits:
             return -1
+        if max_seconds is not None and n * common.GPU_BACKOFF_SECONDS >= max_seconds:
+            print("giving up: the GPU stayed busy for the whole wait ceiling", file=sys.stderr)
+            sys.exit(common.EXIT_GPU_BUSY)
         start = time.time()
         print(
             f"waiting for the GPU before {task}: another session's process is on it "
@@ -595,10 +656,14 @@ def run_chain(
         chain).
     """
     failed = 0
+    waited = 0.0
     for name, kwargs in jobs:
         require_budget(device=device)
         if device == "gpu" and not is_done(name=name):
-            wait_for_gpu(stage=stage, task=name)
+            n = wait_for_gpu(
+                stage=stage, task=name, max_seconds=common.MAX_GPU_WAIT_SECONDS - waited
+            )
+            waited += n * common.GPU_BACKOFF_SECONDS
         failed += not run_task(name=name, fn=fn, kwargs=kwargs, device=device, stage=stage)
     if failed:
         sys.exit(exit_code)

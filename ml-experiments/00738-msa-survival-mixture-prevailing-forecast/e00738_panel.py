@@ -83,6 +83,43 @@ def before_holdout(*, valid_us: Any) -> Any:
     return valid_us < common.HOLDOUT_START_US
 
 
+def frame_of(*, blocks: list[pl.DataFrame]) -> pl.DataFrame:
+    """Return the forecast frame of the per-batch blocks, without any row at or after 2026-07-01.
+
+    Args:
+        blocks: One frame per batch, with `time_series_id`, `origin_us`, `valid_us`, `lead_day`,
+            `actual`, and the 11 quantiles.
+
+    Returns:
+        The frame, keyed and sorted by `KEYS`.
+    """
+    utc = pl.Datetime("us", "UTC")
+    frame = (
+        pl.concat(blocks)
+        # no forecast of the data from 2026-07-01 on, as in experiment 713's own forecast pass
+        .filter(before_holdout(valid_us=pl.col("valid_us")))
+        .with_columns(
+            power_fcst_init_time=pl.col("origin_us")
+            .cast(pl.Datetime("us"))
+            .dt.replace_time_zone("UTC")
+            .cast(utc),
+            valid_time=pl.col("valid_us")
+            .cast(pl.Datetime("us"))
+            .dt.replace_time_zone("UTC")
+            .cast(utc),
+            time_series_id=pl.col("time_series_id").cast(pl.Int64),
+        )
+        .drop("origin_us", "valid_us")
+        .select(*KEYS, "lead_day", "actual", *QCOLS)
+        .sort(*KEYS)
+    )
+    assert (
+        frame.select(pl.all_horizontal(pl.col(c).is_finite() for c in QCOLS)).to_series().all()
+    ), "a forecast quantile is not finite"
+    assert not frame.select(list(KEYS)).is_duplicated().any(), "a forecast key is repeated"
+    return frame
+
+
 def forecast_pass(
     *,
     model_fn: ModelFn,
@@ -179,29 +216,6 @@ def forecast_pass(
                         }
                     )
                 )
-    utc = pl.Datetime("us", "UTC")
-    frame = (
-        pl.concat(frames)
-        # no forecast of the data from 2026-07-01 on, as in experiment 713's own forecast pass
-        .filter(before_holdout(valid_us=pl.col("valid_us")))
-        .with_columns(
-            power_fcst_init_time=pl.col("origin_us")
-            .cast(pl.Datetime("us"))
-            .dt.replace_time_zone("UTC")
-            .cast(utc),
-            valid_time=pl.col("valid_us")
-            .cast(pl.Datetime("us"))
-            .dt.replace_time_zone("UTC")
-            .cast(utc),
-            time_series_id=pl.col("time_series_id").cast(pl.Int64),
-        )
-        .drop("origin_us", "valid_us")
-        .select(*KEYS, "lead_day", "actual", *QCOLS)
-        .sort(*KEYS)
-    )
-    assert (
-        frame.select(pl.all_horizontal(pl.col(c).is_finite() for c in QCOLS)).to_series().all()
-    ), "a forecast quantile is not finite"
-    assert not frame.select(list(KEYS)).is_duplicated().any(), "a forecast key is repeated"
+    frame = frame_of(blocks=frames)
     diag_frame = pl.concat(diags) if diags else pl.DataFrame()
     return frame, diag_frame

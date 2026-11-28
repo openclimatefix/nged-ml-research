@@ -46,6 +46,11 @@ REAL_TRANSFERS_FILE: Final[str] = (
 )
 
 
+def drawn_end_of(*, onset_idx: int, drawn_days: float) -> int:
+    """Return the first half-hour after a shift as drawn (at least one half-hour long)."""
+    return onset_idx + max(round(drawn_days * PER_DAY), 1)
+
+
 @dataclass(frozen=True)
 class Shift:
     """One shift of one Primary, as a share of capacity added to its power.
@@ -75,7 +80,7 @@ class Shift:
     @property
     def drawn_end_idx(self) -> int:
         """The first half-hour after the shift as the generator drew it, before any clipping."""
-        return self.onset_idx + round(self.drawn_days * PER_DAY)
+        return drawn_end_of(onset_idx=self.onset_idx, drawn_days=self.drawn_days)
 
     @property
     def clipped(self) -> bool:

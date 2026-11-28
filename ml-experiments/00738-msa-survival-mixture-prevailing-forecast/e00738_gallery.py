@@ -276,6 +276,7 @@ def draw_gallery(*, clean_row: np.ndarray, out: Path | None = None) -> list[Path
                         hist_power=(z[idx] / max(np.nanstd(base), 1e-6))[None],
                         visible=vis[None],
                         noise=unit,
+                        z=surv.a1_threshold(),
                     )[0]
                 ),
                 (c - s.onset_idx) / world.PER_DAY,

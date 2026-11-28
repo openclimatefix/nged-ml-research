@@ -211,7 +211,9 @@ def sub_predict(
 
 def stage_one_task(*, args: argparse.Namespace) -> None:
     """Run one fit or prediction job in this process; the parent process started it for this job alone."""
-    if args.kind == "fit":
+    if args.kind == "a1":
+        task_a1_fold(month=args.month)
+    elif args.kind == "fit":
         task_fit(arm=args.arm, month=args.month, seed=args.seed, device=args.device)
     else:
         task_predict(
@@ -436,6 +438,31 @@ def task_a1_table(*, month: str) -> None:  # noqa: PLR0915 - one linear Phase 0 
     rows["miss_rate_true_age_3_to_10_days"] = miss_3_10
     common.atomic_json(obj=rows, path=common.OUT / "a1" / f"{month}.json")
     print(json.dumps(rows, indent=1), flush=True)
+    a1_decide(
+        z_tuned=z_tuned,
+        share_tuned=share_tuned,
+        miss_3_10=miss_3_10,
+        month=month,
+        noise=noise,
+    )
+
+
+def a1_decide(
+    *,
+    z_tuned: float | None,
+    share_tuned: float,
+    miss_3_10: float,
+    month: str,
+    noise: float,
+    out: Path | None = None,
+) -> None:
+    """Stop Phase 0 when A1's tuning fails, and write the threshold file only when both limits hold.
+
+    Raises:
+        RuntimeError: When no threshold meets the false-alarm bar, or the miss rate on shifts with a
+            true age of 3 to 10 days is over the limit.
+    """
+    root = out if out is not None else common.OUT
     if z_tuned is None:
         msg = (
             f"A1 cannot reach a false-alarm share of {common.A1_FALSE_ALARM_MAX} on the training "
@@ -457,8 +484,102 @@ def task_a1_table(*, month: str) -> None:  # noqa: PLR0915 - one linear Phase 0 
             "noise_unit": noise,
             "miss_rate_true_age_3_to_10_days": miss_3_10,
         },
-        path=common.OUT / common.A1_THRESHOLD_FILE,
+        path=root / common.A1_THRESHOLD_FILE,
     )
+
+
+def task_a1_fold(*, month: str) -> None:
+    """Write the false-alarm share of the tuned threshold on one fold's own training rows (a child process only).
+
+    The rows are the real rows before the fold's cutoff, in the fold's own noise unit, so no scoring
+    month and no holdout row is read. They include logged events, which overstates the share.
+    """
+    import e00713_train as tr  # ty: ignore[unresolved-import]
+    import e00738_survival as surv
+    import numpy as np
+
+    data, tw, _ = load_fold(month=month, phase="train", device="cpu")
+    z = (data.clean - data.target_mean[:, None]) / data.target_std[:, None]
+    noise = surv.noise_unit_from_panel(z=z, cutoff_idx=data.cutoff_idx)
+    origins = np.arange(48 * 20 + 24, data.cutoff_idx - 48 * 3, 48 * 3)
+    prim, cc = np.meshgrid(np.arange(16), origins, indexing="ij")
+    prim, cc = prim.ravel(), cc.ravel()
+    samples = tr.SampleSet(primary=prim, c_idx=cc, is_val=np.zeros(len(prim), bool))
+    ages = []
+    for start in range(0, len(prim), 512):
+        sel = np.arange(start, min(start + 512, len(prim)))
+        b = tr.batch_for(
+            source=tw.source,
+            samples=samples,
+            index=sel,
+            lead=np.zeros(len(sel), int),
+            ensemble=False,
+            cut=10**9,
+            dropout=None,
+        )
+        ages.append(
+            surv.age_rule_a1(
+                hist_power=b.inputs.hist_power.numpy(),
+                visible=b.inputs.hist_visible.numpy(),
+                noise=noise,
+                z=surv.a1_threshold(),
+            )
+        )
+    found = np.concatenate(ages)
+    common.atomic_json(
+        obj={
+            "month": month,
+            "rows": int(found.size),
+            "flagged": int((found > 0).sum()),
+            "share": float((found > 0).mean()),
+            "noise_unit": noise,
+            "z": surv.a1_threshold(),
+        },
+        path=common.OUT / "a1" / f"fold_{month}.json",
+    )
+
+
+def a1_fold_verdict(*, rows: list[dict]) -> dict:
+    """Return the per-fold and pooled false-alarm shares, and raise when a limit is broken.
+
+    Args:
+        rows: One record per fold with `month`, `rows`, `flagged`, and `share`.
+
+    Raises:
+        RuntimeError: When any fold is above `A1_FOLD_FALSE_ALARM_MAX` or the pooled share is above
+            `A1_FALSE_ALARM_MAX`.
+    """
+    pooled = sum(r["flagged"] for r in rows) / max(sum(r["rows"] for r in rows), 1)
+    worst = max(rows, key=lambda r: r["share"])
+    table = {
+        "by_fold": {r["month"]: r["share"] for r in rows},
+        "pooled": pooled,
+        "worst_fold": worst["month"],
+    }
+    if worst["share"] > common.A1_FOLD_FALSE_ALARM_MAX or pooled > common.A1_FALSE_ALARM_MAX:
+        msg = (
+            f"A1's false-alarm share at the tuned threshold is {worst['share']:.3f} in fold "
+            f"{worst['month']} (limit {common.A1_FOLD_FALSE_ALARM_MAX}), pooled {pooled:.3f} "
+            f"(limit {common.A1_FALSE_ALARM_MAX}). Stop and report to the coordinator."
+        )
+        raise RuntimeError(msg)
+    return table
+
+
+def task_a1_folds() -> None:
+    """Run the false-alarm check of the tuned threshold on all 8 folds, one child process per fold, and print the table."""
+    for month in common.FOLDS:
+        phases.run_child(
+            argv=child_argv(kind="a1", month=month, seed=0, device="cpu"),
+            env=phases.child_env(month=month, phase="train"),
+        )
+    rows = [json.loads((common.OUT / "a1" / f"fold_{m}.json").read_text()) for m in common.FOLDS]
+    try:
+        table = a1_fold_verdict(rows=rows)
+    finally:
+        print("A1 false-alarm share by fold:", {r["month"]: round(r["share"], 3) for r in rows})
+    common.atomic_json(obj=table, path=common.OUT / "a1" / "folds.json")
+    print(json.dumps(table, indent=1), flush=True)
 
 
 def task_gallery(*, month: str) -> None:
@@ -536,6 +657,7 @@ def stage_phase0(*, args: argparse.Namespace) -> None:
     jobs: list[tuple[str, dict[str, Any]]] = [("strata_check", {})]
     jobs += [(f"curves_{m}", {"month": m}) for m in common.FOLDS]
     jobs += [("a1_table_2025-11", {"month": "2025-11"}), ("gallery_2025-11", {"month": "2025-11"})]
+    jobs += [("a1_folds", {})]
 
     # a task's name selects its function, so each job carries its own callable
     failed = 0
@@ -544,6 +666,8 @@ def stage_phase0(*, args: argparse.Namespace) -> None:
         fn = (
             task_strata_check
             if name == "strata_check"
+            else task_a1_folds
+            if name == "a1_folds"
             else task_a1_table
             if name.startswith("a1")
             else task_gallery
@@ -630,6 +754,17 @@ def stage_smoke_collect() -> None:
             assert ok.any()
             assert np.isfinite(score.crps_points(y=y[ok], q=q[ok])).all()
             assert len(origin) == len(valid) == len(lead)
+    import e00738_worldcheck as wc
+
+    shifts = screen_shifts(month=month)["pass00"]
+    real = pl.read_parquet(pred.panel_path(arm=common.ARM_M1, month=month, seed=0, name="real"))
+    ids = site_labels()[1]
+    seen = {}
+    for arm in common.ALL_ARMS:
+        frame = pl.read_parquet(pred.panel_path(arm=arm, month=month, seed=0, name="pass00"))
+        seen[arm] = wc.check_injected_panel(frame=frame, real=real, shifts=shifts, ids=ids)
+    common.atomic_json(obj=seen, path=common.OUT / "checks" / "smoke_injection.json")
+    print("injected power read back from the predicted panels:", seen[common.ARM_M1], flush=True)
     assert (common.OUT / "checks" / f"reproduce_m1_{month}_s0.json").exists(), (
         "stored M1 was not reproduced"
     )
@@ -741,6 +876,25 @@ def a1_age_bias() -> dict[str, object]:
     return {"by_fold": found, "bar_days": common.A1_BIAS_MAX_DAYS, "exceeds_bar": exceeds}
 
 
+def gate_discounts() -> dict[str, float]:
+    """Return the survival discounts of a correct lead-free head, from the first screen fold's empirical curve."""
+    import e00650_common as c650  # ty: ignore[unresolved-import]
+    import e00738_fit as fit
+    import e00738_gate as gate
+
+    month = common.SCREEN_FOLDS[0]
+    curve = fit.fold_curve(
+        month=month,
+        seed=0,
+        cutoff_idx=int(c650.month_start_idx(month=month)),
+        is_mw=fit.fold_world()[2],
+    )
+    return {
+        "check2": gate.survival_discount(curve=curve, ages=gate.CHECK2_AGES),
+        "check3": gate.survival_discount(curve=curve, ages=gate.CHECK3_AGES),
+    }
+
+
 def stage_gate() -> None:
     """The known-answer gate on the screen fits and predictions; sets the remedy flag on a first failure, exits with code 5 on a second."""
     phases.require_stage(stage="gate")
@@ -777,6 +931,7 @@ def stage_gate() -> None:
             ratios.extend(got["depth_ratio"])
             for band, vals in got["depth_bands"].items():
                 by_band.setdefault(band, []).extend(vals)
+    discounts = gate_discounts()
     m1_follow = total["m1_num_seen"] / total["den_seen"] if total["den_seen"] > 0 else 0.0
     record = gate.evaluate(
         oracle={
@@ -787,6 +942,8 @@ def stage_gate() -> None:
         lp_follow_all_far=total["num"] / total["den"] if total["den"] > 0 else float("nan"),
         depth_ratio=float(np.median(ratios)) if ratios else float("nan"),
         m1_follow=m1_follow,
+        discount_follow=discounts["check2"],
+        discount_depth=discounts["check3"],
         diagnostics={
             "a1_age_bias_days": a1_age_bias(),
             "m1_follow_all_far_rows": total["m1_num"] / total["den"] if total["den"] > 0 else None,
@@ -1095,6 +1252,7 @@ def stage_report() -> None:
 def stage_figures() -> None:
     """Draw the result figures from the report."""
     phases.require_stage(stage="figures")
+    phases.require_all_recipes()
     import e00738_figures as figures
     import e00738_report as report
 
@@ -1116,7 +1274,7 @@ def parse_args(*, argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--worker", type=int, default=0)
     p.add_argument("--of", type=int, default=1)
     p.add_argument("--device", default="cuda")
-    p.add_argument("--kind", choices=("fit", "predict"), help="one-task only")
+    p.add_argument("--kind", choices=("fit", "predict", "a1"), help="one-task only")
     p.add_argument("--arm", help="one-task fit only")
     p.add_argument("--month", help="one-task only")
     p.add_argument("--seed", type=int, default=0, help="one-task only")
@@ -1158,10 +1316,12 @@ def main(*, argv: list[str] | None = None) -> None:
     args = parse_args(argv=argv)
     gpu = args.stage in GPU_STAGES
     if gpu and args.of != 1:
-        sys.exit(
+        print(
             f"refusing to run: {args.stage} is a GPU stage, which runs as one worker "
-            f"(got --of {args.of}); two workers would both train on the one GPU"
+            f"(got --of {args.of}); two workers would both train on the one GPU",
+            file=sys.stderr,
         )
+        sys.exit(common.EXIT_BAD_CALL)
     phases.assert_blas_pinned()
     if args.stage != "one-task" and common.PASS_CAP_ENV in os.environ:
         sys.exit(
@@ -1180,6 +1340,8 @@ def main(*, argv: list[str] | None = None) -> None:
     except Exception as exc:  # noqa: BLE001 - the failure record is the point of this boundary
         phases.write_failure(name=f"{args.stage}_worker_{args.worker}", exc=exc, kind="stage")
         print(f"FAILED stage {args.stage}: {exc}", file=sys.stderr, flush=True)
+        if args.stage == "gate-remedy":
+            sys.exit(common.EXIT_REMEDY_CRASH)
         sys.exit(common.EXIT_CHAIN_FAILED if gpu else common.EXIT_FAILED)
     phases.archive_stage_failures(stage=args.stage)
 

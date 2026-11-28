@@ -227,7 +227,8 @@ def test_require_all_recipes_walks_states_and_forecasts(tmp_path) -> None:
     state.parent.mkdir(parents=True)
     state.write_bytes(b"x")
     forecast = tmp_path / "predictions" / "LP" / "2025-11_s0" / "real.parquet"
-    pred.write_parquet_atomic(frame=pl.DataFrame({"a": [1]}), path=forecast)
+    link = phases.state_digest(arm="LP", stem="2025-11_s0", out=tmp_path)
+    pred.write_parquet_atomic(frame=pl.DataFrame({"a": [1]}), path=forecast, link=link)
     with pytest.raises(RuntimeError):  # the state has no recipe file
         phases.require_all_recipes(out=tmp_path)
     phases.write_recipe(path=state, modules=phases.FIT_MODULES)
@@ -309,8 +310,9 @@ def test_a_wait_is_printed_and_does_not_count_against_the_stop_line(
 
 
 def test_a_gpu_stage_refuses_more_than_one_worker() -> None:
-    with pytest.raises(SystemExit, match="one worker"):
+    with pytest.raises(SystemExit) as exc:
         run.main(argv=["screen-fits", "--of", "2", "--device", "cpu"])
+    assert exc.value.code == common.EXIT_BAD_CALL
 
 
 # --- C3: smoke hours enter the real ledger ----------------------------------------------------

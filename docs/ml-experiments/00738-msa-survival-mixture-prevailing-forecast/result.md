@@ -124,8 +124,8 @@ the page and code named.
   are never shifted" ([experiment
   726](../00726-msa-candidate-follow-share-on-injected-shift-bank/result.md)). This experiment draws
   shifts with the generator of [experiment
-  650](../00650-extended-shift-departure-head-against-decayed-recent-error/result.md), which adds the
-  shift to the inputs and to the target, with random depth, shape, onset, and end. The strata of
+  650](../00650-extended-shift-departure-head-against-decayed-recent-error/result.md), which adds
+  the shift to the inputs and to the target, with random depth, shape, onset, and end. The strata of
   experiments 652 and 654 are defined on that generator. The generator's mirrored shifts at
   neighbouring Primaries are not used, because the forecaster reads only its own Primary's power.
 - **The stored `M1` was trained never to follow a shift in its target.** Stage 3 of experiment 713
@@ -136,12 +136,12 @@ the page and code named.
   residual times a survival ratio, a decay of the whole forecast. R-haz is a mixture of K1 and K1
   shifted by a depth, weighted by the survival probability. The arm LM, a mixture with the fixed
   fitted curve, makes the two differences separable.
-- **The forecaster scores target rows 2 to 10 after the 12:00 UTC contract origin, which are leads of
-  24 h up to but not including 240 h.** These are lead days 1 to 9 of experiments 652 and 654. The 16
-  Primaries of the forecaster are the same 16 as the neighbour lists of experiment 650's `world()`.
-  Six report signed megawatts (D5, D9, D10, D11, D14, D16), eight report only megavolt-amperes (D2,
-  D3, D4, D8, D12, D19, D21, D22), and D15 and D18 are report-only. The 14 Primaries of the two
-  groups are the scored Primaries on this page.
+- **The forecaster scores target rows 2 to 10 after the 12:00 UTC contract origin, which are leads
+  of 24 h up to but not including 240 h.** These are lead days 1 to 9 of experiments 652 and 654.
+  The 16 Primaries of the forecaster are the same 16 as the neighbour lists of experiment 650's
+  `world()`. Six report signed megawatts (D5, D9, D10, D11, D14, D16), eight report only
+  megavolt-amperes (D2, D3, D4, D8, D12, D19, D21, D22), and D15 and D18 are report-only. The 14
+  Primaries of the two groups are the scored Primaries on this page.
 
 **"Scaled" means the equal width scaling of experiments 652 and 654.** One point of capacity is 1% of
 a Primary's capacity. Each arm's quantile spread about its median is multiplied by one factor per
@@ -406,12 +406,12 @@ rises is read as a harm of the training worlds on rows with no shift.
   stored `M1` on the real record and reproduces experiment 713's stored forecasts to 1e-5.
 - **Screen first.** 4 folds (2025-11, 2026-01, 2026-03, 2026-06), seed 0, 5 arms, with the choice of
   S* made from the screen alone and every screen number labelled interim.
-- **Tails and cost.** Coverage and pinball loss at q01, q05, q95, and q99, the cold winter nights, and
-  the avoidable-curtailment cost, through experiment 713's scorer, beside CRPS.
+- **Tails and cost.** Coverage and pinball loss at q01, q05, q95, and q99, the cold winter nights,
+  and the avoidable-curtailment cost, through experiment 713's scorer, beside CRPS.
 - **Forecast plots.** A day-ahead forecast and the full 14-day forecast of one origin, each against
   what happened, in a winter and a summer month.
 - **Four load-shift scenarios.** All rows; rows outside events and 7 days or more after one; rows
-  inside events; and the 7 days after an event ends, for each arm and for the climatology row, on the
+  inside events; and the 7 days after an event ends, for each arm, on the
   injected worlds (events known exactly) and on the real record (NGED's logged events, the
   `event_rows`, `outside_events`, and `event_following_7_days` flags of experiment 713's protocol
   rows). One example time series of each scenario is drawn.
@@ -437,14 +437,14 @@ rises is read as a harm of the training worlds on rows with no shift.
 - **The synthetic world gallery.** At least 8 plots of the generator's output, committed before the
   first fit (see "The gallery").
 - **Anonymisation.** The experiment uses no metered generator's series. The real series of D8 is
-  never drawn in a published plot, and every published number is an aggregate. D8 stays in the pooled
-  scores, and the page reports the eight MVA-only Primaries with and without D8.
+  never drawn in a published plot, and every published number is an aggregate. D8 stays in the
+  pooled scores, and the page reports the eight MVA-only Primaries with and without D8.
 
 **The plan follows these items of earlier advice.**
 
 - Fit a survival curve to durations with no neural network, as the baseline for a learned survival
-  output ([experiment 652](../00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md);
-  LD and LM).
+  output ([experiment
+  652](../00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md); LD and LM).
 - Score by the state of the shift at the origin and by lead day, and read the far and near strata
   together (652).
 - Do not fit equal width scaling per stratum, and report unscaled CRPS beside it (652).
@@ -628,6 +628,65 @@ an injected world. The LM control with a constant survival ratio is not built, b
 table has no room for another arm, and the split of C2 into the median's error and the coverage
 tests the same question.
 
+## Amendment 3 before any fit
+
+**Amendment 3 (2026-11-28) changes the gate bars, the smoke test, the A1 checks, the recipe link,
+and the exit codes, after a re-review of Amendment 2 and before any fit.** No fit, prediction, or
+score had run. The re-review listed ten findings (R1 to R10), and all ten hold.
+
+**The gate bars carry the survival discount of a lead-free head (R1).** LP's depth is one number per
+history, trained over 14 lead days, so its best value is the remaining depth times the survival
+ratio averaged over those leads. From the generator's survival function the mean is 0.74 for shifts
+of 3 to 10 days (check 3) and 0.82 for ages 2 to 16 days (check 2). The bars were 0.7 and 0.75 times
+the remaining depth, so a correct head sat 6% above the bar of check 3 before any error. The code
+now builds the empirical curve of the fold's training worlds, averages the ratio over the 14
+training lead days and the ages of each check, and multiplies each bar by the result. The gate
+prints the derivation, and a test feeds an ideal lead-free head to the gate and requires a pass.
+Check 2 reads all ages from 2 to 16 days, and the far rows are older than that average, so its bar
+is the more lenient of the two.
+
+**The smoke test reads the predicted panels (R2).** `smoke-collect` reads the `pass00` panel of
+every arm on the first screen fold, subtracts the real record's actuals, and requires the difference
+to be exactly zero outside each shift and nonzero on at least 0.9 of the rows inside one (the MVA
+floor leaves a few rows unchanged). It asserts that no valid time is on or after 2026-07-01 and
+prints the rows per stratum. The Phase 0 world check still tests the shares and the holdout
+arithmetic, and the page no longer claims that it tests the panels.
+
+**Every filter at the holdout has a test that fails without it (R3, R8).** The concat-and-filter of
+the forecast pass is a function, `frame_of`, and a test fails when its filter line is deleted. The
+gate, the injection check, the scorer, and the member check each have such a test. The world check
+leaves the rows on or after the holdout out of the shares, and a test shows that its "reaches the
+holdout" fault fires on a file whose end was not clipped.
+
+**A1's false-alarm share is checked on all 8 folds (R4).** After tuning, Phase 0 starts one child
+process per fold, applies the tuned threshold to the real rows before that fold's cutoff in the
+fold's own noise unit, and prints the share per fold and pooled. It stops with exit code 3 if any
+fold is above 0.10 or the pooled share is above 0.05. The rows include logged events, so the shares
+are slightly high. The limit of 0.6 on the miss rate for shifts of 3 to 10 days is kept as the
+coordinator set it. At that limit A1 sees at least 0.4 of those shifts, and the gate reads only the
+rows that A1 sees.
+
+**The A1 stops are tested, and the gallery uses the tuned threshold (R5).** The decision to stop or
+write `a1/threshold.json` is a function, and tests show that it raises and writes nothing when the
+tuning fails or the miss rate is above 0.6.
+
+**A forecast records the state it came from (R6).** The sidecar of a forecast file holds the digest
+of the state file of its arm and fold (for `M1`, the stored stage 3 state of experiment 713).
+Scoring and prediction refuse a forecast whose state has changed. The figures stage checks the
+recipes too. Tests show that `fit_job` and `load_for_prediction` refuse a stale recipe.
+
+**The drawn end of a sub-half-hour shift is one half-hour after the onset (R7).** The strata now use
+the same clamp as the injection.
+
+**The page promises no climatology row (R9).** The four-scenario table of the injected worlds has no
+climatology row. It pools the (fold, seed) cells by rows, not by the mean of monthly means that the
+counted readings use, and the report says so.
+
+**Exit codes and the wait ceiling (R10).** A refused call, such as several workers on a GPU stage,
+exits with 64. A crash inside `gate-remedy` exits with 7, so that it is not read as the gate's
+second failure (code 5), and the stage can be rerun. A chain that has waited 2 hours in all for
+another session's GPU process exits with 75.
+
 ## The gallery
 
 **The gallery is committed in a plan update before the first fit.** Each panel shows one component of
@@ -706,7 +765,8 @@ The launcher stops between jobs at the stop line and never inside a fit. A fit w
 temporary name and renames the file when complete. The ledger counts a crashed attempt. The waits under
 contention are printed and booked as waits, and the stop line does not count them. A job treats the
 GPU as busy when `nvidia-smi` lists a compute
-process of another session, and backs off for 5 minutes. The run uses one GPU process at a time under
+process of another session, and backs off for 5 minutes. A chain that has waited 2 hours in all
+exits with code 75. The run uses one GPU process at a time under
 `systemd-run --user --scope -p MemoryMax=16G -p MemorySwapMax=0 -p OOMPolicy=continue`, one thread
 for each numerical library, and cores 8 to 15 for the CPU phases.
 
@@ -778,9 +838,9 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
   `7c29114a8`). The whole `ml-experiments` folder of that checkout goes first on `PYTHONPATH`,
   because the stored fits carry the code hash of that checkout, and that hash covers the recipe
   folders beside experiment 713's own. The two recipe files that changed since that commit
-  (`e00513_slices.py` and `e00709_era_table.py`, which now need a private engine file) then come from
-  the frozen commit. `run.sh` also sets `PYTHONDONTWRITEBYTECODE=1`, so the frozen checkout stays
-  clean. A job stops before it can write into experiment 713's cache folder, because a missing
+  (`e00513_slices.py` and `e00709_era_table.py`, which now need a private engine file) then come
+  from the frozen commit. `run.sh` also sets `PYTHONDONTWRITEBYTECODE=1`, so the frozen checkout
+  stays clean. A job stops before it can write into experiment 713's cache folder, because a missing
   dense array there would be built and written by experiment 713's pipeline.
 - **Child processes.** Experiment 713's pipeline reads its month and phase once, when it is
   imported, so every fit job and every prediction job runs in a child process of its own
@@ -810,9 +870,9 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
 - `e00738_train.py` and `e00738_fit.py` run the fits on the worlds and store the states and the loss
   histories. `e00738_panel.py` copies the panel-swap code of experiment 726 (the original runs
   `argparse` at import) with a provenance note, and asserts experiment 713's code hash.
-- `e00738_predict.py` predicts the worlds and the real record, for the stored `M1` states and the new
-  arms, and writes one parquet file per arm, fold, seed, and panel under `predictions/`, with a second
-  file of diagnostics (age, depth share, survival ratio) beside it. It does not use
+- `e00738_predict.py` predicts the worlds and the real record, for the stored `M1` states and the
+  new arms, and writes one parquet file per arm, fold, seed, and panel under `predictions/`, with a
+  second file of diagnostics (age, depth share, survival ratio) beside it. It does not use
   `experiment_store.write_predictions`, because the gate and the member-path check read the
   diagnostics files.
 - `e00738_score.py`, `e00738_report.py`, and `e00738_members.py` compute every contrast, interval,
@@ -822,32 +882,35 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
   event). The `members` stage runs the 51-path check on `LM` and writes `checks/members.json`.
 - **Exit codes.** A failed CPU task or stage exits with 3. A failed GPU chain exits with 5, as does
   the known-answer gate's second failure. The gate's first failure exits with 6, and means that the
-  remedy flag is set and `gate-remedy` runs next. A launcher that finds the GPU busy exits with 75
-  and starts nothing. The plan states only the code 5 and "a different code" for the busy GPU.
+  remedy flag is set and `gate-remedy` runs next. A crash inside `gate-remedy` exits with 7, and the
+  stage is rerun. A refused call exits with 64. A launcher that finds the GPU busy, or a chain that
+  has waited 2 hours for it, exits with 75. The plan states only the code 5 and "a different code"
+  for the busy GPU.
 - `e00738_worldcheck.py` writes every fold's scoring shifts to disk and checks the strata and the
   holdout from the files. `e00738_gate.py` runs the known-answer gate. `e00738_figures.py` and
   `e00738_gallery.py` draw the
   figures and the gallery.
 - The tests are `test_e00738_world.py`, `test_e00738_survival.py`, `test_e00738_score.py`,
   `test_e00738_panel.py`, `test_e00738_run.py`, `test_e00738_review_fixes.py`,
-  `test_e00738_opus_fixes.py`, `test_e00738_model.py`, `test_e00738_attributes.py`, and
-  `test_e00738_dryrun.py`. The last three
-  need `torch` and skip without it. The tests cover every pure function, the visibility limit of the
-  level features, the keyword names of `run_task`, every state of the verdict table, the guards, and
-  the existence of every attribute that the scripts take from an imported module, including lazy
-  imports inside functions. The dry run fits every arm, predicts four panels, scores them, and runs
-  the member-path check on a tiny synthetic fold, on the CPU, in a scratch folder, with every read
-  of the data folder replaced. It also perturbs the power after the origin, and adds a shift that
-  starts after the origin, in the real `Source` class, and asserts that the level head's features,
-  age, depth, and hazards stay bit-identical. It runs for about 3 minutes. The known-answer tests of
-  the member-path check use a Gaussian forecast, and the gate test uses site identifiers that are
-  not in the order of the site table.
+  `test_e00738_opus_fixes.py`, `test_e00738_rereview_fixes.py`, `test_e00738_model.py`,
+  `test_e00738_attributes.py`, and `test_e00738_dryrun.py`. The last three need `torch` and skip
+  without it. The tests cover every pure function, the visibility limit of the level features, the
+  keyword names of `run_task`, every state of the verdict table, the guards, and the existence of
+  every attribute that the scripts take from an imported module, including lazy imports inside
+  functions. The dry run fits every arm, predicts four panels, scores them, and runs the member-path
+  check on a tiny synthetic fold, on the CPU, in a scratch folder, with every read of the data
+  folder replaced. It also perturbs the power after the origin, and adds a shift that starts after
+  the origin, in the real `Source` class, and asserts that the level head's features, age, depth,
+  and hazards stay bit-identical. It runs for about 3 minutes. The known-answer tests of the
+  member-path check use a Gaussian forecast, and the gate test uses site identifiers that are not in
+  the order of the site table.
 - Read from experiment 713 (`ml-experiments/00713-msa-axial-attention-demand-network-part-1/`): the
   network, inputs, batch, train, and score modules, and the stored stage 1 and stage 3 states and
   forecasts of `M1`, under
   `data/ml-experiments/00713-msa-axial-attention-demand-network-part-1/work/`.
 - Read from experiments 650, 652, and 654: the generator (`e00650_bank.py`), the survival head
   (`e00652_head.py`), and the strata and scaling (`e00652_score.py`, `e00654_score.py`).
-- Written, never committed, under `data/ml-experiments/00738-msa-survival-mixture-prevailing-forecast/`:
-  `worlds/` (the scoring worlds per fold), `networks/` (every fitted state), `fits/` (loss
-  histories, seconds, and peak memory), `predictions/` (per-row forecasts), and `scores/`.
+- Written, never committed, under
+  `data/ml-experiments/00738-msa-survival-mixture-prevailing-forecast/`: `worlds/` (the scoring
+  worlds per fold), `networks/` (every fitted state), `fits/` (loss histories, seconds, and peak
+  memory), `predictions/` (per-row forecasts), and `scores/`.
