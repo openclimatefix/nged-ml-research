@@ -7,7 +7,7 @@ title: >-
 theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
-status: planned
+status: finished
 date: 2026-11-27
 kind: other
 size: >-
@@ -88,46 +88,281 @@ decision_rule: >-
 benchmark: >-
   U-noBSP, the step head of experiment 732 without the bulk supply point (BSP) input, with the
   isotonic map and the F1-rule threshold that the recalibration report froze on the validation
-  overlay (chosen because it had the higher raw-map validation F1, 0.614 against 0.523; the
-  isotonic F1 rule gives 0.606), read from experiment 732's stored test predictions. U* (the head
-  with the BSP input) is a reference row. H-own (the offset model without the shared term and
-  neighbour evidence) is a reference row.
+  overlay (chosen because it had the higher raw-map validation F1 score, the harmonic mean of
+  precision and recall, 0.614 against 0.523; the isotonic F1 rule gives 0.606), read from experiment
+  732's stored test predictions. U* (the head with the BSP input) is a reference row. H-own (the
+  offset model without the shared term and neighbour evidence) is a reference row.
 row_set_id: >-
   experiment 732's test bank (8 held-out months of D8's pre-engine days, 8 draws each), restricted
   to the 6 months that lie inside experiment 653's record: 288 injected transfers, 104 of 4 step
   noise units or more; not comparable with the leaderboard
 metric: >-
   Share of injected transfers whose start has a matching call (same sign, within 6 hours), by
-  duration band, for transfers of 4 step noise units or more (D8's step noise unit in experiment
-  732 is 3.42 points, which is 0.355 MW, so 4 units are 13.67 points, or 1.42 MW), with
-  world-resampled and month-resampled 95% intervals; the same share under a rule that also needs an
-  end call; false edge calls per 100 scored base days; share matched by chance on shifted starts.
+  duration band, for transfers of 4 step noise units or more (D8's step noise unit in experiment 732
+  is 3.42 points, which is 0.355 MW, so 4 units are 13.67 points, or 1.42 MW; one point is 0.10379
+  MW), with world-resampled and month-resampled 95% intervals; the same share under a rule that also
+  needs an end call; false edge calls per 100 scored base days; share matched by chance on shifted
+  starts.
+verdict: inconclusive
+best_arm: >-
+  None. The offset model H-nbr found the start of 13 of the 21 counted transfers (0.619) and the
+  step head U-noBSP found 12 of the 21 (0.571), so C1 is +0.048, which the sign test cannot tell
+  from zero (p = 1.0). The step head is the better detector of transfers under 24 hours (see the
+  table of shares by duration band under Result).
+headline: >-
+  On the 21 injected transfers of 24 to 96 hours and at least 1.42 MW, the offset model found the
+  start of 13 and the step head found 12. The two detectors found the same 9, the step head alone
+  found 3, the offset model alone found 4, and neither found 5, so the difference of +0.048 (1 of 21
+  transfers) is inside the noise. The offset model found 2 of the 29 transfers of 6 to 24 hours and
+  0 of the 54 transfers under 6 hours, against 17 of 29 and 29 of 54 for the step head. The
+  pre-registered porting threshold of +0.15 was not reached.
+lessons: >-
+  The offset model finds about as many long transfers as the step head, within the noise. The offset
+  model found only 2 of 29 transfers of 6 to 24 hours and 0 of 54 under 6 hours, against 17 of 29
+  and 29 of 54 for the step head. The likely causes are its 6-hour blocks, its slow states, and D8's
+  large block noise unit (see Limits), and the experiment did not test any of them. The step head
+  raises about twice as many false calls on D8's own base days (2.70 against 1.42 per 100 days), so
+  the offset model is the quieter detector. Requiring an end call as well as a start call lowers
+  both shares by 2 of 21 transfers (the step head 12 to 10, the offset model 13 to 11). The
+  21-transfer counted cell resolves a difference of shares only to about 0.25, so a larger bank of
+  long transfers is needed before anyone can rank the two detectors on long transfers.
+take_home_message: >-
+  On the substation D8, a probabilistic model of switched load finds about as many long load
+  transfers as a neural network that looks for steps in demand, and the probabilistic model almost
+  never finds the short transfers, so the probabilistic model does not replace the neural network.
+  The experiment could not say which detector is better on long transfers, because only 21 such
+  transfers were available. The open question is whether the two detectors together find more
+  transfers than either alone.
+advice:
+  - >-
+    Do not replace the step head with the offset model for transfers under 24 hours at D8, because
+    the offset model found 2 of 29 transfers of 6 to 24 hours and 0 of 54 under 6 hours, against
+    17 of 29 and 29 of 54 for U-noBSP (table of shares by duration band).
+  - >-
+    Build a bank with many more than 21 injected transfers of 24 hours or more before ranking two
+    detectors on long transfers, because 21 transfers resolve a difference of shares only to about
+    0.25 and the sign test needs at least 6 discordant transfers split 6 to 0 (C1).
+  - >-
+    Excuse only calls near injected edges large enough for a detector to see, or count excused calls
+    separately, because veto V1 excuses a call near an injected edge of any size, including the edge
+    of a 0.3 MW transfer that neither detector can see (see the limit "Veto V1 excuses a call near
+    an injected edge of any size").
+  - >-
+    Read the 6-hour and the 12-hour tolerance side by side when comparing a block-based detector
+    with a half-hourly detector, because the post hoc 12-hour row moves the offset model from 13 to
+    15 found and the step head stays at 12 (post hoc rows).
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00736-switching-offset-model-vs-untangler-on-d8/
 ---
 
-**We ask whether two detectors of load transfers, built in two earlier experiments of this
+**We asked whether two detectors of load transfers, built in two earlier experiments of this
 repository, find the same synthetic transfers at one substation.** The substation, D8, is a Primary
 substation, the kind that steps voltage down towards customers. A transfer is the switching of part
 of a circuit between two Primaries, which moves demand for hours to days. The first detector is the
 untangling network of experiment 732, a neural network that reads two days of D8's electricity
 readings at a time and gives, for each half-hour, the probability of a step in demand (its step
-head). The second is the offset model of experiment 734, a probabilistic model of D8's whole
-history that infers, for every 6-hour block, how much of the demand is switched power, which is
-power moved by a transfer. We add the same synthetic transfers of known start, end, and size to
-D8's record and ask each detector which starts it finds. The measure is the share of the 21 injected
-transfers, lasting 24 to 96 hours and moving at least 4 step noise units (1.42 MW), whose start each
-detector finds. A detector finds a start when it calls a step of the same sign within 6 hours of the
-injected start. The experiment predicts that the step head wins (the offset model has little to find
-at this size), and the head's share is the only interim number so far: 12 of the 21 transfers
-(0.571), read from stored files before any offset-model decode. This page is the plan, so every
-number from a stored file is interim until the final scoring.
+head). The second is the offset model of experiment 734, a probabilistic model of D8's whole history
+that infers, for every 6-hour block, how much of the demand is switched power, which is power moved
+by a transfer. We added the same synthetic transfers of known start, end, and size to D8's record
+and asked each detector which starts it finds. The measure is the share of the 21 injected
+transfers, lasting 24 to 96 hours and moving at least 1.42 MW, whose start each detector finds. The
+plan registered that cell as the headline because it matches the part of the medium cell of
+experiment 665 (transfers of more than 1 day and up to 7 days) that lasts 4 days or less. A detector
+finds a start when it calls a step of the same sign within 6 hours of the injected start.
+
+**The offset model and the step head found about the same number of long transfers, so the verdict
+is `inconclusive`.** The offset model found 13 of the 21 and the step head found 12, a difference of
+1 transfer that the experiment cannot tell from chance. The step head found far more of the shorter
+transfers: 17 of 29 transfers of 6 to 24 hours and 29 of 54 transfers under 6 hours, against 2 and 0
+for the offset model.
+
+## Result
+
+**The verdict is `inconclusive`: on the 21 counted transfers the offset model and the step head find
+about the same number, and 21 transfers are too few to say which is better.** The counted cell holds
+the 21 injected transfers that last 24 to 96 hours and move at least 4 step noise units, all in the
+6 held-out months. A step noise unit is D8's noise scale for steps in experiment 732 (0.355 MW), so
+4 units are 1.42 MW. C1 is the share found by the offset model H-nbr minus the share found by the
+step head U-noBSP (the step head without the input from the bulk supply point), paired on the same
+transfers. C1 is +0.048, which is 1 transfer in 21. The exact two-sided sign test on the 7 transfers
+that only one detector found gives p = 1.0, so C1 does not count (C1 counts when the sign test gives
+p below 0.05). The 95% interval is -0.25 to +0.25 when the 8 draws are resampled and -0.21 to +0.29
+when the 6 months are resampled. A draw is one random placement of the injected transfers, and a
+world is one draw of all 6 months merged into one record, so there are 8 worlds. The pre-registered
+rule gives `inconclusive` because C1 does not count and the upper end of the wider interval, the one
+resampled by draw (+0.25), is above the porting threshold of +0.15, the gain in share that would
+justify adopting the offset model.
+
+| Counted cell, 21 transfers | Found by U-noBSP | Not found by U-noBSP |
+|---|---|---|
+| Found by H-nbr | 9 | 4 |
+| Not found by H-nbr | 3 | 5 |
+
+**The gap rule, the gates, and veto V1 all pass.** No transfer was dropped for a gap in the
+residual, so the cell holds 21. One of the 6 months holds no transfer that only one detector found,
+which is within the rule's limit of 2. The four gates G1 to G4 all passed: the head's stored results
+reproduce, the injection is exact, the offset model's decode reproduces, and the overlays reproduce.
+Veto V1, which requires the offset model's false-call rate to be at most 1.10 times the step head's,
+passes (below). The numbers in this section are from the final scoring of the 8 worlds; the head's
+12 of 21 equals the interim number read before the plan was frozen.
+
+**The offset model finds about as many long transfers as the step head, within the noise, and finds
+almost no short transfers.** The table gives the share of injected transfers of at least 4 step
+noise units whose start has a matching call, by duration band, for the four detectors that were
+scored. The offset model with no shared term and no neighbour evidence is H-own, and U\* is the step
+head with the bulk supply point input. Both reference rows are uncounted.
+
+| Duration | Transfers | U-noBSP | U\* | H-own | H-nbr |
+|---|---|---|---|---|---|
+| under 6 hours | 54 | 29 (0.54) | 23 (0.43) | 0 (0.00) | 0 (0.00) |
+| 6 to under 24 hours | 29 | 17 (0.59) | 16 (0.55) | 2 (0.07) | 2 (0.07) |
+| 24 to 96 hours (counted) | 21 | 12 (0.57) | 9 (0.43) | 10 (0.48) | 13 (0.62) |
+
+**The offset model is the quieter detector on D8's own days, so veto V1 passes.** V1 counts the
+calls that match no injected start or end edge within 6 hours, on the 1,480 base days (D8's own days
+before any transfer is injected, 185 days in each of the 8 draws). U-noBSP made 40 false calls in
+168 calls on base days (2.70 per 100 days), and H-nbr made 21 false calls in 39 events (1.42 per 100
+days). H-nbr's rate is 0.53 times the step head's, against the veto's limit of 1.10. Real D8 events
+inside the base days count as false calls for both detectors.
+
+**Requiring an end call lowers both shares by 2 transfers, and the chance-matched share (the
+placebo) is near zero.** The placebo moves every injected start 7 days later, onto time where no
+transfer was injected, and counts the calls that match a moved start.
+
+| Secondary row | U-noBSP | H-nbr |
+|---|---|---|
+| Counted transfers found with both a start call and an end call | 10 of 21 | 11 of 21 |
+| Starts matched by chance, counted cell (placebo, 14 starts kept) | 0 | 0 |
+| Starts matched by chance, all transfers of at least 4 step noise units (63 starts kept) | 0 | 1 |
+
+**Three of the five pre-registered predictions hold, one holds in half, and P1, the prediction about
+long transfers, fails.** P1 predicts that the step head wins, and P1 fails in a direction that
+favours the offset model.
+
+| Prediction | Registered | Result | Outcome |
+|---|---|---|---|
+| P1 | H-nbr finds 5 to 9 of the 21, so C1 is between -0.37 and -0.12 | H-nbr finds 13, so C1 is +0.048 | Fails |
+| P2 | In the 29 transfers of 6 to 24 hours, H-nbr finds at least 0.20 less than U-noBSP | 0.07 against 0.59, a gap of 0.52 | Holds |
+| P3 | With an end call also required, U-noBSP's counted share falls by 0.20 or more and H-nbr's by 0.10 or less | U-noBSP falls by 0.095 (12 to 10), H-nbr by 0.095 (13 to 11) | Half holds: H-nbr's fall (0.095) is under 0.10, but U-noBSP's fall (0.095) is under 0.20, so the 0.20 half fails |
+| P4 | Chance-matched share at most 0.08 for U-noBSP and 0.05 for H-nbr | 0 of 14 and 0 of 63 for U-noBSP, 0 of 14 and 1 of 63 (0.016) for H-nbr | Holds |
+| P5 | H-nbr finds at least 1 more of the 11 mirrored transfers than H-own, and at most 1 more of the other 10 | H-nbr 6 against H-own 4 of 11, and H-nbr 7 against H-own 6 of 10 | Holds |
+
+**The step head found more of the 11 mirrored transfers, and the offset model found more of the 10
+unmirrored ones.** A mirrored transfer is one that experiment 732 mirrored at its partner Primary
+(D3, D5, or D14), by adding the equal and opposite change there. Of the 11 counted mirrored
+transfers, both detectors found 5, only the step head 3, only the offset model 1, and neither 2. Of
+the 10 counted transfers with no mirror, both found 4, only the step head 0, only the offset model
+3, and neither 3. Each split holds too few transfers for a test. Of the 21 counted transfers, 2 sit
+in segments with neither a simulated engine array nor a simulated solar array added to D8's record,
+where both detectors read the same signal. Each detector found both of those 2 transfers.
+
+**Post hoc, a tolerance of 12 hours moves the offset model ahead by 3 transfers, which is still
+inside the noise.** This row was not pre-registered, because the plan fixed the tolerance at 6
+hours. At 12 hours both detectors find 10 transfers, only the step head finds 2, only the offset
+model finds 5, and neither finds 4, so the step head finds 12 and the offset model finds 15. C1 is
+then +0.143 (3 of 21), which is below the +0.15 threshold, and the sign test on 2 against 5
+discordant transfers gives p = 0.45. The pre-registered verdict is unchanged.
+
+## Checks
+
+- **The checks that compare a median forecast and a mean forecast with the metered values do not
+  apply,** because no forecast is scored.
+- **One audit trigger fires, for P1, and no audit has been run.** The trigger "a result contradicts
+  its prediction" fires for P1, because the offset model found more transfers than the plan
+  expected. The small cell and the tuning years listed below are the explanations on offer. The
+  trigger "a failed control" does not fire, because the placebo is near zero. No other trigger
+  applies, because no quantile score, leave-one-out, nested arm, or sister interval is involved.
+- **All four gates passed.** G1 reproduced the head's 304 calls and its recall of 0.490 for
+  transfers of at least 4 step noise units, and the 12 of 21. G2 found the injected megawatts equal
+  to the plan's values (worst relative error 5.8e-8), found no injected half-hour with a zero
+  addition in 9,063 half-hours, and asserted that the offset model's panel index is the bank's
+  half-hour plus 1, so transfers are not placed 30 minutes early. G3 reproduced the 131 stored
+  events of experiment 734's un-injected decode exactly. G4 reproduced experiment 732's overlay
+  checksum, its 384 transfers, and its 768 edge rows.
+- **The world design that ran was Design A with the simulated engine and solar arrays added, so both
+  detectors read the same signal.**
+
+## Limits that apply to this result
+
+**Five handicaps of the plan apply to the result, and each is listed here so that a reader can
+discount the number.**
+
+- **The head's recall was computed before the plan was frozen.** The step head's 12 of 21 came
+  from stored files before the offset model was decoded. Only the offset model's side was
+  predicted blind.
+- **Experiment 734's tuning years overlap the test months and favour the offset model.** All 8 test
+  months fall before the end of the years that experiment 734 tuned on. The tuning touched the
+  priors, the time constant, the noise units, the block scales, and the shared-term loadings. No
+  injected transfer was seen in tuning, and the step heads never trained on those months. A win by
+  the offset model would have carried this caveat, and the offset model's 13 against 12 carries it
+  too.
+- **Veto V1 excuses a call near an injected edge of any size.** A call within 6 hours of an injected
+  edge of the right sign counts as not false even when that transfer moves 0.3 MW, a transfer that
+  neither detector can see. Both detectors get the same excuse. Each rate is therefore lower than
+  its unexcused rate, and the veto tests the ratio.
+- **The `small gain` verdict row cannot be reached with 21 transfers.** Any gain that passes the
+  sign test is at least 6 transfers (0.29), so a gain of 1 to 3 transfers can only land in
+  `inconclusive` or `not supported`.
+- **The placebo and the real rows do not cover exactly the same starts.** Each world merges one draw
+  of each of the 6 months into one record. The placebo drops every moved start that crosses a month
+  end, lands inside a transfer, or meets another drop rule, so only 177 of the 288 starts remain in
+  the placebo. Transfers near a month's end are scored in the real rows.
+
+**Six further limits apply, and the last one concerns the registered text itself.**
+
+- **The counted cell holds only 21 transfers, so the experiment resolves a difference of shares only
+  to about 0.25.**
+- **The transfers last 96 hours or less, so the experiment says nothing about the long, deep
+  transfers on which experiment 734 scored the offset model.**
+- **The size band is below the offset model's design range, so the weak showing on short transfers
+  may reflect D8's large block noise unit as well as the offset model.** At D8, 4 step noise units
+  are 1.39 block noise units (1.42 MW against 1.02 MW), below the 2 block noise units where
+  experiment 734 scored its shallow cells.
+- **Both detectors read the future of the event (see "Look-ahead"), so the result bears on labelling
+  a historical record and not on real-time use.**
+- **The experiment tests one substation.**
+- **The registered text has three inconsistencies, and the Result follows the decision rule's own
+  table.** First, the prediction says that a transfer of 1.4 to 4.2 MW is 1.4 to 4 block noise
+  units, "below the 2 block noise units" of experiment 734's shallow cells, but that range straddles
+  2 block noise units. Second, the prediction says that `refuted` needs both intervals below zero,
+  while the decision rule defines `refuted` by the sign test (b exceeds c and C1 counts). Third, the
+  prediction calls `small gain` nearly impossible, while the decision rule says that `small gain`
+  cannot occur.
+
+## Compute
+
+**The experiment used 0.91 CPU-hours, against the plan's estimate of 2.4 and its stop at 8
+CPU-hours.** The time log sums the start-to-end time of every job on one core. The 16 decodes (8
+worlds, 2 arms) took 0.82 CPU-hours, with H-own taking about 2.1 minutes and H-nbr about 4.0 minutes
+per decode (3.1 minutes on average), and G3's un-injected decode took 4.1 minutes. The plan's
+estimate of 15 CPU-minutes per world, and its worst case of 27.6 minutes per decode, were far too
+high. The plan had taken experiment 734's median of 27.6 wall-minutes per scoring job as a guide to
+the time of one decode. Peak memory was 0.57 GB, against the plan's 1.5 GB.
+
+## What the result means for choosing a detector
+
+**The offset model cannot replace the step head on D8, because the step head sees the transfers
+under 24 hours that the offset model does not.** On the transfers of 24 to 96 hours the two
+detectors are tied, with the offset model giving fewer false calls. Of the 21 counted transfers, 16
+were found by at least one detector (9 by both, 3 by only the step head, and 4 by only the offset
+model), against 13 for the offset model, the better single detector. A union of the two detectors
+would also carry both detectors' false calls. The result leaves open whether a rule that uses both
+detectors, where the step head gives short calls and the offset model long ones, finds more
+transfers than either alone.
+
+## The plan as registered
 
 **The two earlier experiments cannot be compared as they stand, because they measured different
 rows.** Experiment 732 scored 8 held-out months of D8's real days with simulated transfers of 1 to
 96 hours, one 48-hour window at a time. Experiment 734 scored the 15 Primaries over a continuous
 record from 2022 to mid-2026, with transfers of hours to months. The offset model cannot be decoded
-on one 48-hour window, and the step head cannot see more than 48 hours. This plan puts both
+on one 48-hour window, and the step head cannot see more than 48 hours. The experiment put both
 detectors on the same transfers.
+
+**Everything from here to "Method" is the plan as it was frozen before the offset model was decoded,
+and is kept unchanged.** The plan's "Open questions before the first run" were settled by the code
+review, and the world design that ran is stated above.
 
 ## Design
 
@@ -136,17 +371,17 @@ could put both detectors on identical transfers.
 
 - **Design A (chosen).** Take the 288 transfers of experiment 732's test bank that fall in the 6
   held-out months inside experiment 653's record. Build each of the 8 worlds from D8's power plus
-  the segment's synthetic engine and solar output plus the transfers, so that the offset model
-  reads the same signal as the step head (experiment 732's test segments add simulated engine or
-  solar output in most of the 64 segments, and the head reads that sum together with the synthetic
-  sky). Add the mirror to the partner Primary when experiment 732 mirrored the transfer (D3, D5, or
-  D14), where the mirror is the equal and opposite change added at the partner. Decode the
-  15-Primary panel with H-own and H-nbr, with the tuned values of experiment 734. Read the step
-  heads' outputs on the same transfers from experiment 732's stored test predictions. The code
-  review checks that experiment 734's `apply_additions` and `WorldDecoder(power=...)` accept the
-  engine and solar arrays of experiment 732's overlay segments (`engine` and `solar`). If they do
-  not, the worlds hold transfers alone, the offset model reads a cleaner series than the head, and
-  the "Every handicap" list says so.
+  the segment's synthetic engine and solar output plus the transfers, so that the offset model reads
+  the same signal as the step head (experiment 732's test segments add simulated engine or solar
+  output in most of the 64 segments, and the head reads that sum together with the synthetic sky).
+  Add the mirror to the partner Primary when experiment 732 mirrored the transfer (D3, D5, or D14),
+  where the mirror is the equal and opposite change added at the partner. Decode the 15-Primary
+  panel with H-own and H-nbr, with the tuned values of experiment 734. Read the step heads' outputs
+  on the same transfers from experiment 732's stored test predictions. The code review checked that
+  experiment 734's `apply_additions` and `WorldDecoder(power=...)` accept the engine and solar
+  arrays of experiment 732's overlay segments (`engine` and `solar`), and they do. Had they not, the
+  worlds would have held transfers alone, the offset model would have read a cleaner series than the
+  head, and the "Every handicap" list would have said so.
 - **Design B (rejected).** Run U-noBSP and U* on experiment 734's D8 worlds. Experiment 734
   injected events into D8's record in its scored years, which lie later in the record than the
   heads' training days, and the heads were trained only on pre-engine days, with a synthetic sky and
@@ -198,12 +433,12 @@ one; the counts below are start edges.
 - **The step head's validation overlay was also the networks' early-stopping set.** The recalibration
   report states this caveat, and the head's frozen threshold is therefore tuned on rows that the
   networks also stopped on.
-- **The two detectors read different signals unless the code review settles otherwise.** Experiment
-  732's test segments add simulated engine or solar output in most of the 64 segments, which the
-  head reads. Only the transfers distinguish the worlds if Design A cannot add the engine and solar
-  arrays. A secondary row scores the counted transfers that sit in segments with neither engine nor
-  solar output, where both detectors read the same signal, and reports how many such transfers
-  there are (the reviewer's count is 2 of the 21).
+- **The two detectors read the same signal, because Design A could add the engine and solar
+  arrays.** Experiment 732's test segments add simulated engine or solar output in most of the 64
+  segments, which the head reads. Had Design A been unable to add the arrays, only the transfers
+  would have distinguished the worlds. A secondary row scores the counted transfers that sit in
+  segments with neither engine nor solar output, where both detectors read the same signal, and
+  reports how many such transfers there are (the reviewer's count is 2 of the 21).
 - **The counted contrast has a half-hour offset to get right.** On the valid half-hours of
   segments with neither engine nor solar output, D8's value in the offset model's panel equals the
   reading in points times 0.10379 MW only when the panel index is the bank half-hour plus 1, so a
@@ -219,7 +454,7 @@ one; the counts below are start edges.
   head's number below was computed before the plan was frozen. Only the offset model's side is
   predicted.
 
-**The head's number was read before the plan was frozen, and the offset model has not been
+**The head's number was read before the plan was frozen, and the offset model had not been
 decoded.** The numbers in this paragraph came from a read-only script on stored files, run before
 any offset-model decode. It took the mean of the three seeds' `step_p` and `size` in
 `test_transfer.npz` for U-noBSP (94,080 half-hours), applied the frozen isotonic map and F1-rule
@@ -274,13 +509,13 @@ after the frozen isotonic map, reaches the frozen F1-rule threshold. Calls of th
 2 hours apart merge into one call, and the sign of the call is the sign of the step head's size
 output (positive when D8 gains load).
 
-**An offset-model call is the start of an event in its event table.** The event table is the
-H-nbr (or H-own) table with its sign, which is the sign of the event's `amp_mw` read as positive
-when D8 gains load (the code review checks the convention against experiment 734's table). A
-transfer is found when a call of the same sign lies within 6 hours of its injected start, and one
-call matches at most one transfer, with the larger transfer assigned first. The step head's
-predicted size and the offset model's `amp_mw` do not enter the match. A match to an injected end
-edge counts as a match for V1's false-call count, so a call near either injected edge is not false.
+**An offset-model call is the start of an event in its event table.** The event table is the H-nbr
+(or H-own) table with its sign, which is the sign of the event's `amp_mw` read as positive when D8
+gains load (the code review checked the convention against experiment 734's table). A transfer is
+found when a call of the same sign lies within 6 hours of its injected start, and one call matches
+at most one transfer, with the larger transfer assigned first. The step head's predicted size and
+the offset model's `amp_mw` do not enter the match. A match to an injected end edge counts as a
+match for V1's false-call count, so a call near either injected edge is not false.
 
 **The secondary rule also needs an end call.** The head needs an opposite-sign call within 6
 hours of the injected end. The offset model needs an event whose end lies within 6 hours of the
@@ -454,10 +689,10 @@ with a time log.
 ## Open questions before the first run
 
 - **D8's residual series.** Whether the real D8 series of experiment 653 on the 6 months equals the
-  folded reading that experiment 732 used (the code review checks both are MVA and equal to
+  folded reading that experiment 732 used (the code review checked that both are MVA and equal to
   rounding).
-- **Whether the world builder can add the engine and solar arrays.** The code review settles it
-  before any decode, and the "Every handicap" list is updated to match.
+- **Whether the world builder can add the engine and solar arrays.** The code review settled it
+  before any decode, and the "Every handicap" list was updated to match.
 - **Gaps in the residual.** Transfers whose start block has no residual at D8 are dropped from both
   detectors, and the count is reported, together with the discordant counts per month.
 
@@ -501,7 +736,7 @@ with a time log.
 
 ## Files
 
-- `ml-experiments/00736-switching-offset-model-vs-untangler-on-d8/` (to be written):
+- `ml-experiments/00736-switching-offset-model-vs-untangler-on-d8/`:
   `e00736_world.py` re-draws experiment 732's test overlay and builds the 8 worlds;
   `e00736_heads.py` copies the match and isotonic code of the recalibration report, reads the stored
   head predictions, applies the frozen maps, and reproduces the head's table above;
