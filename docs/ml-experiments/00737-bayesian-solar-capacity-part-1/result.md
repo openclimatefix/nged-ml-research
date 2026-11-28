@@ -511,19 +511,23 @@ every number.
   temperature means are trailing means built from `temperature_2m`, the test checks each mean
   against a direct calculation from values at or before the half-hour's end, and the inputs hold no
   forecast column.
-- **G4, the timing convention.** Three conventions meet, and a one-slot error is exactly 30
-  minutes, which a test of the peak against solar noon cannot see (CAMS is hourly). CAMS labels
-  the end of the hour. `half_hour_sun_and_sky` returns half-hour end stamps. The power index `i` of
-  experiment 327's store is the half-hour starting at the origin plus 30 minutes times `i` (the
-  docstring of experiment 660's generator), whereas `baseline_design` takes end times. The code
-  review brief pins the mapping from index to end time. The gate runs on the real half-hourly
-  series: for each Primary, it compares the mean daytime dip of real summer power minus real winter
-  power (April to September against October to March, by half-hour of the day) with the model's
-  unit solar curve for the same two seasons, shifted by -1, 0, and +1 half-hour, and requires the
-  best shift (the one with the highest correlation over the 48 half-hours) to be 0 at each Primary
-  and in the pooled mean. The gate also requires that the real nights carry no CAMS irradiance,
-  and the test calls the real loader on a small fixture shaped like the real file (the second
-  lesson of experiment 729).
+- **G4, the timing convention.** Three conventions meet, and a one-slot error is exactly 30 minutes,
+  which a test of the peak against solar noon cannot see (CAMS is hourly). CAMS labels the end of
+  the hour. `half_hour_sun_and_sky` returns half-hour end stamps. Index `i` of experiment 327's
+  store holds the half-hour that ends at the origin plus 30 minutes times `i` (the `power_mw` column
+  of experiment 6's `features.parquet`, whose `valid_time` is a half-hour end stamp, matches the
+  store at that index in every row), whereas the grid's index `i` ends 30 minutes times `i + 1`
+  after the origin and `baseline_design` takes end times. The loader therefore reads grid index `i`
+  from store index `i + 1` ([Amendment 1](#amendment-1-to-the-plan-of-experiment-737) records the
+  correction). The gate runs on the real half-hourly series: for each Primary, it compares the mean
+  daytime dip of real summer power minus real winter power (April to September against October to
+  March, by half-hour of the day) with the model's unit solar curve for the same two seasons,
+  shifted by -1, 0, and +1 half-hour, and requires the best shift (the one with the highest
+  correlation over the 48 half-hours) to be 0 at each Primary and in the pooled mean. The gate also
+  requires that the real nights carry no CAMS irradiance, and the test calls the real loader on a
+  small fixture shaped like the real file (the second lesson of experiment 729). [Amendment
+  1](#amendment-1-to-the-plan-of-experiment-737) replaces the summer-minus-winter comparison with a
+  same-month comparison of sunny and dull days, and scans the shift in steps of 0.25 half-hour.
 - **G5, convergence.** The expectation-maximisation fit converges in 30 iterations or fewer in 99%
   of the fits, and no fit ends with every quarter's capacity at its bound.
 
@@ -771,3 +775,88 @@ page reports the count of scored quarters per Primary, and the dropped half-hour
   half-real-farm worlds).
 - Written: `data/ml-experiments/00737-bayesian-solar-capacity-part-1/` (never committed): world
   files, fit and posterior tables, score tables, the time log, and the review markers.
+
+## Amendment 1 to the plan of experiment 737 (2026-11-28)
+
+**Date:** 2026-11-28. Written before any scored fit, before any fit of any stage, and after the
+first two runs of the `gates` stage.
+
+### Reason
+
+**The registered G4 compares two seasons, and the winter demand confounds the comparison.** The
+gate correlates the real power of April to September minus October to March, by half-hour of the
+day, with the model's solar curve for the same two seasons. Winter evening demand is much higher
+than summer evening demand, so the real difference is deepest at the winter evening peak and not
+at solar noon. In the first run, the best shift was +1 at each of the six Primaries and in the
+pooled mean, and the minimum of the full-day difference sat in the evening at each Primary. A
+shift of +1 therefore does not show a timing error, because the demand moves the real curve for a
+reason that has nothing to do with the sun.
+
+### What changes
+
+1. **G4 becomes a same-month comparison.** Within each calendar month of April to September of
+   each year, the usable weekdays are ranked by their daily clear-sky index (the day's summed CAMS
+   irradiance over its summed CAMS clear-sky irradiance, over the reliable CAMS hours). For each
+   half-hour of the day, the test takes the mean real power on the days of the top tercile minus
+   its mean on the days of the bottom tercile, and the same difference of the model's unit solar
+   output on the same days, and averages each difference over the months. Both terciles come from
+   one month, so the seasonal swing of the demand cancels.
+2. **The correlation runs over the daylight half-hours, and the shift is scanned.** These are the
+   half-hours at which the sun is up on more than half of the days of April to September. The real
+   difference is correlated with minus the model's difference, delayed by each shift from -2 to
+   +2 half-hours in steps of 0.25 (the model's curve is interpolated linearly between slots). The
+   fleet mix is the prior mix of 20%, 60%, and 20%, and the mix is not tuned. The gate passes when
+   the pooled best shift lies in the range -0.5 to +1.5 half-hours, and each Primary's best shift
+   lies above -1.0 and below +2.0 half-hours. A Primary with no readable difference fails the
+   gate. The gate reports each Primary's and the pooled best shift and the correlation at each
+   shift.
+3. **The usable days and half-hours are fixed in advance.** A weekday is a Monday to Friday that
+   is not a bank holiday, a day is readable when its reliable CAMS hours hold at least 90% of its
+   clear-sky irradiance, and a half-hour of one month is used when at least 3 days of each tercile
+   have a power reading and a reliable CAMS hour there.
+4. **The earlier results stay as diagnostics.** `gates.json` keeps the summer-minus-winter
+   correlations and best shifts under `diagnostic_summer_minus_winter`, and the best shift of the
+   same-month comparison at the integer shifts -1, 0, and +1 under `diagnostic_integer_shift`.
+   Both are marked as not deciding the gate. The registered comparison failed, and the amendment
+   does not hide that.
+5. **The fixture test of the registered plan is added.** A test writes four small files shaped like
+   the real files (the series table, the power and forecast arrays, the CAMS parquet, and the ERA5
+   parquet), calls the real loader `load_primary` on them, and runs the gate on its output with
+   a power series that follows the model, a power series that is one half-hour late, and a power
+   series with an added winter evening peak. A second test checks the index shift against a
+   known-answer store, and a third checks that a series late by a further half-hour fails the scan
+   gate.
+
+### Cause found: the loader read the power one half-hour late
+
+**The power loader was one half-hour late.** The same-month comparison still gave a pooled best
+shift of about +2 half-hours, which is too large for the fleet's lean alone. A diagnosis compared
+the store with the `power_mw` column of experiment 6's `features.parquet`, whose `valid_time` is a
+half-hour end stamp. That column matches the store at index `(valid_time - 2022-01-01) / 30 minutes`
+in every row, so store index `i` holds the half-hour that ends at the origin plus 30 minutes times
+`i`. The loader had treated index `i` as the half-hour that starts there, which delays the power by
+one half-hour relative to the end stamps of the sky, the weather, and the calendar.
+
+### What changes in the loader and the gate
+
+1. **The loader shifts the stored arrays by one index.** Grid index `i` ends at the origin plus 30
+   minutes times `i + 1`, so `load_primary` reads it from store index `i + 1` for the power and
+   for the stored forecast of arm R, and the last grid half-hour has no reading. The farm loader's
+   existing shift by one half-hour stays, because the farm file labels each half-hour with its end
+   stamp. The bank-holiday flags, the day-type columns, and the temperature columns are keyed on
+   the grid's own stamps, so they align with the shifted power, and a test checks the holiday
+   flags.
+2. **The corrected loader gives a pooled best shift of about +1.1 half-hours.** The previous loader
+   gave about +2.1, and that value must fail the gate. The remaining +1.1 half-hours is attributed
+   to the fleet's west lean (west-facing panels peak later than the prior mix) and to the demand's
+   response to the sun. It is not corrected, because tuning the mix or the shape to the real
+   record would fit the gate to the data. The pass rule above (a pooled best shift in the range
+   -0.5 to +1.5 half-hours, and each Primary's best shift above -1.0 and below +2.0) allows this
+   remainder and rejects a loader that is a further half-hour late.
+
+### What does not change
+
+**G4 is a gate, so the amendment changes no bar and no verdict rule.** The other gates, every bar,
+every arm, every verdict rule, the bars B1 to B7, the contrasts C1 and C2, and the verdict table are
+as registered. The same-month comparison needs no fit and reads only inputs that the plan already
+lists, and no scored world has been read. The nights must still carry no CAMS irradiance.
