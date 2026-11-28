@@ -293,7 +293,8 @@ rule, which also looks at the valid time.
 - **Far from the end:** a shift is in force and more than 10 days remain.
 - **Middle:** a shift is in force and the remaining time is above 1 day and at most 10 days.
 - **Near the end:** a shift is in force and the remaining time is above 0 and at most 1 day.
-- **Ended in the last 24 hours:** the shift ended above 0 and at most 24 hours before the origin.
+- **Ended in the last 24 hours:** the shift ended at most 24 hours before the origin (an origin at
+  the half-hour of the end counts).
 - **Event-free:** no shift in force, none ended in the previous 7 days, and none starting before the
   row's valid time.
 - **Context strata, report-only:** onset ahead (the shift starts after the origin and before the
@@ -301,14 +302,17 @@ rule, which also looks at the valid time.
 
 **The expected stratum shares of the scoring worlds come from a simulation of the generator, and the
 data smoke check must match them within 3 points of share (1 point for the near and ended strata).**
-Over origins on days 0 to 29 of a month, the simulated shares are: far 0.38, middle 0.10, near
-0.015, ended in the last 24 hours 0.015, ended 1 to 7 days before 0.088, event-free 0.225, and onset
-ahead 0.17, with 0.50 of origins in force and 0.33 of the in-force origins older than 15 days. The
-clipping of shifts at the window edge moves the shares by under 1 point. "In force" pools far,
-middle, and near, and a shift clipped at the window edge is left out of the strata that use the end.
-The scaling factor pools all strata of a month, so the factor cannot absorb a stratum. The
-event-free stratum can hold a history with a shift that ended 8 to 15 days before the origin, and
-the page reports that share.
+The rows span leads of 1 to 10 days, and the event-free and onset-ahead shares depend on the lead,
+because the valid time moves with it. Over origins on days 0 to 29 of a month, pooled over leads of
+1 to 10 days, the simulated shares are: far 0.38, middle 0.10, near 0.015, ended in the last 24
+hours 0.015, ended 1 to 7 days before 0.09, event-free 0.29, and onset ahead 0.10. With every row
+at a lead of 10 days, event-free is 0.225 and onset ahead 0.17. In both cases 0.50 of origins are in
+force and 0.33 of the in-force origins are older than 15 days. The clipping of shifts at the window
+edge moves the shares by under 1 point. "In force" pools far, middle, and near, and a shift clipped
+at the window edge is left out of the strata that use the end. An origin at the half-hour of the
+shift's end counts as ended in the last 24 hours. The scaling factor pools all strata of a month, so
+the factor cannot absorb a stratum. The event-free stratum can hold a history with a shift that
+ended 8 to 15 days before the origin, and the page reports that share.
 
 ### Contrasts, thresholds, and gates
 
@@ -621,13 +625,24 @@ carries the id as `e00738_`. The implementation plan names each file, its tests,
   diagnostics files.
 - `e00738_score.py`, `e00738_report.py`, and `e00738_members.py` compute every contrast, interval,
   gate, scenario, check, and the member-path check, and print every number of the page.
+- `e00738_protocol.py` adapts the protocol of experiment 713 to score the real record of every arm
+  in the four load-shift scenarios (all rows, outside events, inside events, and the 7 days after an
+  event). The `members` stage runs the 51-path check on `LM` and writes `checks/members.json`.
+- **Exit codes.** A failed CPU task or stage exits with 3. A failed GPU chain exits with 5, as does
+  the known-answer gate's second failure. The gate's first failure exits with 6, and means that the
+  remedy flag is set and `gate-remedy` runs next. A launcher that finds the GPU busy exits with 75
+  and starts nothing. The plan states only the code 5 and "a different code" for the busy GPU.
 - `e00738_gate.py` runs the known-answer gate. `e00738_figures.py` and `e00738_gallery.py` draw the
   figures and the gallery.
 - The tests are `test_e00738_world.py`, `test_e00738_survival.py`, `test_e00738_score.py`,
-  `test_e00738_panel.py`, `test_e00738_run.py`, and `test_e00738_model.py`. The last needs `torch`
-  and skips without it. They cover every pure function, the visibility limit of the level features,
-  the keyword names of `run_task`, every state of the verdict table, the guards, and the existence
-  of every attribute that the scripts take from an imported module.
+  `test_e00738_panel.py`, `test_e00738_run.py`, `test_e00738_model.py`,
+  `test_e00738_attributes.py`, and `test_e00738_dryrun.py`. The last three need `torch` and skip
+  without it. The tests cover every pure function, the visibility limit of the level features, the
+  keyword names of `run_task`, every state of the verdict table, the guards, and the existence of
+  every attribute that the scripts take from an imported module, including lazy imports inside
+  functions. The dry run fits every arm, predicts four panels, scores them, and runs the member-path
+  check on a tiny synthetic fold, on the CPU, in a scratch folder, with every read of the data folder
+  replaced. It runs for about 3 minutes.
 - Read from experiment 713 (`ml-experiments/00713-msa-axial-attention-demand-network-part-1/`): the
   network, inputs, batch, train, and score modules, and the stored stage 1 and stage 3 states and
   forecasts of `M1`, under
