@@ -742,7 +742,8 @@ class WorldFits:
     sd: dict[str, np.ndarray]
     info: dict[str, np.ndarray]
     """Per arm: iterations, converged, daylight scale, night scale, inflation, ratio, evidence,
-    seconds."""
+    seconds, and whether the sandwich covariance was used (1.0) or the fit fell back to
+    `(X' W X)^-1` (0.0)."""
 
 
 def _info(*, fit: FitResult, ratio: float = PRIOR_DC_AC) -> np.ndarray:
@@ -756,6 +757,7 @@ def _info(*, fit: FitResult, ratio: float = PRIOR_DC_AC) -> np.ndarray:
             ratio,
             fit.evidence,
             fit.seconds,
+            float(fit.sandwich),
         ]
     )
 
@@ -800,7 +802,7 @@ def fit_all_arms(
     cap["Q"] = fit_quarters(model=model, power=power)
     sd["Q"] = np.full(N_QUARTERS, np.nan)
     info["Q"] = np.array(
-        [0, 1.0, np.nan, np.nan, 1.0, PRIOR_DC_AC, np.nan, time.perf_counter() - start]
+        [0, 1.0, np.nan, np.nan, 1.0, PRIOR_DC_AC, np.nan, time.perf_counter() - start, np.nan]
     )
     put(arm="Ad", fit=fit_daily(model=model, power=power, prior=rw, ridge_scale=ridge_scale))
     fit_af, ratio = fit_free_ratio(
@@ -844,13 +846,26 @@ def summarise_info(*, tables: list[dict[str, np.ndarray]]) -> pl.DataFrame:
         tables: The loaded arrays of each file.
 
     Returns:
-        Columns `arm`, `n_iter`, and `converged`, one row per fit.
+        Columns `arm`, `n_iter`, `converged`, and `sandwich`, one row per fit.
     """
     rows = []
     for arrays in tables:
         for key, value in arrays.items():
             if key.endswith("_info") and key[:-5] in ("A", "F", "Qt", "Ad", "Af", "O", "R"):
-                rows.append({"arm": key[:-5], "n_iter": int(value[0]), "converged": bool(value[1])})
+                rows.append(
+                    {
+                        "arm": key[:-5],
+                        "n_iter": int(value[0]),
+                        "converged": bool(value[1]),
+                        "sandwich": bool(value[8]) if len(value) > 8 else None,
+                    }
+                )
     return pl.DataFrame(
-        rows, schema={"arm": pl.String, "n_iter": pl.Int64, "converged": pl.Boolean}
+        rows,
+        schema={
+            "arm": pl.String,
+            "n_iter": pl.Int64,
+            "converged": pl.Boolean,
+            "sandwich": pl.Boolean,
+        },
     )

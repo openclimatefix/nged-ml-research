@@ -236,7 +236,7 @@ def task_ocontrol(
         arrays={
             "A_cap": fit.capacity,
             "A_sd": fit.sd,
-            "A_info": np.array([fit.n_iter, fit.converged]),
+            "A_info": np.array([fit.n_iter, fit.converged, 0, 0, 0, 0, 0, 0, fit.sandwich]),
         },
         path=store / "fits" / site / f"ocontrol_{seed}.npz",
     )
@@ -277,7 +277,7 @@ def task_placebo(*, site: str, store: Path, growth_sd: float, ridge_scale: float
         arrays={
             "A_cap": fit.capacity,
             "A_sd": fit.sd,
-            "A_info": np.array([fit.n_iter, fit.converged]),
+            "A_info": np.array([fit.n_iter, fit.converged, 0, 0, 0, 0, 0, 0, fit.sandwich]),
         },
         path=store / "fits" / site / "placebo.npz",
     )
@@ -344,7 +344,7 @@ def task_past(
         arrays={
             "A_cap": fit.capacity,
             "A_sd": fit.sd,
-            "A_info": np.array([fit.n_iter, fit.converged]),
+            "A_info": np.array([fit.n_iter, fit.converged, 0, 0, 0, 0, 0, 0, fit.sandwich]),
         },
         path=store / "past" / site / f"cut{quarter}.npz",
     )
