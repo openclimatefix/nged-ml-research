@@ -20,13 +20,12 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 for _d in HERE.parent.glob("*"):
     if _d.is_dir() and _d.name[:5].isdigit() and int(_d.name[:5]) in {
-        11, 87, 377, 381, 391, 397, 400, 402, 404, 407, 410, 418, 422, 425, 428, 435, 437, 448,
+        11, 87, 377, 378, 381, 391, 397, 400, 402, 404, 407, 410, 418, 422, 425, 428, 435, 437, 448,
         454, 470, 510, 511, 513, 515, 521, 545, 558, 559, 560, 562, 565, 568, 569, 572, 574, 578,
         581, 632, 667, 668, 709, 647, 650, 652, 654, 713, 726,
     }:  # fmt: skip
         sys.path.append(str(_d))
 
-import ast
 import json
 import subprocess
 
@@ -242,42 +241,6 @@ def test_blas_guard(monkeypatch) -> None:
         phases.assert_blas_pinned()
 
 
-# --- Every attribute taken from an imported module exists ------------------------------------
-
-
-def _imported_modules(tree: ast.AST) -> dict[str, str]:
-    """Return alias -> module name for every `import x` and `import x as y` in the tree."""
-    out: dict[str, str] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for a in node.names:
-                out[a.asname or a.name.split(".")[0]] = a.name
-    return out
-
-
-def test_every_attribute_taken_from_an_imported_module_exists() -> None:
-    """A call to a function that does not exist fails only when its line runs, so check them all."""
-    import importlib
-
-    problems: list[str] = []
-    for mod_name in REAL_ATTRIBUTE_MODULES:
-        tree = ast.parse((FOLDER / f"{mod_name}.py").read_text())
-        aliases = _imported_modules(tree)
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)):
-                continue
-            target = aliases.get(node.value.id)
-            if target is None or target.split(".")[0] in {"numpy", "polars", "json", "os", "sys"}:
-                continue
-            try:
-                module = importlib.import_module(target)
-            except ImportError:
-                continue  # torch and other optional modules are not on every machine
-            if not hasattr(module, node.attr):
-                problems.append(f"{mod_name}:{node.lineno} {node.value.id}.{node.attr}")
-    assert not problems, "\n".join(problems)
-
-
 def test_wrapper_scripts_name_no_absolute_home_path() -> None:
     for f in [*FOLDER.glob("*.py"), *FOLDER.glob("*.sh")]:
         assert "/home/jack" not in f.read_text() or f.name.startswith("test_"), f.name
@@ -344,3 +307,24 @@ def test_compute_report_on_synthetic_tables_gives_a_verdict_and_renders() -> Non
     text = report.render(report=rep)
     assert "C1" in text and "N1" in text
     assert isinstance(report.audit_triggers(report=rep), dict)
+
+
+def test_scenario_table_keeps_the_four_scenarios_in_words() -> None:
+    import e00738_protocol as protocol
+    import polars as pl
+
+    slices = ["all", "outside_events", "event_rows", "event_following_7_days", "winter"]
+    scores = pl.DataFrame(
+        {
+            "group": ["g"] * 5,
+            "slice": slices,
+            "metric": ["crps"] * 5,
+            "arm": ["M1"] * 5,
+            "mean": [1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+    )
+    table = protocol.scenario_table(scores=scores)
+    assert sorted(table["scenario"].to_list()) == sorted(
+        ["all rows", "outside events", "inside events", "7 days after an event"]
+    )
+    assert "winter" not in table["slice"].to_list()

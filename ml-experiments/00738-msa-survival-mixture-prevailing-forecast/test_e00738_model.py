@@ -21,7 +21,7 @@ sys.path.insert(0, str(HERE))
 torch = pytest.importorskip("torch", reason="the level head tests need torch (workstation only)")
 for _d in HERE.parent.glob("*"):
     if _d.is_dir() and _d.name[:5].isdigit() and int(_d.name[:5]) in {
-        11, 87, 377, 381, 391, 397, 400, 402, 404, 407, 410, 418, 422, 425, 428, 435, 437, 448,
+        11, 87, 377, 378, 381, 391, 397, 400, 402, 404, 407, 410, 418, 422, 425, 428, 435, 437, 448,
         454, 470, 510, 511, 513, 515, 521, 545, 558, 559, 560, 562, 565, 568, 569, 572, 574, 578,
         581, 632, 667, 668, 709, 647, 650, 652, 654, 713, 726,
     }:  # fmt: skip

@@ -21,7 +21,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 for _d in HERE.parent.glob("*"):
     if _d.is_dir() and _d.name[:5].isdigit() and int(_d.name[:5]) in {
-        11, 87, 377, 381, 391, 397, 400, 402, 404, 407, 410, 418, 422, 425, 428, 435, 437, 448,
+        11, 87, 377, 378, 381, 391, 397, 400, 402, 404, 407, 410, 418, 422, 425, 428, 435, 437, 448,
         454, 470, 510, 511, 513, 515, 521, 545, 558, 559, 560, 562, 565, 568, 569, 572, 574, 578,
         581, 632, 667, 668, 709, 647, 650, 652, 654, 713, 726,
     }:  # fmt: skip
@@ -219,7 +219,7 @@ def test_true_delta_follows_the_ramp() -> None:
 
 
 def test_stratum_shares_of_the_scoring_worlds_match_the_plan() -> None:
-    shares = world.simulate_stratum_shares(lead_days=(10.0,))
+    shares = world.simulate_stratum_shares()
     assert sum(shares[k] for k in (*world.STRATA, "in_force_clipped")) == pytest.approx(1.0)
     for name, want in common.EXPECTED_SHARES.items():
         tol = (
@@ -228,3 +228,12 @@ def test_stratum_shares_of_the_scoring_worlds_match_the_plan() -> None:
             else common.STRATUM_TOLERANCE
         )
         assert shares[name] == pytest.approx(want, abs=tol), name
+
+
+def test_event_free_and_onset_ahead_shares_depend_on_the_lead() -> None:
+    at_10 = world.simulate_stratum_shares(lead_days=(10.0,))
+    for name, want in common.EXPECTED_SHARES_LEAD_10.items():
+        assert at_10[name] == pytest.approx(want, abs=0.01), name
+    pooled = world.simulate_stratum_shares()
+    assert pooled["event_free"] > at_10["event_free"]
+    assert pooled["onset_ahead"] < at_10["onset_ahead"]
